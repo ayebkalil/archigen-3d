@@ -1,0 +1,101 @@
+# =============================================================================
+# ArchiGen 3D - Strict .gitignore Configuration
+# (Strictly complies with syllabus rule: NO heavy weights or raw data on Git!)
+# =============================================================================
+
+# --- Deep Learning Model Weights & Checkpoints (Managed by DVC / ONNX) ---
+*.pt
+*.pth
+*.pwf
+*.onnx
+*.tflite
+*.h5
+*.hdf5
+*.ckpt
+*.safetensors
+*.bin
+models/checkpoints/
+models/saved/
+
+# --- Datasets & Raw Images (Managed strictly by DVC, NOT Git) ---
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+*.zip
+*.tar.gz
+*.tar
+*.rar
+
+# --- MLOps Local Artifacts & Experiment Stores ---
+mlruns/
+mlartifacts/
+.dvc/cache/
+.dvc/tmp/
+
+# --- Python & Environment Artifacts ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+
+# --- Frontend (Node / React) ---
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/out/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Environment Variables & Secrets ---
+.env
+.env.*
+!.env.example
+secrets.json
+
+# --- IDE & OS Cache ---
+.vscode/
+!.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+desktop.ini
