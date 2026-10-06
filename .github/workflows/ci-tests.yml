@@ -36,5 +36,6 @@ jobs:
 
     - name: Run Pytest Suite
       run: |
+        python -m pytest tests/ -v
         cd backend
         python -m pytest tests/ -v

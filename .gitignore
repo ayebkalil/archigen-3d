@@ -34,6 +34,7 @@ data/processed/*
 # --- MLOps Local Artifacts & Experiment Stores ---
 mlruns/
 mlartifacts/
+mlflow.db
 .dvc/cache/
 .dvc/tmp/
 

@@ -1,0 +1,46 @@
+# =============================================================================
+# ArchiGen 3D - Externalized Configuration File
+# Decouples all hyperparameters, data paths, and MLOps settings from code.
+# =============================================================================
+
+project:
+  name: "ArchiGen-3D"
+  experiment_name: "pix2pix-cmp-facades"
+  seed: 42
+
+data:
+  raw_dir: "data/raw/facades"
+  processed_dir: "data/processed/facades"
+  image_size: 256
+  channels: 3
+  num_workers: 2
+
+model:
+  generator:
+    architecture: "unet_256"
+    in_channels: 3
+    out_channels: 3
+    num_filters: 64
+  discriminator:
+    architecture: "patchgan_70"
+    in_channels: 6   # Concatenation of sketch (3) + photo (3)
+    num_filters: 64
+    use_spectral_norm: true
+
+training:
+  epochs: 50
+  batch_size: 4
+  lr_g: 0.0002
+  lr_d: 0.0002
+  beta1: 0.5
+  beta2: 0.999
+  lambda_l1: 100.0   # Weight for L1 reconstruction loss
+  save_sample_freq: 5  # Save visual comparison every N epochs
+
+mlflow:
+  tracking_uri: "sqlite:///mlflow.db"
+  registered_model_name: "ArchiGen-Pix2Pix-Generator"
+
+export:
+  onnx_output_path: "models/saved/generator.onnx"
+  opset_version: 17
