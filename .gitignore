@@ -20,8 +20,12 @@ models/saved/
 # --- Datasets & Raw Images (Managed strictly by DVC, NOT Git) ---
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/*.dvc
+!data/raw/**/.gitignore
 data/processed/*
 !data/processed/.gitkeep
+!data/processed/*.dvc
+!data/processed/**/.gitignore
 *.zip
 *.tar.gz
 *.tar
