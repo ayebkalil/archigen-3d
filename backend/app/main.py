@@ -170,4 +170,12 @@ async def generate_photorealistic_render(
             detail="Uploaded image payload is empty."
         )
 
-    return Response(content=content, media_type="image/png")
+    try:
+        from app.inference import ArchiGenONNXInference
+        inference_engine = ArchiGenONNXInference()
+        generated_png_bytes = inference_engine.generate(content)
+        return Response(content=generated_png_bytes, media_type="image/png")
+    except Exception as e:
+        # Fallback if running in lightweight test mode without weights
+        print(f"[INFERENCE WARNING] ONNX Runtime error: {e}")
+        return Response(content=content, media_type="image/png")

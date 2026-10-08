@@ -26,6 +26,8 @@ data/processed/*
 !data/processed/.gitkeep
 !data/processed/*.dvc
 !data/processed/**/.gitignore
+data/CubiCasa5k/
+data/CubiCasa5K/
 *.zip
 *.tar.gz
 *.tar
