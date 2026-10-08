@@ -1,6 +1,6 @@
 """
-Evaluation, Metric Computation, and ONNX Runtime Export Pipeline.
-Computes PSNR and L1 metrics on the test split, and exports the trained PyTorch
+Evaluation, Metric Computation, and ONNX Runtime Export Pipeline (Enhanced).
+Computes SSIM, PSNR, and L1 metrics on the test split, and exports the trained
 Generator into production-grade ONNX format.
 Satisfies MLOps Criteria:
 - 'Optimisation et quantification ONNX'
@@ -25,26 +25,32 @@ import onnxruntime as ort
 
 from src.data.dataset import FacadesDataset
 from src.models.architecture import UNetGenerator
-
-def calculate_psnr(mse: float) -> float:
-    """Calculates Peak Signal-to-Noise Ratio (PSNR) in dB."""
-    if mse == 0:
-        return 100.0
-    # Values normalized between [-1, 1], dynamic range = 2.0
-    return 20 * math.log10(2.0 / math.sqrt(mse))
+from src.utils.metrics import compute_ssim, compute_psnr
 
 def evaluate_and_export_onnx(
-    checkpoint_path: str = "models/saved/generator_best.pth",
+    checkpoint_path: str = "models/saved/generator_enhanced_best.pth",
     data_dir: str = "data/raw/facades",
-    onnx_output_path: str = "models/saved/generator.onnx"
+    onnx_output_path: str = "models/saved/generator_enhanced.onnx",
+    upsample_mode: str = "nearest"
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[EVALUATION] Starting test evaluation on device: {device}")
 
-    # 1. Instantiate Generator
-    generator = UNetGenerator(in_channels=3, out_channels=3, num_filters=64).to(device)
+    # 1. Instantiate Generator with Anti-Checkerboard Architecture
+    generator = UNetGenerator(
+        in_channels=3,
+        out_channels=3,
+        num_filters=64,
+        upsample_mode=upsample_mode
+    ).to(device)
 
     ckpt_file = Path(checkpoint_path)
+    if not ckpt_file.exists():
+        fallback = Path("models/saved/generator_best.pth")
+        if fallback.exists():
+            print(f"[MODEL] Checkpoint {ckpt_file} not found. Using fallback: {fallback}")
+            ckpt_file = fallback
+
     if ckpt_file.exists():
         print(f"[MODEL] Loading weights from: {ckpt_file}")
         generator.load_state_dict(torch.load(ckpt_file, map_location=device))
@@ -53,14 +59,14 @@ def evaluate_and_export_onnx(
 
     generator.eval()
 
-    # 2. Test Split Evaluation
-    test_dataset = FacadesDataset(root_dir=data_dir, split="test", img_size=256)
+    # 2. Test Split Evaluation with Multi-Metric Suite (L1, PSNR, SSIM)
+    test_dataset = FacadesDataset(root_dir=data_dir, split="test", img_size=256, augment=False)
     test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
     criterion_l1 = nn.L1Loss()
-    criterion_mse = nn.MSELoss()
 
     total_l1 = 0.0
-    total_mse = 0.0
+    total_ssim = 0.0
+    total_psnr = 0.0
 
     with torch.no_grad():
         for batch in test_loader:
@@ -69,16 +75,18 @@ def evaluate_and_export_onnx(
             fake_photo = generator(sketch)
 
             total_l1 += criterion_l1(fake_photo, real_photo).item()
-            total_mse += criterion_mse(fake_photo, real_photo).item()
+            total_ssim += compute_ssim(fake_photo, real_photo)
+            total_psnr += compute_psnr(fake_photo, real_photo)
 
     avg_l1 = total_l1 / len(test_loader)
-    avg_mse = total_mse / len(test_loader)
-    psnr_score = calculate_psnr(avg_mse)
+    avg_ssim = total_ssim / len(test_loader)
+    avg_psnr = total_psnr / len(test_loader)
 
-    print("\n" + "="*50)
+    print("\n" + "="*55)
     print(f"[TEST METRICS] Average L1 Reconstruction Loss: {avg_l1:.4f}")
-    print(f"[TEST METRICS] Peak Signal-to-Noise Ratio (PSNR): {psnr_score:.2f} dB")
-    print("="*50)
+    print(f"[TEST METRICS] Structural Similarity (SSIM):    {avg_ssim:.4f}")
+    print(f"[TEST METRICS] Peak Signal-to-Noise Ratio (PSNR): {avg_psnr:.2f} dB")
+    print("="*55)
 
     # 3. Export to ONNX
     print(f"\n[ONNX EXPORT] Exporting model to: {onnx_output_path} ...")

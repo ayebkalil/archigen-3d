@@ -36,3 +36,15 @@ def test_generator_gradient_flow():
     for name, param in generator.named_parameters():
         if param.requires_grad:
             assert param.grad is not None, f"Zero gradient detected in parameter: {name}"
+
+def test_metrics_ssim_and_psnr():
+    """Verify SSIM and PSNR computation on identical and distinct tensors."""
+    from src.utils.metrics import compute_ssim, compute_psnr
+    t1 = torch.randn(1, 3, 256, 256)
+    
+    # Identical images should have SSIM ~ 1.0 and high PSNR
+    ssim_same = compute_ssim(t1, t1)
+    assert ssim_same > 0.99, f"SSIM of identical images should be ~1.0, got {ssim_same}"
+    
+    psnr_same = compute_psnr(t1, t1)
+    assert psnr_same == 100.0, f"PSNR of identical images should be 100 dB, got {psnr_same}"

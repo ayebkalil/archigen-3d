@@ -37,3 +37,23 @@ def test_dataset_val_split_exists(dataset_root):
     """Verify validation split loading."""
     dataset = FacadesDataset(root_dir=dataset_root, split="val", img_size=256)
     assert len(dataset) == 100, f"Expected 100 validation images, got {len(dataset)}"
+
+def test_data_augmentation_flips_crops_scale_jitter(dataset_root):
+    """
+    Verify that data augmentation (scale jitter, synchronized crops, and flips)
+    generates stochastic variations across calls on the same sample.
+    """
+    dataset_aug = FacadesDataset(root_dir=dataset_root, split="train", img_size=256, augment=True)
+    sample_a = dataset_aug[0]["photo"]
+    sample_b = dataset_aug[0]["photo"]
+    
+    # Stochastic difference must exist between two augmented calls
+    pixel_diff = (sample_a - sample_b).abs().sum().item()
+    assert pixel_diff > 0.0, "Augmented dataset should produce stochastic variations on repeated calls"
+    
+    # Verify that validation set is NOT augmented (anti-leakage)
+    dataset_val = FacadesDataset(root_dir=dataset_root, split="val", img_size=256, augment=False)
+    val_a = dataset_val[0]["photo"]
+    val_b = dataset_val[0]["photo"]
+    val_diff = (val_a - val_b).abs().sum().item()
+    assert val_diff == 0.0, "Validation set must be deterministic with zero data leakage"

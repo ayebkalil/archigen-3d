@@ -41,11 +41,24 @@ class UNetDown(nn.Module):
 
 
 class UNetUp(nn.Module):
-    """Upsampling block: ConvTranspose -> InstanceNorm -> Dropout -> ReLU -> Skip Connection."""
-    def __init__(self, in_size, out_size, dropout=0.0):
+    """
+    Upsampling block:
+    Replaces ConvTranspose2d with Upsample(nearest) + Conv2d to eliminate checkerboard artifacts.
+    (Reference: Odena et al., 'Deconvolution and Checkerboard Artifacts', Distill 2016).
+    """
+    def __init__(self, in_size, out_size, dropout=0.0, upsample_mode="nearest"):
         super().__init__()
+        if upsample_mode == "transpose":
+            up_layer = nn.ConvTranspose2d(in_size, out_size, kernel_size=4, stride=2, padding=1, bias=False)
+        else:
+            # Nearest-neighbor or Bilinear interpolation followed by standard convolution
+            up_layer = nn.Sequential(
+                nn.Upsample(scale_factor=2, mode=upsample_mode),
+                nn.Conv2d(in_size, out_size, kernel_size=3, stride=1, padding=1, bias=False)
+            )
+
         layers = [
-            nn.ConvTranspose2d(in_size, out_size, kernel_size=4, stride=2, padding=1, bias=False),
+            up_layer,
             nn.InstanceNorm2d(out_size),
             nn.ReLU(inplace=True)
         ]
@@ -63,9 +76,11 @@ class UNetGenerator(nn.Module):
     """
     U-Net 256 Generator with 8 downsampling and 7 upsampling stages.
     Skip connections transfer fine details directly from encoder to decoder.
+    Configurable upsample_mode: 'nearest' (prevents checkerboard artifacts) or 'transpose'.
     """
-    def __init__(self, in_channels=3, out_channels=3, num_filters=64):
+    def __init__(self, in_channels=3, out_channels=3, num_filters=64, upsample_mode="nearest"):
         super().__init__()
+        self.upsample_mode = upsample_mode
 
         # Encoder (Downsampling)
         self.down1 = UNetDown(in_channels, num_filters, normalize=False)        # 256 -> 128
@@ -77,19 +92,18 @@ class UNetGenerator(nn.Module):
         self.down7 = UNetDown(num_filters * 8, num_filters * 8)                 # 4 -> 2
         self.down8 = UNetDown(num_filters * 8, num_filters * 8, normalize=False)# 2 -> 1 (Bottleneck)
 
-        # Decoder (Upsampling with Skip Connections)
-        self.up1 = UNetUp(num_filters * 8, num_filters * 8, dropout=0.5)        # 1 -> 2
-        self.up2 = UNetUp(num_filters * 16, num_filters * 8, dropout=0.5)       # 2 -> 4
-        self.up3 = UNetUp(num_filters * 16, num_filters * 8, dropout=0.5)       # 4 -> 8
-        self.up4 = UNetUp(num_filters * 16, num_filters * 8)                    # 8 -> 16
-        self.up5 = UNetUp(num_filters * 16, num_filters * 4)                    # 16 -> 32
-        self.up6 = UNetUp(num_filters * 8, num_filters * 2)                     # 32 -> 64
-        self.up7 = UNetUp(num_filters * 4, num_filters)                         # 64 -> 128
+        # Decoder (Upsampling with Skip Connections without checkerboard artifacts)
+        self.up1 = UNetUp(num_filters * 8, num_filters * 8, dropout=0.5, upsample_mode=upsample_mode) # 1 -> 2
+        self.up2 = UNetUp(num_filters * 16, num_filters * 8, dropout=0.5, upsample_mode=upsample_mode)# 2 -> 4
+        self.up3 = UNetUp(num_filters * 16, num_filters * 8, dropout=0.5, upsample_mode=upsample_mode)# 4 -> 8
+        self.up4 = UNetUp(num_filters * 16, num_filters * 8, upsample_mode=upsample_mode)             # 8 -> 16
+        self.up5 = UNetUp(num_filters * 16, num_filters * 4, upsample_mode=upsample_mode)             # 16 -> 32
+        self.up6 = UNetUp(num_filters * 8, num_filters * 2, upsample_mode=upsample_mode)              # 32 -> 64
+        self.up7 = UNetUp(num_filters * 4, num_filters, upsample_mode=upsample_mode)                  # 64 -> 128
 
         self.final = nn.Sequential(
-            nn.Upsample(scale_factor=2),
-            nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(num_filters * 2, out_channels, kernel_size=4, padding=1),
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(num_filters * 2, out_channels, kernel_size=3, padding=1),
             nn.Tanh()  # Normalizes output to [-1, 1]
         )
 

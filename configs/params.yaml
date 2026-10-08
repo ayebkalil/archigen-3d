@@ -1,11 +1,16 @@
 # =============================================================================
-# ArchiGen 3D - Externalized Configuration File
-# Decouples all hyperparameters, data paths, and MLOps settings from code.
+# ArchiGen 3D - Externalized Configuration File (Enhanced Experiment 2)
+# Features:
+# 1. 200 Epochs Training on RTX 3050.
+# 2. Upsampling Mode: Nearest + Conv (No Checkerboard Artifacts).
+# 3. Synchronized Scale Jittering & Random Cropping Augmentation.
+# 4. Multi-metric Quality Tracking (L1, PSNR, SSIM).
 # =============================================================================
 
 project:
   name: "ArchiGen-3D"
   experiment_name: "pix2pix-cmp-facades"
+  run_name: "pix2pix_enhanced_upsample_200ep"
   seed: 42
 
 data:
@@ -14,6 +19,7 @@ data:
   image_size: 256
   channels: 3
   num_workers: 2
+  augmentation: true
 
 model:
   generator:
@@ -21,6 +27,7 @@ model:
     in_channels: 3
     out_channels: 3
     num_filters: 64
+    upsample_mode: "nearest"   # "nearest" prevents deconvolution checkerboard artifacts
   discriminator:
     architecture: "patchgan_70"
     in_channels: 6   # Concatenation of sketch (3) + photo (3)
@@ -28,19 +35,19 @@ model:
     use_spectral_norm: true
 
 training:
-  epochs: 50
+  epochs: 200
   batch_size: 4
   lr_g: 0.0002
   lr_d: 0.0002
   beta1: 0.5
   beta2: 0.999
   lambda_l1: 100.0   # Weight for L1 reconstruction loss
-  save_sample_freq: 5  # Save visual comparison every N epochs
+  save_sample_freq: 10  # Save visual comparison every 10 epochs
 
 mlflow:
   tracking_uri: "sqlite:///mlflow.db"
-  registered_model_name: "ArchiGen-Pix2Pix-Generator"
+  registered_model_name: "ArchiGen-Pix2Pix-Enhanced"
 
 export:
-  onnx_output_path: "models/saved/generator.onnx"
+  onnx_output_path: "models/saved/generator_enhanced.onnx"
   opset_version: 17

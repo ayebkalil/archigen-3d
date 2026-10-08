@@ -1,10 +1,11 @@
 """
-Training Pipeline with Centralized MLflow Tracking.
-Implements the Minimax training loop for Pix2Pix Conditional GAN.
-Satisfies MLOps Criteria:
-- 'Tracking des expériences' (3/3)
-- 'Versioning des modèles' (3/3)
-- 'Métriques et validation' (3/3)
+Training Pipeline with Centralized MLflow Tracking (Enhanced Experiment 2).
+Features:
+- 200 Epochs Training on RTX 3050 GPU.
+- U-Net with Upsample + Conv (eliminating checkerboard artifacts).
+- Synchronized Scale Jittering & Random Crop Augmentation.
+- SSIM (Structural Similarity) & PSNR Multi-Metric Evaluation.
+- MLflow Tracking & Comparison with Baseline.
 """
 
 import os
@@ -27,6 +28,7 @@ import mlflow.pytorch
 from src.data.dataset import FacadesDataset
 from src.models.architecture import UNetGenerator, PatchGANDiscriminator, weights_init_normal
 from src.utils.seed import seed_everything
+from src.utils.metrics import compute_ssim, compute_psnr
 
 def load_config(config_path: str = "configs/params.yaml") -> dict:
     with open(config_path, "r") as f:
@@ -45,29 +47,34 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
     models_dir.mkdir(parents=True, exist_ok=True)
     samples_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Dataset & Dataloaders
+    # 1. Dataset & Dataloaders with Advanced Augmentation
+    use_aug = config["data"].get("augmentation", True)
     train_dataset = FacadesDataset(
         root_dir=config["data"]["raw_dir"],
         split="train",
-        img_size=config["data"]["image_size"]
+        img_size=config["data"]["image_size"],
+        augment=use_aug
     )
     val_dataset = FacadesDataset(
         root_dir=config["data"]["raw_dir"],
         split="val",
-        img_size=config["data"]["image_size"]
+        img_size=config["data"]["image_size"],
+        augment=False  # Deterministic (prevents Data Leakage)
     )
 
     batch_size = config["training"]["batch_size"]
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False)
 
-    print(f"[DATA] Train samples: {len(train_dataset)}, Val samples: {len(val_dataset)}")
+    print(f"[DATA] Train samples: {len(train_dataset)} (Augmentation: {use_aug}), Val samples: {len(val_dataset)}")
 
-    # 2. Architectures & Weight Initialization
+    # 2. Architectures with Anti-Checkerboard Upsample Mode
+    upsample_mode = config["model"]["generator"].get("upsample_mode", "nearest")
     generator = UNetGenerator(
         in_channels=config["model"]["generator"]["in_channels"],
         out_channels=config["model"]["generator"]["out_channels"],
-        num_filters=config["model"]["generator"]["num_filters"]
+        num_filters=config["model"]["generator"]["num_filters"],
+        upsample_mode=upsample_mode
     ).to(device)
 
     discriminator = PatchGANDiscriminator(
@@ -80,7 +87,7 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
     discriminator.apply(weights_init_normal)
 
     # 3. Loss Functions
-    criterion_GAN = nn.MSELoss()  # LSGAN objective for stable training
+    criterion_GAN = nn.MSELoss()  # LSGAN objective
     criterion_pixelwise = nn.L1Loss()
     lambda_l1 = config["training"]["lambda_l1"]
 
@@ -101,9 +108,10 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
     mlflow.set_experiment(config["project"]["experiment_name"])
 
     epochs = epochs_override if epochs_override is not None else config["training"]["epochs"]
+    run_name = config["project"].get("run_name", "pix2pix_enhanced_upsample_200ep")
 
-    with mlflow.start_run(run_name="pix2pix_unet_patchgan") as run:
-        print(f"[MLFLOW] Run started with ID: {run.info.run_id}")
+    with mlflow.start_run(run_name=run_name) as run:
+        print(f"[MLFLOW] Run '{run_name}' started with ID: {run.info.run_id}")
         
         # Log all hyperparameters
         mlflow.log_params({
@@ -114,12 +122,14 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
             "lambda_l1": lambda_l1,
             "beta1": config["training"]["beta1"],
             "image_size": config["data"]["image_size"],
+            "upsample_mode": upsample_mode,
+            "data_augmentation": use_aug,
             "generator_arch": config["model"]["generator"]["architecture"],
             "discriminator_arch": config["model"]["discriminator"]["architecture"],
             "use_spectral_norm": config["model"]["discriminator"]["use_spectral_norm"]
         })
 
-        best_val_l1 = float("inf")
+        best_val_ssim = 0.0
 
         for epoch in range(1, epochs + 1):
             generator.train()
@@ -133,7 +143,6 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
                 real_a = batch["sketch"].to(device) # Condition (Layout)
                 real_b = batch["photo"].to(device)  # Target (Real Photo)
 
-                # Output shape of discriminator patches
                 patch_h, patch_w = 32, 32
                 valid = torch.ones((real_a.size(0), 1, patch_h, patch_w), device=device)
                 fake = torch.zeros((real_a.size(0), 1, patch_h, patch_w), device=device)
@@ -175,26 +184,36 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
             avg_loss_d = epoch_loss_d / num_batches
             avg_loss_pixel = epoch_loss_pixel / num_batches
 
-            # Validation step
+            # Validation step with SSIM and PSNR
             generator.eval()
             val_l1 = 0.0
+            val_ssim = 0.0
+            val_psnr = 0.0
+
             with torch.no_grad():
                 for val_batch in val_loader:
                     v_real_a = val_batch["sketch"].to(device)
                     v_real_b = val_batch["photo"].to(device)
                     v_fake_b = generator(v_real_a)
+
                     val_l1 += criterion_pixelwise(v_fake_b, v_real_b).item()
+                    val_ssim += compute_ssim(v_fake_b, v_real_b)
+                    val_psnr += compute_psnr(v_fake_b, v_real_b)
 
             avg_val_l1 = val_l1 / len(val_loader)
+            avg_val_ssim = val_ssim / len(val_loader)
+            avg_val_psnr = val_psnr / len(val_loader)
 
-            print(f"[EPOCH {epoch}/{epochs}] Loss_G: {avg_loss_g:.4f} | Loss_D: {avg_loss_d:.4f} | Val_L1: {avg_val_l1:.4f}")
+            print(f"[EPOCH {epoch:03d}/{epochs}] Loss_G: {avg_loss_g:.3f} | Loss_D: {avg_loss_d:.4f} | Val_L1: {avg_val_l1:.4f} | SSIM: {avg_val_ssim:.4f} | PSNR: {avg_val_psnr:.2f} dB")
 
             # Log metrics to MLflow
             mlflow.log_metrics({
                 "loss_G": avg_loss_g,
                 "loss_D": avg_loss_d,
                 "loss_pixel_train": avg_loss_pixel,
-                "loss_pixel_val": avg_val_l1
+                "val_l1": avg_val_l1,
+                "val_ssim": avg_val_ssim,
+                "val_psnr": avg_val_psnr
             }, step=epoch)
 
             # Save visual comparison sample every save_sample_freq epochs
@@ -212,22 +231,22 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
 
                     # Grid: Sketch (Left) -> Generated (Middle) -> Ground Truth (Right)
                     comparison = torch.cat((s_real_a[:2], s_fake_b[:2], s_real_b[:2]), dim=0)
-                    sample_img_path = samples_dir / f"epoch_{epoch:03d}.png"
+                    sample_img_path = samples_dir / f"enhanced_epoch_{epoch:03d}.png"
                     save_image(comparison, sample_img_path, nrow=2, normalize=False)
                     
-                    # Log image artifact directly into MLflow!
+                    # Log image artifact directly into MLflow
                     mlflow.log_artifact(str(sample_img_path), artifact_path="visual_samples")
-                    print(f"  -> Visual sample logged to MLflow: {sample_img_path.name}")
+                    print(f"  -> Visual sample logged: {sample_img_path.name}")
 
-            # Checkpoint best model
-            if avg_val_l1 < best_val_l1:
-                best_val_l1 = avg_val_l1
-                best_ckpt_path = models_dir / "generator_best.pth"
+            # Checkpoint best model based on SSIM
+            if avg_val_ssim > best_val_ssim:
+                best_val_ssim = avg_val_ssim
+                best_ckpt_path = models_dir / "generator_enhanced_best.pth"
                 torch.save(generator.state_dict(), best_ckpt_path)
-                print(f"  -> [CHECKPOINT] New best model saved (Val_L1: {best_val_l1:.4f})")
+                print(f"  -> [CHECKPOINT] New best SSIM model saved (SSIM: {best_val_ssim:.4f}, Val_L1: {avg_val_l1:.4f})")
 
         # 6. Save final model to MLflow Model Registry
-        print("[MLFLOW] Registering best Generator model ...")
+        print("[MLFLOW] Registering Enhanced Generator model ...")
         generator_cpu = generator.to("cpu")
         mlflow.pytorch.log_model(
             pytorch_model=generator_cpu,
@@ -235,7 +254,7 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
             serialization_format="pickle",
             registered_model_name=config["mlflow"]["registered_model_name"]
         )
-        print("[SUCCESS] Training pipeline and Model Registry registration completed successfully!")
+        print("[SUCCESS] Enhanced training pipeline and Model Registry registration completed successfully!")
 
 if __name__ == "__main__":
     epochs = int(sys.argv[1]) if len(sys.argv) > 1 else None
