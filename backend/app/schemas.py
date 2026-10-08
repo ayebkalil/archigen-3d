@@ -30,7 +30,9 @@ class WallSegment(BaseModel):
     id: str = Field(..., example="wall_0")
     polygon_meters: List[List[float]] = Field(...)
     height_m: float = Field(default=2.8)
+    is_exterior: bool = Field(default=False)
     openings: List[Dict[str, Any]] = Field(default=[])
+
 
 class FloorPlanAnalysisResponse(BaseModel):
     total_area_m2: float = Field(..., example=115.0)

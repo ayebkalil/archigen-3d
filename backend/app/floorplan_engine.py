@@ -48,9 +48,10 @@ class FloorplanPipeline:
             cls._instance = cls()
         return cls._instance
 
-    def process_image(self, image_bytes: bytes) -> Dict[str, Any]:
+    def process_image(self, image_bytes: bytes, scale_override: Any = None) -> Dict[str, Any]:
         """
         Takes raw image bytes, runs segmentation, vectorizes to polygons, and returns 3D scene data.
+        Supports manual scale override in meters per pixel.
         """
         raw_img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         iw, ih = raw_img.size
@@ -75,8 +76,8 @@ class FloorplanPipeline:
             logits = self.model(tensor)
             pred_mask = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
 
-        # 2. Geometric Vectorization
-        layout = self.vectorizer.vectorize(pred_mask)
+        # 2. Geometric Vectorization (with exterior detection & scale override)
+        layout = self.vectorizer.vectorize(pred_mask, scale_override_m_per_px=scale_override)
 
         # 3. 3D Scene Generation
         threejs_scene = self.extruder.generate_threejs_scene_data(layout)
@@ -85,3 +86,4 @@ class FloorplanPipeline:
             "layout": layout,
             "threejs_scene": threejs_scene
         }
+

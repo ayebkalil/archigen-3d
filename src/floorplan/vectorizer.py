@@ -10,7 +10,15 @@ import numpy as np
 import cv2
 from shapely.geometry import Polygon, LineString, Point
 
+ROOM_NAMES = {
+    0: "Background", 1: "Living Room", 2: "Bedroom", 3: "Kitchen",
+    4: "Bathroom", 5: "Entry / Hall", 6: "Balcony / Terrace",
+    7: "Storage", 8: "Closet", 9: "Garage", 10: "Office", 11: "Other"
+}
+
 class FloorplanVectorizer:
+
+
     """
     Transforms multi-class floorplan probability masks into vector geometry.
     Classes:
@@ -77,9 +85,17 @@ class FloorplanVectorizer:
             return self.default_door_width_m / median_door_px
         return 0.025  # Standard fallback: 1 pixel ~ 2.5 cm
 
-    def vectorize(self, mask: np.ndarray) -> Dict[str, Any]:
+    def vectorize(
+
+        self,
+        mask: np.ndarray,
+        room_mask: Any = None,
+        struct_mask: Any = None,
+        scale_override_m_per_px: Any = None
+    ) -> Dict[str, Any]:
         """
         Main pipeline: Takes (H, W) class index mask and extracts structured vector layout.
+        Supports optional semantic room_mask and struct_mask (with Wall_External).
         """
         h, w = mask.shape
         wall_binary = (mask == 1).astype(np.uint8)
@@ -91,10 +107,29 @@ class FloorplanVectorizer:
         wall_clean = cv2.morphologyEx(wall_binary, cv2.MORPH_CLOSE, kernel)
         wall_clean = cv2.morphologyEx(wall_clean, cv2.MORPH_OPEN, kernel)
 
-        # 2. Scale estimation
-        scale_m_per_px = self.estimate_scale(door_binary)
+        # 2. Scale estimation with manual override support
+        if scale_override_m_per_px is not None and scale_override_m_per_px > 0:
+            scale_m_per_px = float(scale_override_m_per_px)
+            scale_source = "user_override"
+        else:
+            scale_m_per_px = self.estimate_scale(door_binary)
+            scale_source = "door_width_estimation"
 
-        # 3. Wall Contour extraction and Rectilinear Polygon simplification
+        # 3. Outer Building Shell (Watertight Exterior Envelope)
+        ext_contours, _ = cv2.findContours(wall_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        shell_valid = False
+        building_perimeter_m = 0.0
+
+        if len(ext_contours) > 0:
+            largest_ext = max(ext_contours, key=cv2.contourArea)
+            if cv2.contourArea(largest_ext) > 100:
+                ext_poly_approx = cv2.approxPolyDP(largest_ext, 3.0, True).reshape(-1, 2)
+                if len(ext_poly_approx) >= 3:
+                    shell_poly = Polygon(ext_poly_approx * scale_m_per_px)
+                    shell_valid = shell_poly.is_valid
+                    building_perimeter_m = round(float(shell_poly.length), 2)
+
+        # 4. Wall Contour extraction and Rectilinear Polygon simplification
         wall_contours, _ = cv2.findContours(wall_clean, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         walls = []
         wall_segments = []
@@ -122,9 +157,30 @@ class FloorplanVectorizer:
             # Convert to meters
             poly_meters = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in snapped_poly]
 
+            # Determine if Exterior Wall:
+            # Method A: from struct_mask (class 2 = Wall_External)
+            # Method B: from building envelope proximity
+            is_exterior = False
+            if struct_mask is not None:
+                # Sample pixels under contour
+                wall_patch = np.zeros((h, w), dtype=np.uint8)
+                cv2.drawContours(wall_patch, [cnt], -1, 1, thickness=-1)
+                ext_pixels = np.logical_and(wall_patch == 1, struct_mask == 2).sum()
+                if ext_pixels > 20:
+                    is_exterior = True
+            elif len(ext_contours) > 0:
+                # Fallback: check distance to outer contour
+                M = cv2.moments(cnt)
+                if M["m00"] > 0:
+                    c_pt = (M["m10"] / M["m00"], M["m01"] / M["m00"])
+                    dist_to_ext = cv2.pointPolygonTest(largest_ext, c_pt, True)
+                    if abs(dist_to_ext) < 15.0:
+                        is_exterior = True
+
             # Register wall
             walls.append({
                 "id": f"wall_{wall_id}",
+                "is_exterior": is_exterior,
                 "polygon_px": snapped_poly,
                 "polygon_meters": poly_meters,
                 "area_m2": round(area * (scale_m_per_px ** 2), 2),
@@ -145,7 +201,7 @@ class FloorplanVectorizer:
 
             wall_id += 1
 
-        # 4. Doors & Windows extraction and wall projection
+        # 5. Doors & Windows extraction and wall projection
         def extract_openings(bin_mask: np.ndarray, opening_type: str):
             openings = []
             cnts, _ = cv2.findContours(bin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -195,49 +251,75 @@ class FloorplanVectorizer:
         doors = extract_openings(door_binary, "door")
         windows = extract_openings(window_binary, "window")
 
-        # 5. Extract Room Interior Spaces
-        # Rooms are the connected components of interior spaces (inverse of walls)
-        interior_mask = (wall_clean == 0).astype(np.uint8)
-        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(interior_mask)
+        # 6. Extract Room Interior Spaces with Semantic Room Typing
         rooms = []
         room_idx = 0
         total_interior_area_m2 = 0.0
 
-        for lbl in range(1, num_labels):
-            area_px = stats[lbl, cv2.CC_STAT_AREA]
-            # Ignore background border and tiny noise
-            if area_px < 200 or area_px > (h * w * 0.7):
-                continue
+        if room_mask is not None and np.max(room_mask) > 0:
+            # Semantic rooms extracted directly from room_mask
+            for r_id in range(1, 12):
+                r_bin = (room_mask == r_id).astype(np.uint8)
+                r_cnts, _ = cv2.findContours(r_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                for c in r_cnts:
+                    area_px = cv2.contourArea(c)
+                    if area_px < 50:
+                        continue
+                    area_m2 = round(area_px * (scale_m_per_px ** 2), 2)
+                    total_interior_area_m2 += area_m2
+                    r_approx = cv2.approxPolyDP(c, 2.5, True).reshape(-1, 2)
+                    r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
 
-            area_m2 = round(area_px * (scale_m_per_px ** 2), 2)
-            total_interior_area_m2 += area_m2
+                    M = cv2.moments(c)
+                    cx = (M["m10"] / max(M["m00"], 1e-4)) * scale_m_per_px
+                    cy = (M["m01"] / max(M["m00"], 1e-4)) * scale_m_per_px
 
-            # Extract room boundary polygon
-            room_bin = (labels == lbl).astype(np.uint8)
-            r_cnts, _ = cv2.findContours(room_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if len(r_cnts) > 0:
-                largest_c = max(r_cnts, key=cv2.contourArea)
-                r_approx = cv2.approxPolyDP(largest_c, 3.0, True).reshape(-1, 2)
-                r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
+                    rooms.append({
+                        "id": f"room_{room_idx}",
+                        "room_type": ROOM_NAMES.get(r_id, "Other Room"),
+                        "surface_m2": area_m2,
+                        "centroid_meters": [round(cx, 3), round(cy, 3)],
+                        "polygon_meters": r_poly_m
+                    })
+                    room_idx += 1
+        else:
+            # Geometric Connected Components fallback
+            interior_mask = (wall_clean == 0).astype(np.uint8)
+            num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(interior_mask)
+            for lbl in range(1, num_labels):
+                area_px = stats[lbl, cv2.CC_STAT_AREA]
+                if area_px < 200 or area_px > (h * w * 0.7):
+                    continue
 
-                # Heuristic room type assignment
-                r_type = "Living Room / Common" if area_m2 > 25 else "Bedroom" if area_m2 > 12 else "Bathroom / Storage"
+                area_m2 = round(area_px * (scale_m_per_px ** 2), 2)
+                total_interior_area_m2 += area_m2
+                room_bin = (labels == lbl).astype(np.uint8)
+                r_cnts, _ = cv2.findContours(room_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if len(r_cnts) > 0:
+                    largest_c = max(r_cnts, key=cv2.contourArea)
+                    r_approx = cv2.approxPolyDP(largest_c, 3.0, True).reshape(-1, 2)
+                    r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
+                    r_type = "Living Room / Common" if area_m2 > 25 else "Bedroom" if area_m2 > 12 else "Bathroom / Storage"
 
-                rooms.append({
-                    "id": f"room_{room_idx}",
-                    "room_type": r_type,
-                    "surface_m2": area_m2,
-                    "centroid_meters": [round(centroids[lbl][0] * scale_m_per_px, 3), round(centroids[lbl][1] * scale_m_per_px, 3)],
-                    "polygon_meters": r_poly_m
-                })
-                room_idx += 1
+                    rooms.append({
+                        "id": f"room_{room_idx}",
+                        "room_type": r_type,
+                        "surface_m2": area_m2,
+                        "centroid_meters": [round(centroids[lbl][0] * scale_m_per_px, 3), round(centroids[lbl][1] * scale_m_per_px, 3)],
+                        "polygon_meters": r_poly_m
+                    })
+                    room_idx += 1
 
         return {
             "metadata": {
                 "canvas_size": [w, h],
                 "scale_meters_per_pixel": round(scale_m_per_px, 5),
+                "scale_source": scale_source,
+                "building_perimeter_m": building_perimeter_m,
+                "is_building_shell_valid": shell_valid,
                 "total_surface_m2": round(total_interior_area_m2, 2),
                 "num_walls": len(walls),
+                "num_exterior_walls": sum(1 for w in walls if w.get("is_exterior", False)),
                 "num_rooms": len(rooms),
                 "num_doors": len(doors),
                 "num_windows": len(windows)
@@ -247,3 +329,4 @@ class FloorplanVectorizer:
             "doors": doors,
             "windows": windows
         }
+

@@ -146,10 +146,12 @@ async def analyze_floorplan(file: UploadFile = File(...)):
                 id=w["id"],
                 polygon_meters=w["polygon_meters"],
                 height_m=w.get("height_m", 2.8),
+                is_exterior=w.get("is_exterior", False),
                 openings=w.get("openings", [])
             )
             for w in layout.get("walls", [])
         ]
+
 
         return FloorPlanAnalysisResponse(
             total_area_m2=layout["metadata"].get("total_surface_m2", 0.0),

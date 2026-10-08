@@ -30,7 +30,19 @@ def parse_svg_points(pts_str: str, scale: float, pad_x: int, pad_y: int) -> np.n
             pts.append([int(round(x)), int(round(y))])
     return np.array(pts, dtype=np.int32)
 
+ROOM_CLASSES = {
+    "Background": 0, "LivingRoom": 1, "Bedroom": 2, "Kitchen": 3,
+    "Bath": 4, "Entry": 5, "Outdoor": 6, "Storage": 7,
+    "Closet": 8, "Garage": 9, "Office": 10, "Other": 11
+}
+
+STRUCTURE_CLASSES = {
+    "Background": 0, "Wall_Internal": 1, "Wall_External": 2,
+    "Door": 3, "Window": 4
+}
+
 class CubiCasaDataset(Dataset):
+
     """
     High-performance PyTorch Dataset for CubiCasa5k Floorplan Segmentation.
     Features:
@@ -103,47 +115,75 @@ class CubiCasaDataset(Dataset):
         canvas_img = Image.new("RGB", (size, size), (255, 255, 255))
         canvas_img.paste(img_resized, (pad_x, pad_y))
 
-        # 4. Rasterize ground-truth mask
-        # 0: Background, 1: Wall, 2: Door, 3: Window
-        mask = np.zeros((size, size), dtype=np.uint8)
+        # 4. Rasterize Ground-Truth Masks: Structure + Semantic Room Types
+
+        struct_mask = np.zeros((size, size), dtype=np.uint8)
+        room_mask = np.zeros((size, size), dtype=np.uint8)
 
         for elem in root.iter():
             c = elem.attrib.get("class", "")
+            # Check for Room Spaces
+            if "Space" in c:
+                for r_name, r_id in ROOM_CLASSES.items():
+                    if r_name in c:
+                        for child in elem.iter():
+                            if child.tag.split("}")[-1] == "polygon" and "points" in child.attrib:
+                                pts = parse_svg_points(child.attrib["points"], scale, pad_x, pad_y)
+                                if len(pts) >= 3:
+                                    cv2.fillPoly(room_mask, [pts], r_id)
+                                    break
+                        break
+
+            # Check for Structural Elements (Walls, Doors, Windows)
             for child in elem.iter():
                 tag = child.tag.split("}")[-1]
                 if tag == "polygon" and "points" in child.attrib:
                     pts = parse_svg_points(child.attrib["points"], scale, pad_x, pad_y)
                     if len(pts) >= 3:
                         if "Wall" in c:
-                            cv2.fillPoly(mask, [pts], 1)
+                            if "External" in c:
+                                cv2.fillPoly(struct_mask, [pts], 2) # Wall_External
+                            else:
+                                cv2.fillPoly(struct_mask, [pts], 1) # Wall_Internal
                         elif "Door" in c:
-                            cv2.fillPoly(mask, [pts], 2)
+                            cv2.fillPoly(struct_mask, [pts], 3)     # Door
                         elif "Window" in c:
-                            cv2.fillPoly(mask, [pts], 3)
+                            cv2.fillPoly(struct_mask, [pts], 4)     # Window
+
+        # Legacy 4-class mask (0: bg, 1: wall, 2: door, 3: window)
+        mask_4class = np.zeros((size, size), dtype=np.uint8)
+        mask_4class[(struct_mask == 1) | (struct_mask == 2)] = 1
+        mask_4class[struct_mask == 3] = 2
+        mask_4class[struct_mask == 4] = 3
 
         # 5. Data Augmentation (90 deg rotations, flips)
         if self.augment:
-            # Random horizontal flip
             if np.random.rand() > 0.5:
                 canvas_img = TF.hflip(canvas_img)
-                mask = np.fliplr(mask)
-            # Random vertical flip
+                struct_mask = np.fliplr(struct_mask)
+                room_mask = np.fliplr(room_mask)
+                mask_4class = np.fliplr(mask_4class)
             if np.random.rand() > 0.5:
                 canvas_img = TF.vflip(canvas_img)
-                mask = np.flipud(mask)
-            # Random 90 deg rotation (preserves rectilinear orientation)
+                struct_mask = np.flipud(struct_mask)
+                room_mask = np.flipud(room_mask)
+                mask_4class = np.flipud(mask_4class)
             rot_k = np.random.choice([0, 1, 2, 3])
             if rot_k > 0:
                 canvas_img = canvas_img.rotate(rot_k * 90)
-                mask = np.rot90(mask, rot_k)
+                struct_mask = np.rot90(struct_mask, rot_k)
+                room_mask = np.rot90(room_mask, rot_k)
+                mask_4class = np.rot90(mask_4class, rot_k)
 
         # 6. Tensor conversion and normalization
         img_tensor = TF.to_tensor(canvas_img)
         img_tensor = (img_tensor - self.mean) / self.std
-        mask_tensor = torch.from_numpy(np.ascontiguousarray(mask)).long()
 
         return {
             "image": img_tensor,
-            "mask": mask_tensor,
+            "mask": torch.from_numpy(np.ascontiguousarray(mask_4class)).long(),
+            "struct_mask": torch.from_numpy(np.ascontiguousarray(struct_mask)).long(),
+            "room_mask": torch.from_numpy(np.ascontiguousarray(room_mask)).long(),
             "sample_id": sample_rel_path
         }
+
