@@ -26,8 +26,19 @@ class RoomSegment(BaseModel):
     surface_m2: float = Field(..., example=32.5)
     polygon_points: List[List[float]] = Field(..., example=[[0.0, 0.0], [5.0, 0.0], [5.0, 6.5], [0.0, 6.5]])
 
+class WallSegment(BaseModel):
+    id: str = Field(..., example="wall_0")
+    polygon_meters: List[List[float]] = Field(...)
+    height_m: float = Field(default=2.8)
+    openings: List[Dict[str, Any]] = Field(default=[])
+
 class FloorPlanAnalysisResponse(BaseModel):
     total_area_m2: float = Field(..., example=115.0)
     num_rooms: int = Field(..., example=4)
     rooms: List[RoomSegment]
-    has_garden_or_terrace: bool = Field(..., example=True)
+    walls: List[WallSegment] = Field(default=[])
+    doors: List[Dict[str, Any]] = Field(default=[])
+    windows: List[Dict[str, Any]] = Field(default=[])
+    has_garden_or_terrace: bool = Field(default=False)
+    threejs_scene: Optional[Dict[str, Any]] = Field(default=None)
+

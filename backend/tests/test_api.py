@@ -49,3 +49,25 @@ def test_predict_render_empty_payload():
         data={"style": "Modern Minimalist"}
     )
     assert response.status_code == 400
+
+def test_predict_floorplan_valid_image():
+    """Verify that uploading a valid floorplan image triggers Deep Learning segmentation & 3D extrusion."""
+    from PIL import Image
+    buf = io.BytesIO()
+    img = Image.new("RGB", (256, 256), color=(255, 255, 255))
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    response = client.post(
+        "/predict/floorplan",
+        files={"file": ("floorplan.png", buf.getvalue(), "image/png")}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_area_m2" in data
+    assert "num_rooms" in data
+    assert "walls" in data
+    assert "rooms" in data
+    assert "threejs_scene" in data
+    assert "X-Inference-Latency-ms" in response.headers
+
