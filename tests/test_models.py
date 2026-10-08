@@ -48,3 +48,27 @@ def test_metrics_ssim_and_psnr():
     
     psnr_same = compute_psnr(t1, t1)
     assert psnr_same == 100.0, f"PSNR of identical images should be 100 dB, got {psnr_same}"
+
+def test_feature_matching_and_perceptual_loss():
+    """Verify FeatureMatchingLoss and PerceptualLoss compute valid gradients."""
+    from src.models.losses import FeatureMatchingLoss, PerceptualLoss
+    from src.utils.metrics import compute_lpips
+
+    fm_loss = FeatureMatchingLoss()
+    r_feats = [torch.randn(2, 64, 128, 128)]
+    f_feats = [torch.randn(2, 64, 128, 128, requires_grad=True)]
+    loss_val = fm_loss(r_feats, f_feats)
+    loss_val.backward()
+    assert f_feats[0].grad is not None, "Feature matching gradients must propagate"
+
+    perc_loss = PerceptualLoss(net="squeeze")
+    img_a = torch.randn(2, 3, 256, 256, requires_grad=True)
+    img_b = torch.randn(2, 3, 256, 256)
+    p_val = perc_loss(img_a, img_b)
+    p_val.backward()
+    assert img_a.grad is not None, "Perceptual loss gradients must propagate"
+
+    # LPIPS evaluation function
+    lpips_val = compute_lpips(img_a.detach(), img_b, net="squeeze")
+    assert lpips_val >= 0.0, "LPIPS distance must be non-negative"
+

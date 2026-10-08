@@ -20,6 +20,7 @@ data:
   channels: 3
   num_workers: 2
   augmentation: true
+  color_jitter: false   # Disabled to prevent blur hedging
 
 model:
   generator:
@@ -35,18 +36,21 @@ model:
     use_spectral_norm: true
 
 training:
-  epochs: 200
+  epochs: 100
   batch_size: 4
   lr_g: 0.0002
   lr_d: 0.0002
   beta1: 0.5
   beta2: 0.999
-  lambda_l1: 100.0   # Weight for L1 reconstruction loss
+  lambda_l1: 30.0        # Reduced from 100.0 to prevent pixel averaging / blur
+  lambda_perc: 10.0     # Deep LPIPS Perceptual Loss (recovers sharp textures, window mullions)
+  lambda_fm: 10.0       # Discriminator Multi-Scale Feature Matching Loss
   save_sample_freq: 10  # Save visual comparison every 10 epochs
 
 mlflow:
   tracking_uri: "sqlite:///mlflow.db"
-  registered_model_name: "ArchiGen-Pix2Pix-Enhanced"
+  registered_model_name: "ArchiGen-Pix2Pix-Perceptual"
+
 
 export:
   onnx_output_path: "models/saved/generator_enhanced.onnx"

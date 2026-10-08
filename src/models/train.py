@@ -27,8 +27,9 @@ import mlflow.pytorch
 
 from src.data.dataset import FacadesDataset
 from src.models.architecture import UNetGenerator, PatchGANDiscriminator, weights_init_normal
+from src.models.losses import FeatureMatchingLoss, PerceptualLoss
 from src.utils.seed import seed_everything
-from src.utils.metrics import compute_ssim, compute_psnr
+from src.utils.metrics import compute_ssim, compute_psnr, compute_lpips
 
 def load_config(config_path: str = "configs/params.yaml") -> dict:
     with open(config_path, "r") as f:
@@ -49,18 +50,22 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
 
     # 1. Dataset & Dataloaders with Advanced Augmentation
     use_aug = config["data"].get("augmentation", True)
+    color_jitter = config["data"].get("color_jitter", False)
     train_dataset = FacadesDataset(
         root_dir=config["data"]["raw_dir"],
         split="train",
         img_size=config["data"]["image_size"],
-        augment=use_aug
+        augment=use_aug,
+        color_jitter=color_jitter
     )
     val_dataset = FacadesDataset(
         root_dir=config["data"]["raw_dir"],
         split="val",
         img_size=config["data"]["image_size"],
-        augment=False  # Deterministic (prevents Data Leakage)
+        augment=False,
+        color_jitter=False
     )
+
 
     batch_size = config["training"]["batch_size"]
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -89,7 +94,12 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
     # 3. Loss Functions
     criterion_GAN = nn.MSELoss()  # LSGAN objective
     criterion_pixelwise = nn.L1Loss()
-    lambda_l1 = config["training"]["lambda_l1"]
+    criterion_fm = FeatureMatchingLoss()
+    criterion_perc = PerceptualLoss(net="squeeze").to(device)
+
+    lambda_l1 = config["training"].get("lambda_l1", 30.0)
+    lambda_fm = config["training"].get("lambda_fm", 10.0)
+    lambda_perc = config["training"].get("lambda_perc", 10.0)
 
     # 4. Optimizers
     optimizer_G = torch.optim.Adam(
@@ -108,7 +118,7 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
     mlflow.set_experiment(config["project"]["experiment_name"])
 
     epochs = epochs_override if epochs_override is not None else config["training"]["epochs"]
-    run_name = config["project"].get("run_name", "pix2pix_enhanced_upsample_200ep")
+    run_name = config["project"].get("run_name", "pix2pix_perceptual_sharpness_100ep")
 
     with mlflow.start_run(run_name=run_name) as run:
         print(f"[MLFLOW] Run '{run_name}' started with ID: {run.info.run_id}")
@@ -120,16 +130,20 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
             "lr_g": config["training"]["lr_g"],
             "lr_d": config["training"]["lr_d"],
             "lambda_l1": lambda_l1,
+            "lambda_fm": lambda_fm,
+            "lambda_perc": lambda_perc,
             "beta1": config["training"]["beta1"],
             "image_size": config["data"]["image_size"],
             "upsample_mode": upsample_mode,
             "data_augmentation": use_aug,
+            "color_jitter": color_jitter,
             "generator_arch": config["model"]["generator"]["architecture"],
             "discriminator_arch": config["model"]["discriminator"]["architecture"],
             "use_spectral_norm": config["model"]["discriminator"]["use_spectral_norm"]
         })
 
-        best_val_ssim = 0.0
+        best_val_lpips = 999.0
+
 
         for epoch in range(1, epochs + 1):
             generator.train()
@@ -152,11 +166,23 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
                 # ------------------
                 optimizer_G.zero_grad()
                 fake_b = generator(real_a)
-                pred_fake = discriminator(real_a, fake_b)
 
+                # 1. Adversarial GAN loss & Feature Matching
+                pred_fake, fake_features = discriminator.forward_features(real_a, fake_b)
                 loss_GAN = criterion_GAN(pred_fake, valid)
+
+                with torch.no_grad():
+                    _, real_features = discriminator.forward_features(real_a, real_b)
+                loss_FM = criterion_fm(real_features, fake_features)
+
+                # 2. Pixelwise L1 loss (reduced weight to prevent blur)
                 loss_pixel = criterion_pixelwise(fake_b, real_b)
-                loss_G = loss_GAN + lambda_l1 * loss_pixel
+
+                # 3. Deep Perceptual LPIPS Loss (forces sharp edges, mullions, textures)
+                loss_perc = criterion_perc(fake_b, real_b)
+
+                # Total Generator loss
+                loss_G = loss_GAN + lambda_l1 * loss_pixel + lambda_fm * loss_FM + lambda_perc * loss_perc
 
                 loss_G.backward()
                 optimizer_G.step()
@@ -184,11 +210,12 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
             avg_loss_d = epoch_loss_d / num_batches
             avg_loss_pixel = epoch_loss_pixel / num_batches
 
-            # Validation step with SSIM and PSNR
+            # Validation step with SSIM, PSNR, and LPIPS
             generator.eval()
             val_l1 = 0.0
             val_ssim = 0.0
             val_psnr = 0.0
+            val_lpips = 0.0
 
             with torch.no_grad():
                 for val_batch in val_loader:
@@ -199,12 +226,14 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
                     val_l1 += criterion_pixelwise(v_fake_b, v_real_b).item()
                     val_ssim += compute_ssim(v_fake_b, v_real_b)
                     val_psnr += compute_psnr(v_fake_b, v_real_b)
+                    val_lpips += compute_lpips(v_fake_b, v_real_b, net="squeeze")
 
             avg_val_l1 = val_l1 / len(val_loader)
             avg_val_ssim = val_ssim / len(val_loader)
             avg_val_psnr = val_psnr / len(val_loader)
+            avg_val_lpips = val_lpips / len(val_loader)
 
-            print(f"[EPOCH {epoch:03d}/{epochs}] Loss_G: {avg_loss_g:.3f} | Loss_D: {avg_loss_d:.4f} | Val_L1: {avg_val_l1:.4f} | SSIM: {avg_val_ssim:.4f} | PSNR: {avg_val_psnr:.2f} dB")
+            print(f"[EPOCH {epoch:03d}/{epochs}] Loss_G: {avg_loss_g:.2f} | Loss_D: {avg_loss_d:.4f} | LPIPS: {avg_val_lpips:.4f} | SSIM: {avg_val_ssim:.4f} | PSNR: {avg_val_psnr:.2f} dB | Val_L1: {avg_val_l1:.4f}")
 
             # Log metrics to MLflow
             mlflow.log_metrics({
@@ -213,7 +242,8 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
                 "loss_pixel_train": avg_loss_pixel,
                 "val_l1": avg_val_l1,
                 "val_ssim": avg_val_ssim,
-                "val_psnr": avg_val_psnr
+                "val_psnr": avg_val_psnr,
+                "val_lpips": avg_val_lpips
             }, step=epoch)
 
             # Save visual comparison sample every save_sample_freq epochs
@@ -231,19 +261,20 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
 
                     # Grid: Sketch (Left) -> Generated (Middle) -> Ground Truth (Right)
                     comparison = torch.cat((s_real_a[:2], s_fake_b[:2], s_real_b[:2]), dim=0)
-                    sample_img_path = samples_dir / f"enhanced_epoch_{epoch:03d}.png"
+                    sample_img_path = samples_dir / f"perceptual_epoch_{epoch:03d}.png"
                     save_image(comparison, sample_img_path, nrow=2, normalize=False)
                     
                     # Log image artifact directly into MLflow
                     mlflow.log_artifact(str(sample_img_path), artifact_path="visual_samples")
                     print(f"  -> Visual sample logged: {sample_img_path.name}")
 
-            # Checkpoint best model based on SSIM
-            if avg_val_ssim > best_val_ssim:
-                best_val_ssim = avg_val_ssim
-                best_ckpt_path = models_dir / "generator_enhanced_best.pth"
+            # Checkpoint best model based on LPIPS (perceptual sharpness)
+            if avg_val_lpips < best_val_lpips:
+                best_val_lpips = avg_val_lpips
+                best_ckpt_path = models_dir / "generator_perceptual_best.pth"
                 torch.save(generator.state_dict(), best_ckpt_path)
-                print(f"  -> [CHECKPOINT] New best SSIM model saved (SSIM: {best_val_ssim:.4f}, Val_L1: {avg_val_l1:.4f})")
+                print(f"  -> [CHECKPOINT] New best LPIPS model saved (LPIPS: {best_val_lpips:.4f}, SSIM: {avg_val_ssim:.4f})")
+
 
         # 6. Save final model to MLflow Model Registry
         print("[MLFLOW] Registering Enhanced Generator model ...")

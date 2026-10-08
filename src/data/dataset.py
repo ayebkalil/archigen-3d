@@ -20,7 +20,7 @@ class FacadesDataset(Dataset):
     2. Synchronized Random Horizontal Flip.
     3. Strict isolation: Augmentation applies ONLY to training split (prevents Data Leakage).
     """
-    def __init__(self, root_dir: str, split: str = "train", img_size: int = 256, augment: bool = True):
+    def __init__(self, root_dir: str, split: str = "train", img_size: int = 256, augment: bool = True, color_jitter: bool = False):
         self.split_dir = Path(root_dir) / split
         if not self.split_dir.exists():
             raise FileNotFoundError(f"Split directory not found: {self.split_dir}")
@@ -29,6 +29,7 @@ class FacadesDataset(Dataset):
         self.img_size = img_size
         self.split = split
         self.augment = augment and (split == "train")
+        self.color_jitter = color_jitter
 
         self.normalize = transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
 
@@ -63,8 +64,8 @@ class FacadesDataset(Dataset):
                 photo = TF.hflip(photo)
                 sketch = TF.hflip(sketch)
 
-            # 4. Subtle Color Jitter on target photo only (brightness & contrast variation)
-            if random.random() > 0.5:
+            # 4. Subtle Color Jitter on target photo only (optional, disabled by default to prevent blur)
+            if self.color_jitter and random.random() > 0.5:
                 photo = TF.adjust_brightness(photo, brightness_factor=random.uniform(0.9, 1.1))
                 photo = TF.adjust_contrast(photo, contrast_factor=random.uniform(0.9, 1.1))
         else:

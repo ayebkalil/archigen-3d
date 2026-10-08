@@ -147,19 +147,36 @@ class PatchGANDiscriminator(nn.Module):
             layers.append(nn.LeakyReLU(0.2, inplace=True))
             return layers
 
-        self.model = nn.Sequential(
-            *disc_block(in_channels, num_filters, normalization=False), # 256 -> 128
-            *disc_block(num_filters, num_filters * 2),                  # 128 -> 64
-            *disc_block(num_filters * 2, num_filters * 4),              # 64 -> 32
+        # Build multi-scale stages for Feature Matching Loss (Pix2PixHD style)
+        self.stage1 = nn.Sequential(*disc_block(in_channels, num_filters, normalization=False)) # 256 -> 128
+        self.stage2 = nn.Sequential(*disc_block(num_filters, num_filters * 2))                  # 128 -> 64
+        self.stage3 = nn.Sequential(*disc_block(num_filters * 2, num_filters * 4))              # 64 -> 32
+        self.stage4 = nn.Sequential(
             nn.ZeroPad2d((1, 0, 1, 0)),
             nn.Conv2d(num_filters * 4, num_filters * 8, kernel_size=4, padding=1, bias=False),
             nn.InstanceNorm2d(num_filters * 8),
-            nn.LeakyReLU(0.2, inplace=True),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        self.stage5 = nn.Sequential(
             nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(num_filters * 8, 1, kernel_size=4, padding=1)     # 1-channel Patch prediction
+            nn.Conv2d(num_filters * 8, 1, kernel_size=4, padding=1)
         )
 
     def forward(self, img_a, img_b):
-        # Concatenate condition (sketch) and image (real or fake photo) along channel axis
         img_input = torch.cat((img_a, img_b), 1)
-        return self.model(img_input)
+        x = self.stage1(img_input)
+        x = self.stage2(x)
+        x = self.stage3(x)
+        x = self.stage4(x)
+        return self.stage5(x)
+
+    def forward_features(self, img_a, img_b):
+        """Returns the final prediction plus intermediate feature activations for Feature Matching Loss."""
+        img_input = torch.cat((img_a, img_b), 1)
+        f1 = self.stage1(img_input)
+        f2 = self.stage2(f1)
+        f3 = self.stage3(f2)
+        f4 = self.stage4(f3)
+        out = self.stage5(f4)
+        return out, [f1, f2, f3, f4]
+

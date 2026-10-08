@@ -25,10 +25,10 @@ import onnxruntime as ort
 
 from src.data.dataset import FacadesDataset
 from src.models.architecture import UNetGenerator
-from src.utils.metrics import compute_ssim, compute_psnr
+from src.utils.metrics import compute_ssim, compute_psnr, compute_lpips
 
 def evaluate_and_export_onnx(
-    checkpoint_path: str = "models/saved/generator_enhanced_best.pth",
+    checkpoint_path: str = "models/saved/generator_perceptual_best.pth",
     data_dir: str = "data/raw/facades",
     onnx_output_path: str = "models/saved/generator_enhanced.onnx",
     upsample_mode: str = "nearest"
@@ -46,7 +46,7 @@ def evaluate_and_export_onnx(
 
     ckpt_file = Path(checkpoint_path)
     if not ckpt_file.exists():
-        fallback = Path("models/saved/generator_best.pth")
+        fallback = Path("models/saved/generator_enhanced_best.pth")
         if fallback.exists():
             print(f"[MODEL] Checkpoint {ckpt_file} not found. Using fallback: {fallback}")
             ckpt_file = fallback
@@ -59,7 +59,7 @@ def evaluate_and_export_onnx(
 
     generator.eval()
 
-    # 2. Test Split Evaluation with Multi-Metric Suite (L1, PSNR, SSIM)
+    # 2. Test Split Evaluation with Multi-Metric Suite (L1, PSNR, SSIM, LPIPS)
     test_dataset = FacadesDataset(root_dir=data_dir, split="test", img_size=256, augment=False)
     test_loader = DataLoader(test_dataset, batch_size=4, shuffle=False)
     criterion_l1 = nn.L1Loss()
@@ -67,6 +67,7 @@ def evaluate_and_export_onnx(
     total_l1 = 0.0
     total_ssim = 0.0
     total_psnr = 0.0
+    total_lpips = 0.0
 
     with torch.no_grad():
         for batch in test_loader:
@@ -77,16 +78,20 @@ def evaluate_and_export_onnx(
             total_l1 += criterion_l1(fake_photo, real_photo).item()
             total_ssim += compute_ssim(fake_photo, real_photo)
             total_psnr += compute_psnr(fake_photo, real_photo)
+            total_lpips += compute_lpips(fake_photo, real_photo, net="squeeze")
 
     avg_l1 = total_l1 / len(test_loader)
     avg_ssim = total_ssim / len(test_loader)
     avg_psnr = total_psnr / len(test_loader)
+    avg_lpips = total_lpips / len(test_loader)
 
     print("\n" + "="*55)
-    print(f"[TEST METRICS] Average L1 Reconstruction Loss: {avg_l1:.4f}")
-    print(f"[TEST METRICS] Structural Similarity (SSIM):    {avg_ssim:.4f}")
-    print(f"[TEST METRICS] Peak Signal-to-Noise Ratio (PSNR): {avg_psnr:.2f} dB")
+    print(f"[TEST METRICS] LPIPS Perceptual Distance (lower is better): {avg_lpips:.4f}")
+    print(f"[TEST METRICS] Structural Similarity (SSIM):                {avg_ssim:.4f}")
+    print(f"[TEST METRICS] Peak Signal-to-Noise Ratio (PSNR):           {avg_psnr:.2f} dB")
+    print(f"[TEST METRICS] Average L1 Reconstruction Loss:              {avg_l1:.4f}")
     print("="*55)
+
 
     # 3. Export to ONNX
     print(f"\n[ONNX EXPORT] Exporting model to: {onnx_output_path} ...")

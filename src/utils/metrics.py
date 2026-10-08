@@ -62,3 +62,20 @@ def compute_psnr(img1: torch.Tensor, img2: torch.Tensor) -> float:
     # Dynamic range for [-1, 1] is 2.0
     max_pixel = 2.0
     return 20 * math.log10(max_pixel / math.sqrt(mse))
+
+_lpips_fn = None
+
+def compute_lpips(img1: torch.Tensor, img2: torch.Tensor, net: str = "alex") -> float:
+    """
+    Computes Learned Perceptual Image Patch Similarity (LPIPS).
+    Lower is better (0.0 = perceptually identical).
+    Captures human perception of sharpness, texture, and structural clarity.
+    """
+    global _lpips_fn
+    import lpips
+    if _lpips_fn is None:
+        _lpips_fn = lpips.LPIPS(net=net, verbose=False).to(img1.device)
+    with torch.no_grad():
+        dist = _lpips_fn(img1, img2)
+        return dist.mean().item()
+
