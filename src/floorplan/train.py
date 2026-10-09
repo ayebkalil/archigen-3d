@@ -33,7 +33,8 @@ def train_floorplan_multitask(
     img_size: int = 512,
     max_train_samples: Optional[int] = None,
     max_val_samples: Optional[int] = None,
-    device_str: Optional[str] = None
+    device_str: Optional[str] = None,
+    resume: Optional[str] = None
 ):
     seed_everything(42)
     device = torch.device(device_str or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -70,8 +71,8 @@ def train_floorplan_multitask(
     ).to(device)
 
     # 3. Loss Functions
-    # Structure weights: Background=1.0, Wall_Int=4.0, Wall_Ext=5.0, Door=8.0, Window=6.0
-    struct_weights = torch.tensor([1.0, 4.0, 5.0, 8.0, 6.0]).to(device)
+    # Structure weights: Background=1.0, Wall_Int=5.0, Wall_Ext=5.0, Door=12.0, Window=8.0
+    struct_weights = torch.tensor([1.0, 5.0, 5.0, 12.0, 8.0]).to(device)
     criterion_struct_ce = nn.CrossEntropyLoss(weight=struct_weights)
     criterion_struct_dice = smp.losses.DiceLoss(mode="multiclass", classes=[1, 2, 3, 4])
 
@@ -89,6 +90,9 @@ def train_floorplan_multitask(
         loss_r = criterion_room_ce(r_logits, r_targets) + 1.0 * criterion_room_dice(r_logits, r_targets)
         return loss_s + 0.8 * loss_r, loss_s, loss_r
 
+    # Fixed 6 validation samples for visual progress tracking
+    fixed_val_samples = [val_dataset[i] for i in range(min(6, len(val_dataset)))]
+
     # 4. Optimizer & Scheduler
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-2)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
@@ -98,8 +102,24 @@ def train_floorplan_multitask(
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow.set_experiment("floorplan-multitask-unetpp")
 
+    start_epoch = 1
     best_score = 0.0
     best_ckpt_path = models_dir / f"multitask_{encoder_name}_best.pth"
+
+    if resume and Path(resume).exists():
+        print(f"[RESUME] Loading checkpoint from {resume}...")
+        ckpt = torch.load(resume, map_location=device)
+        model.load_state_dict(ckpt["model_state_dict"])
+        if "optimizer_state_dict" in ckpt:
+            try:
+                optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+            except Exception as e:
+                print(f"[WARNING] Could not restore optimizer state: {e}")
+        start_epoch = ckpt.get("epoch", 0) + 1
+        if "val_metrics" in ckpt:
+            vm = ckpt["val_metrics"]
+            best_score = 0.5 * vm.get("merged_wall_iou", 0) + 0.3 * vm.get("room_miou", 0) + 0.2 * vm.get("door_iou", 0)
+        print(f"[RESUME] Resuming from Epoch {start_epoch} (Previous Best Score: {best_score*100:.2f}%)")
 
     with mlflow.start_run(run_name=f"multitask_unetpp_{encoder_name}_{epochs}ep") as run:
         print(f"[MLFLOW] Started Run ID: {run.info.run_id}")
@@ -115,7 +135,7 @@ def train_floorplan_multitask(
             "device": str(device)
         })
 
-        for epoch in range(1, epochs + 1):
+        for epoch in range(start_epoch, epochs + 1):
             model.train()
             train_loss_accum = 0.0
             train_s_loss_accum = 0.0
@@ -172,8 +192,12 @@ def train_floorplan_multitask(
                 "learning_rate": scheduler.get_last_lr()[0]
             }, step=epoch)
 
-            # Combined score for checkpoint selection
-            combined_score = 0.6 * val_metrics["merged_wall_iou"] + 0.4 * val_metrics["room_miou"]
+            # Visual overlay logging every 5 epochs
+            if epoch % 5 == 0 or epoch == 1 or epoch == epochs:
+                save_val_grid(model, fixed_val_samples, device, epoch, Path("models/samples"))
+
+            # Composite score on validation (Wall 50%, Room 30%, Door 20%)
+            combined_score = 0.5 * val_metrics["merged_wall_iou"] + 0.3 * val_metrics["room_miou"] + 0.2 * val_metrics["door_iou"]
             if combined_score > best_score:
                 best_score = combined_score
                 torch.save({
@@ -184,7 +208,7 @@ def train_floorplan_multitask(
                     "encoder_name": encoder_name,
                     "img_size": img_size
                 }, best_ckpt_path)
-                print(f"  -> [CHECKPOINT] Saved best model to {best_ckpt_path} (Combined Score: {best_score*100:.2f}%)")
+                print(f"  -> [CHECKPOINT] Saved best model to {best_ckpt_path} (Composite Score: {best_score*100:.2f}%)")
 
         # 6. Final Evaluation on Test Split using Best Checkpoint
         print(f"\n[EVALUATION] Loading best checkpoint from {best_ckpt_path} for Test Split...")
@@ -291,6 +315,90 @@ def evaluate_loader(model, loader, device, loss_fn) -> Dict[str, float]:
         "room_acc": room_acc
     }
 
+def save_val_grid(model, fixed_samples, device, epoch: int, output_dir: Path):
+    """Renders and logs a 6-sample ground-truth vs prediction validation grid to MLflow."""
+    import cv2
+    import numpy as np
+    from PIL import Image
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    model.eval()
+
+    # Color palettes (BGR for OpenCV)
+    # Struct: 0: BG, 1: Wall_Int (orange), 2: Wall_Ext (red), 3: Door (green), 4: Window (cyan)
+    STRUCT_COLORS = {
+        0: [255, 255, 255],
+        1: [0, 140, 255],   # Orange
+        2: [0, 0, 230],     # Red
+        3: [0, 200, 0],     # Green
+        4: [230, 216, 0]    # Cyan
+    }
+
+    ROOM_PALETTE = [
+        [240, 240, 240], [255, 180, 50], [180, 50, 255], [50, 180, 255],
+        [50, 255, 180], [255, 220, 50], [100, 255, 100], [150, 150, 150],
+        [180, 180, 180], [100, 100, 100], [200, 150, 255], [220, 220, 220]
+    ]
+
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+
+    vis_rows = []
+    with torch.no_grad():
+        for sample in fixed_samples:
+            img_t = sample["image"]
+            denorm = (img_t * std + mean).clamp(0, 1)
+            raw_rgb = (denorm.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+            raw_bgr = cv2.cvtColor(raw_rgb, cv2.COLOR_RGB2BGR)
+
+            inp = img_t.unsqueeze(0).to(device)
+            with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
+                out = model(inp)
+            p_s = torch.argmax(out["struct"], dim=1)[0].cpu().numpy()
+            p_r = torch.argmax(out["room"], dim=1)[0].cpu().numpy()
+
+            gt_s = sample["struct_mask"].numpy()
+            gt_r = sample["room_mask"].numpy()
+
+            # Colorize masks
+            h, w = p_s.shape
+            vis_gt_s = np.zeros((h, w, 3), dtype=np.uint8)
+            vis_pred_s = np.zeros((h, w, 3), dtype=np.uint8)
+            for c_id, col in STRUCT_COLORS.items():
+                vis_gt_s[gt_s == c_id] = col
+                vis_pred_s[p_s == c_id] = col
+
+            vis_gt_r = np.zeros((h, w, 3), dtype=np.uint8)
+            vis_pred_r = np.zeros((h, w, 3), dtype=np.uint8)
+            for c_id, col in enumerate(ROOM_PALETTE):
+                vis_gt_r[gt_r == c_id] = col
+                vis_pred_r[p_r == c_id] = col
+
+            # Blend with input image (30% raw, 70% mask)
+            blend_gt_s = cv2.addWeighted(raw_bgr, 0.35, vis_gt_s, 0.65, 0)
+            blend_pred_s = cv2.addWeighted(raw_bgr, 0.35, vis_pred_s, 0.65, 0)
+            blend_gt_r = cv2.addWeighted(raw_bgr, 0.35, vis_gt_r, 0.65, 0)
+            blend_pred_r = cv2.addWeighted(raw_bgr, 0.35, vis_pred_r, 0.65, 0)
+
+            # Stack 1 sample column: [Raw, GT Struct, Pred Struct, GT Room, Pred Room]
+            sample_col = np.vstack([
+                cv2.resize(raw_bgr, (180, 180)),
+                cv2.resize(blend_gt_s, (180, 180)),
+                cv2.resize(blend_pred_s, (180, 180)),
+                cv2.resize(blend_gt_r, (180, 180)),
+                cv2.resize(blend_pred_r, (180, 180))
+            ])
+            vis_rows.append(sample_col)
+
+    if vis_rows:
+        grid = np.hstack(vis_rows)
+        save_path = output_dir / f"val_grid_epoch_{epoch:03d}.png"
+        cv2.imwrite(str(save_path), grid)
+        try:
+            mlflow.log_artifact(str(save_path), artifact_path="val_visualizations")
+        except Exception:
+            pass
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-Task Floorplan UNet++ Training")
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
@@ -300,6 +408,7 @@ if __name__ == "__main__":
     parser.add_argument("--encoder", type=str, default="resnet34", help="Backbone encoder")
     parser.add_argument("--max_train_samples", type=int, default=None, help="Limit train samples for fast benchmark")
     parser.add_argument("--max_val_samples", type=int, default=None, help="Limit val samples")
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training from")
     args = parser.parse_args()
 
     train_floorplan_multitask(
@@ -309,5 +418,6 @@ if __name__ == "__main__":
         lr=args.lr,
         img_size=args.img_size,
         max_train_samples=args.max_train_samples,
-        max_val_samples=args.max_val_samples
+        max_val_samples=args.max_val_samples,
+        resume=args.resume
     )

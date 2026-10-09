@@ -101,11 +101,19 @@ class UNetGenerator(nn.Module):
         self.up6 = UNetUp(num_filters * 8, num_filters * 2, upsample_mode=upsample_mode)              # 32 -> 64
         self.up7 = UNetUp(num_filters * 4, num_filters, upsample_mode=upsample_mode)                  # 64 -> 128
 
-        self.final = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode="nearest"),
-            nn.Conv2d(num_filters * 2, out_channels, kernel_size=3, padding=1),
-            nn.Tanh()  # Normalizes output to [-1, 1]
-        )
+        if upsample_mode == "transpose":
+            self.final = nn.Sequential(
+                nn.Upsample(scale_factor=2),
+                nn.ZeroPad2d((1, 0, 1, 0)),
+                nn.Conv2d(num_filters * 2, out_channels, 4, padding=1),
+                nn.Tanh()
+            )
+        else:
+            self.final = nn.Sequential(
+                nn.Upsample(scale_factor=2, mode="nearest"),
+                nn.Conv2d(num_filters * 2, out_channels, kernel_size=3, padding=1),
+                nn.Tanh()  # Normalizes output to [-1, 1]
+            )
 
     def forward(self, x):
         d1 = self.down1(x)

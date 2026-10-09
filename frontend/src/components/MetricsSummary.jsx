@@ -1,5 +1,21 @@
 import React from 'react';
-import { Home, ShieldCheck, Maximize2, LayoutGrid, CheckCircle } from 'lucide-react';
+import { Home, ShieldCheck, Maximize2, LayoutGrid, CheckCircle, AlertTriangle } from 'lucide-react';
+
+function checkRoomPlausibility(room) {
+  const t = (room.room_type || '').toLowerCase();
+  const s = room.surface_m2 || 0;
+  if (t.includes('bed')) {
+    if (s < 5.0) return { flag: true, warning: 'Bedroom < 5 m² (under standard living norm)' };
+    if (s > 45.0) return { flag: true, warning: 'Bedroom > 45 m² (unusually large)' };
+  } else if (t.includes('bath')) {
+    if (s < 1.8) return { flag: true, warning: 'Bathroom < 1.8 m² (under sanitary code minimum)' };
+    if (s > 20.0) return { flag: true, warning: 'Bathroom > 20 m² (unusually large)' };
+  } else if (t.includes('kitchen')) {
+    if (s < 3.0) return { flag: true, warning: 'Kitchen < 3 m² (cramped)' };
+    if (s > 40.0) return { flag: true, warning: 'Kitchen > 40 m² (unusually large)' };
+  }
+  return { flag: false, warning: null };
+}
 
 export default function MetricsSummary({ layout, frontWallId }) {
   if (!layout) return null;
@@ -9,6 +25,13 @@ export default function MetricsSummary({ layout, frontWallId }) {
   const walls = layout.walls || [];
   const totalArea = metadata.total_surface_m2 || 0;
   const isShellValid = metadata.is_building_shell_valid ?? true;
+
+  // Run architectural plausibility checks
+  const plausibilityResults = rooms.map((r) => ({
+    ...r,
+    ...checkRoomPlausibility(r),
+  }));
+  const warningsCount = plausibilityResults.filter((r) => r.flag).length;
 
   return (
     <div className="h-44 border-t border-slate-800 bg-slate-900/80 px-6 py-3 flex items-center space-x-6 overflow-x-auto z-20 select-none">
@@ -47,17 +70,32 @@ export default function MetricsSummary({ layout, frontWallId }) {
           </p>
         </div>
 
-        {/* Watertight Status */}
-        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 min-w-[150px]">
+        {/* Architectural Plausibility Status */}
+        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 min-w-[170px]">
           <div className="flex items-center space-x-1.5 text-slate-400 text-xs">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>3D Validity</span>
+            {warningsCount === 0 ? (
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            )}
+            <span>Plausibility Gate</span>
           </div>
-          <div className="flex items-center space-x-1 mt-1.5">
-            <CheckCircle className={`w-4 h-4 ${isShellValid ? 'text-emerald-400' : 'text-amber-400'}`} />
-            <span className={`text-xs font-semibold ${isShellValid ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {isShellValid ? 'Watertight Shell' : 'Complex Boundary'}
-            </span>
+          <div className="flex items-center space-x-1.5 mt-1.5">
+            {warningsCount === 0 ? (
+              <>
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-semibold text-emerald-400">
+                  Dimensions Plausible
+                </span>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-semibold text-amber-400">
+                  {warningsCount} Area {warningsCount === 1 ? 'Anomaly' : 'Anomalies'}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -75,15 +113,23 @@ export default function MetricsSummary({ layout, frontWallId }) {
         </div>
 
         <div className="flex flex-wrap gap-2 max-h-24 overflow-y-auto pr-2">
-          {rooms.map((room, idx) => {
+          {plausibilityResults.map((room, idx) => {
             const pct = totalArea > 0 ? Math.round((room.surface_m2 / totalArea) * 100) : 0;
             return (
               <div
                 key={idx}
-                className="bg-slate-950/80 border border-slate-800 px-2.5 py-1 rounded-lg text-xs flex items-center space-x-2 shrink-0"
+                title={room.warning || `${room.room_type}: ${room.surface_m2} m²`}
+                className={`border px-2.5 py-1 rounded-lg text-xs flex items-center space-x-2 shrink-0 transition-colors ${
+                  room.flag
+                    ? 'bg-amber-950/40 border-amber-500/50 text-amber-200'
+                    : 'bg-slate-950/80 border-slate-800 text-slate-300'
+                }`}
               >
-                <span className="font-medium text-slate-300">{room.room_type}</span>
-                <span className="font-semibold text-sky-400">{room.surface_m2} m²</span>
+                {room.flag && <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />}
+                <span className="font-medium">{room.room_type}</span>
+                <span className={`font-semibold ${room.flag ? 'text-amber-400' : 'text-sky-400'}`}>
+                  {room.surface_m2} m²
+                </span>
                 <span className="text-[10px] text-slate-500">({pct}%)</span>
               </div>
             );

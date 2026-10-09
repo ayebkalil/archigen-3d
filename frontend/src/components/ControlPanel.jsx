@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Upload, Sparkles, Building, Sliders, Palette, Download, RefreshCw, Check } from 'lucide-react';
+import { Upload, Sparkles, Building, Sliders, Palette, Download, RefreshCw, Check, Ruler } from 'lucide-react';
 
 const SAMPLE_PLANS = [
   { name: 'Standard Apartment', path: '/samples/plan_sample1.png', scale: 0.03 },
@@ -28,6 +28,8 @@ export default function ControlPanel({
   frontWallId,
   hasLayout,
   facadeTextureUrl,
+  isCalibrating,
+  setIsCalibrating,
 }) {
   const fileInputRef = useRef(null);
 
@@ -78,7 +80,7 @@ export default function ControlPanel({
           <span>2. Dimensions & Floors</span>
         </label>
 
-        {/* Scale Slider */}
+        {/* Scale Slider & 2-Point Calibration Tool */}
         <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800/80">
           <div className="flex justify-between items-center text-xs mb-1.5">
             <span className="text-slate-400">Scale Ratio:</span>
@@ -93,9 +95,22 @@ export default function ControlPanel({
             onChange={(e) => setScale(parseFloat(e.target.value))}
             className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
           />
-          <span className="text-[10px] text-slate-500 block mt-1">
-            Standard residential door: ~0.90 m
-          </span>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
+            <span className="text-[10px] text-slate-500">
+              Door ~0.90m
+            </span>
+            <button
+              onClick={() => setIsCalibrating && setIsCalibrating(!isCalibrating)}
+              className={`text-[11px] px-2.5 py-1 rounded border font-medium flex items-center space-x-1 transition-colors ${
+                isCalibrating
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
+              }`}
+            >
+              <Ruler className="w-3 h-3 text-amber-400" />
+              <span>{isCalibrating ? 'Measuring...' : '2-Point Calibrate'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Floor Count */}

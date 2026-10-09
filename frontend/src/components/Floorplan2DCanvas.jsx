@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, ZoomIn, ZoomOut, CheckCircle2, Info } from 'lucide-react';
+import { Eye, EyeOff, ZoomIn, ZoomOut, CheckCircle2, Info, Ruler, X, Check } from 'lucide-react';
 
 const ROOM_COLORS = {
   'Living Room': { fill: 'rgba(56, 189, 248, 0.25)', stroke: '#38bdf8' },
@@ -28,17 +28,67 @@ export default function Floorplan2DCanvas({
   layout,
   frontWallId,
   onSelectFrontWall,
+  onCalibrateScale,
+  isCalibrating,
+  setIsCalibrating,
 }) {
   const [showRooms, setShowRooms] = useState(true);
   const [showWalls, setShowWalls] = useState(true);
   const [showOpenings, setShowOpenings] = useState(true);
   const [hoveredWall, setHoveredWall] = useState(null);
 
+  // 2-Point Calibration State
+  const [calibPointA, setCalibPointA] = useState(null);
+  const [calibPointB, setCalibPointB] = useState(null);
+  const [knownDistanceM, setKnownDistanceM] = useState('0.90');
+
   const canvasSize = layout?.metadata?.canvas_size || [512, 512];
   const walls = layout?.walls || [];
   const rooms = layout?.rooms || [];
   const doors = layout?.doors || [];
   const windows = layout?.windows || [];
+
+  const handleCanvasClick = (e) => {
+    if (!isCalibrating) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(e.clientX - rect.left);
+    const y = Math.round(e.clientY - rect.top);
+
+    if (!calibPointA) {
+      setCalibPointA([x, y]);
+    } else if (!calibPointB) {
+      setCalibPointB([x, y]);
+    } else {
+      // If both were set, restart with new point A
+      setCalibPointA([x, y]);
+      setCalibPointB(null);
+    }
+  };
+
+  const calibPixelDist =
+    calibPointA && calibPointB
+      ? Math.hypot(calibPointB[0] - calibPointA[0], calibPointB[1] - calibPointA[1])
+      : 0;
+
+  const calculatedScale =
+    calibPixelDist > 0 && parseFloat(knownDistanceM) > 0
+      ? (parseFloat(knownDistanceM) / calibPixelDist).toFixed(4)
+      : null;
+
+  const handleApplyCalibration = () => {
+    if (calculatedScale && onCalibrateScale) {
+      onCalibrateScale(parseFloat(calculatedScale));
+      setIsCalibrating(false);
+      setCalibPointA(null);
+      setCalibPointB(null);
+    }
+  };
+
+  const handleCancelCalibration = () => {
+    if (setIsCalibrating) setIsCalibrating(false);
+    setCalibPointA(null);
+    setCalibPointB(null);
+  };
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-950 relative overflow-hidden border-r border-slate-800">
@@ -52,8 +102,27 @@ export default function Floorplan2DCanvas({
           </span>
         </div>
 
-        {/* Visibility Toggles */}
+        {/* Visibility Toggles & Calibration Button */}
         <div className="flex items-center space-x-2 text-xs">
+          {/* 2-Point Calibration Toggle */}
+          <button
+            onClick={() => {
+              if (setIsCalibrating) setIsCalibrating(!isCalibrating);
+              setCalibPointA(null);
+              setCalibPointB(null);
+            }}
+            className={`px-3 py-1 rounded border font-medium transition-colors flex items-center space-x-1.5 ${
+              isCalibrating
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 animate-pulse'
+                : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white hover:border-slate-600'
+            }`}
+          >
+            <Ruler className="w-3.5 h-3.5 text-amber-400" />
+            <span>{isCalibrating ? 'Exit Measurement' : 'Calibrate Scale'}</span>
+          </button>
+
+          <span className="text-slate-700">|</span>
+
           <button
             onClick={() => setShowRooms(!showRooms)}
             className={`px-2.5 py-1 rounded border transition-colors flex items-center space-x-1.5 ${
@@ -90,7 +159,10 @@ export default function Floorplan2DCanvas({
       {/* Main Canvas Area */}
       <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
         <div
-          className="relative rounded-xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900"
+          onClick={handleCanvasClick}
+          className={`relative rounded-xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900 ${
+            isCalibrating ? 'cursor-crosshair ring-2 ring-amber-500/50' : ''
+          }`}
           style={{ width: `${canvasSize[0]}px`, height: `${canvasSize[1]}px` }}
         >
           {/* Base Image */}
@@ -217,7 +289,7 @@ export default function Floorplan2DCanvas({
                 );
               })}
 
-            {/* 3. Doors & Windows Markers */}
+            {/* 4. Doors & Windows Markers */}
             {showOpenings &&
               doors.map((door, idx) => {
                 const p = door.position_meters || [0, 0];
@@ -257,8 +329,138 @@ export default function Floorplan2DCanvas({
                   />
                 );
               })}
+
+            {/* 5. Measurement / Calibration Line */}
+            {isCalibrating && (
+              <g>
+                {calibPointA && calibPointB && (
+                  <>
+                    <line
+                      x1={calibPointA[0]}
+                      y1={calibPointA[1]}
+                      x2={calibPointB[0]}
+                      y2={calibPointB[1]}
+                      stroke="#f59e0b"
+                      strokeWidth="2.5"
+                      strokeDasharray="6,4"
+                    />
+                    <text
+                      x={(calibPointA[0] + calibPointB[0]) / 2}
+                      y={(calibPointA[1] + calibPointB[1]) / 2 - 8}
+                      fill="#f59e0b"
+                      fontSize="11"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                    >
+                      {Math.round(calibPixelDist)} px
+                    </text>
+                  </>
+                )}
+                {calibPointA && (
+                  <g transform={`translate(${calibPointA[0]}, ${calibPointA[1]})`}>
+                    <circle r="7" fill="#f59e0b" stroke="#ffffff" strokeWidth="2" />
+                    <text x="10" y="4" fill="#f59e0b" fontSize="10" fontWeight="bold">Point A</text>
+                  </g>
+                )}
+                {calibPointB && (
+                  <g transform={`translate(${calibPointB[0]}, ${calibPointB[1]})`}>
+                    <circle r="7" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
+                    <text x="10" y="4" fill="#10b981" fontSize="10" fontWeight="bold">Point B</text>
+                  </g>
+                )}
+              </g>
+            )}
           </svg>
         </div>
+
+        {/* Floating Calibration Controls Card */}
+        {isCalibrating && (
+          <div className="absolute top-4 right-6 bg-slate-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl p-4 text-xs text-slate-200 shadow-2xl w-80 z-30">
+            <div className="flex items-center justify-between font-semibold text-slate-100 mb-2">
+              <div className="flex items-center space-x-1.5">
+                <Ruler className="w-4 h-4 text-amber-400" />
+                <span className="text-amber-300">2-Point Scale Calibration</span>
+              </div>
+              <button onClick={handleCancelCalibration} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+              {!calibPointA
+                ? "Click Point 1 on the canvas (e.g. one side of a doorway or exterior wall)."
+                : !calibPointB
+                ? "Click Point 2 (the other side of the doorway or wall)."
+                : `Distance between points: ${Math.round(calibPixelDist)} pixels.`}
+            </p>
+
+            {calibPointA && calibPointB && (
+              <div className="space-y-3 pt-2 border-t border-slate-800">
+                <div>
+                  <label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    Known Distance in Real World (Meters)
+                  </label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.1"
+                      max="30"
+                      value={knownDistanceM}
+                      onChange={(e) => setKnownDistanceM(e.target.value)}
+                      className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-sm w-28 focus:border-amber-400 focus:outline-none"
+                    />
+                    <span className="text-slate-400 text-xs">meters</span>
+                  </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setKnownDistanceM('0.90')}
+                    className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                  >
+                    Door (0.9m)
+                  </button>
+                  <button
+                    onClick={() => setKnownDistanceM('1.80')}
+                    className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                  >
+                    Double Door (1.8m)
+                  </button>
+                  <button
+                    onClick={() => setKnownDistanceM('3.50')}
+                    className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                  >
+                    Wall (3.5m)
+                  </button>
+                </div>
+
+                {/* Calculated Result */}
+                <div className="bg-slate-950 p-2.5 rounded border border-slate-800 flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Calibrated Ratio:</span>
+                  <span className="font-mono font-bold text-amber-400">{calculatedScale} m/px</span>
+                </div>
+
+                <div className="flex space-x-2 pt-1">
+                  <button
+                    onClick={handleApplyCalibration}
+                    className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-1.5 px-3 rounded text-xs flex items-center justify-center space-x-1.5 transition-colors"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Apply Calibration</span>
+                  </button>
+                  <button
+                    onClick={() => { setCalibPointA(null); setCalibPointB(null); }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-xs transition-colors"
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Wall Selection Helper Box */}
         <div className="absolute bottom-4 left-6 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg p-3 text-xs text-slate-300 shadow-xl max-w-sm">

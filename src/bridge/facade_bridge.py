@@ -36,7 +36,7 @@ CMP_PALETTE = {
 }
 
 class FacadeBridge:
-    def __init__(self, onnx_model_path: str = "models/saved/generator_enhanced.onnx"):
+    def __init__(self, onnx_model_path: str = "models/saved/generator_perceptual.onnx"):
         self.model_path = Path(onnx_model_path)
         self.inference_engine = None
         self._init_inference_engine()

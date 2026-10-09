@@ -19,6 +19,7 @@ export default function App() {
   const [layout, setLayout] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGeneratingFacade, setIsGeneratingFacade] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
   const [health, setHealth] = useState(null);
   const [latency, setLatency] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -133,6 +134,13 @@ export default function App() {
     }
   };
 
+  const handleCalibrateScale = (newScale) => {
+    setScale(newScale);
+    if (file) {
+      executeAnalysis(file, newScale, numFloors, frontWallId);
+    }
+  };
+
   const handleGenerateFacade = () => {
     if (file) {
       setIsGeneratingFacade(true);
@@ -170,6 +178,8 @@ export default function App() {
           frontWallId={frontWallId}
           hasLayout={!!layout}
           facadeTextureUrl={facadeTextureUrl}
+          isCalibrating={isCalibrating}
+          setIsCalibrating={setIsCalibrating}
         />
 
         {/* Center Viewport Area */}
@@ -192,6 +202,9 @@ export default function App() {
                   layout={layout}
                   frontWallId={frontWallId}
                   onSelectFrontWall={handleSelectFrontWall}
+                  onCalibrateScale={handleCalibrateScale}
+                  isCalibrating={isCalibrating}
+                  setIsCalibrating={setIsCalibrating}
                 />
                 <Viewer3D
                   layout={layout}
@@ -209,6 +222,9 @@ export default function App() {
                 layout={layout}
                 frontWallId={frontWallId}
                 onSelectFrontWall={handleSelectFrontWall}
+                onCalibrateScale={handleCalibrateScale}
+                isCalibrating={isCalibrating}
+                setIsCalibrating={setIsCalibrating}
               />
             )}
 

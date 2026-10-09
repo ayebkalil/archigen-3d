@@ -85,6 +85,18 @@ def evaluate_model_pipeline(
     r_union = {c: 0 for c in range(1, 12)}
     r_correct_px, r_total_px = 0, 0
 
+    # True Ground-Truth Accuracy Metrics
+    living_area_inter = 0
+    living_area_union = 0
+    room_count_errors = []
+    perimeter_rel_errors = []
+
+    # Object-level detection accumulators (within 20px radius)
+    door_gt_total = 0
+    door_gt_detected = 0
+    win_gt_total = 0
+    win_gt_detected = 0
+
     valid_shell_count = 0
     valid_polygon_count = 0
     total_polygon_count = 0
@@ -150,6 +162,28 @@ def evaluate_model_pipeline(
                 win_inter += np.logical_and(p_win, t_win).sum()
                 win_union += np.logical_or(p_win, t_win).sum()
 
+                # Object-level door & window localization
+                import cv2
+                # GT doors
+                _, _, _, gt_door_cents = cv2.connectedComponentsWithStats((t_door).astype(np.uint8))
+                _, _, _, pred_door_cents = cv2.connectedComponentsWithStats((p_door).astype(np.uint8))
+                gt_door_pts = gt_door_cents[1:] if len(gt_door_cents) > 1 else []
+                pred_door_pts = pred_door_cents[1:] if len(pred_door_cents) > 1 else []
+                door_gt_total += len(gt_door_pts)
+                for g_pt in gt_door_pts:
+                    if any(np.hypot(p_pt[0] - g_pt[0], p_pt[1] - g_pt[1]) < 20.0 for p_pt in pred_door_pts):
+                        door_gt_detected += 1
+
+                # GT windows
+                _, _, _, gt_win_cents = cv2.connectedComponentsWithStats((t_win).astype(np.uint8))
+                _, _, _, pred_win_cents = cv2.connectedComponentsWithStats((p_win).astype(np.uint8))
+                gt_win_pts = gt_win_cents[1:] if len(gt_win_cents) > 1 else []
+                pred_win_pts = pred_win_cents[1:] if len(pred_win_cents) > 1 else []
+                win_gt_total += len(gt_win_pts)
+                for g_pt in gt_win_pts:
+                    if any(np.hypot(p_pt[0] - g_pt[0], p_pt[1] - g_pt[1]) < 20.0 for p_pt in pred_win_pts):
+                        win_gt_detected += 1
+
                 # Internal & External Wall IoU if 5-class available
                 if pred_struct5 is not None:
                     p_s5 = pred_struct5[b]
@@ -172,6 +206,15 @@ def evaluate_model_pipeline(
                     r_correct_px += np.logical_and(p_r == t_r, non_bg).sum()
                     r_total_px += non_bg.sum()
 
+                    # Living Area Footprint IoU (all non-background rooms combined)
+                    p_living = (p_r > 0)
+                    t_living = (t_r > 0)
+                    living_area_inter += np.logical_and(p_living, t_living).sum()
+                    living_area_union += np.logical_or(p_living, t_living).sum()
+
+                    # Ground truth room count vs predicted room count
+                    gt_num_rooms = len(np.unique(t_r[t_r > 0]))
+
                 # 3D Vectorizer and Geometric Quality
                 p_s_input = pred_struct5[b] if pred_struct5 is not None else None
                 p_r_input = pred_room[b] if pred_room is not None else None
@@ -181,6 +224,10 @@ def evaluate_model_pipeline(
                     struct_mask=p_s_input,
                     room_mask=p_r_input
                 )
+
+                if pred_room is not None:
+                    pred_num_rooms = len(layout.get("rooms", []))
+                    room_count_errors.append(abs(pred_num_rooms - gt_num_rooms))
 
                 meta = layout.get("metadata", {})
                 if meta.get("is_building_shell_valid", False):
@@ -195,6 +242,19 @@ def evaluate_model_pipeline(
                             valid_polygon_count += 1
 
                 total_rooms_count += len(layout.get("rooms", []))
+
+                # Exterior Perimeter relative error
+                # Compute GT exterior wall perimeter in pixels
+                gt_ext_mask = (t_s5 == 2).astype(np.uint8) if pred_struct5 is not None else (t_wall).astype(np.uint8)
+                gt_cnts, _ = cv2.findContours(gt_ext_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if gt_cnts:
+                    gt_perimeter_px = sum(cv2.arcLength(c, True) for c in gt_cnts)
+                    scale_m = meta.get("scale_meters_per_pixel", 0.03)
+                    gt_perimeter_m = gt_perimeter_px * scale_m
+                    pred_perimeter_m = meta.get("building_perimeter_m", 0)
+                    if gt_perimeter_m > 1.0:
+                        rel_err = abs(pred_perimeter_m - gt_perimeter_m) / gt_perimeter_m
+                        perimeter_rel_errors.append(min(rel_err, 2.0))
 
                 processed_samples += 1
 
@@ -214,6 +274,13 @@ def evaluate_model_pipeline(
     room_miou = (sum(room_ious) / len(room_ious)) if room_ious else 0.0
     room_acc = (r_correct_px / max(r_total_px, 1)) if r_total_px > 0 else 0.0
 
+    living_area_iou = (living_area_inter / max(living_area_union, 1)) if living_area_union > 0 else 0.0
+    room_count_mae = float(np.mean(room_count_errors)) if room_count_errors else 0.0
+    perimeter_rel_err = float(np.mean(perimeter_rel_errors)) * 100.0 if perimeter_rel_errors else 0.0
+
+    door_obj_recall = (door_gt_detected / max(door_gt_total, 1)) * 100.0
+    win_obj_recall = (win_gt_detected / max(win_gt_total, 1)) * 100.0
+
     shell_valid_rate = (valid_shell_count / max(processed_samples, 1)) * 100.0
     polygon_valid_rate = (valid_polygon_count / max(total_polygon_count, 1)) * 100.0
 
@@ -228,6 +295,11 @@ def evaluate_model_pipeline(
         "wall_external_iou": round(wall_ext_iou * 100, 2) if wall_ext_union > 0 else None,
         "room_miou": round(room_miou * 100, 2) if r_total_px > 0 else None,
         "room_pixel_accuracy": round(room_acc * 100, 2) if r_total_px > 0 else None,
+        "living_area_iou": round(living_area_iou * 100, 2) if living_area_union > 0 else None,
+        "room_count_mae": round(room_count_mae, 2) if room_count_errors else None,
+        "perimeter_relative_error_pct": round(perimeter_rel_err, 2) if perimeter_rel_errors else None,
+        "door_object_recall_pct": round(door_obj_recall, 2) if door_gt_total > 0 else None,
+        "win_object_recall_pct": round(win_obj_recall, 2) if win_gt_total > 0 else None,
         "watertight_shell_rate_pct": round(shell_valid_rate, 2),
         "polygon_validity_rate_pct": round(polygon_valid_rate, 2),
         "avg_rooms_per_plan": round(total_rooms_count / max(processed_samples, 1), 1)
@@ -250,6 +322,16 @@ def evaluate_model_pipeline(
     print(f"  Watertight 3D Shell Rate: {results['watertight_shell_rate_pct']}%")
     print(f"  3D Polygon Validity Rate: {results['polygon_validity_rate_pct']}%")
     print(f"  Avg Rooms Extracted:      {results['avg_rooms_per_plan']}")
+    if results.get('living_area_iou') is not None:
+        print(f"  Living Area Footprint IoU:{results['living_area_iou']}%")
+    if results.get('room_count_mae') is not None:
+        print(f"  Room Count MAE:           {results['room_count_mae']}")
+    if results.get('perimeter_relative_error_pct') is not None:
+        print(f"  Perimeter Rel Error:      {results['perimeter_relative_error_pct']}%")
+    if results.get('door_object_recall_pct') is not None:
+        print(f"  Door Object Recall (20px):{results['door_object_recall_pct']}%")
+    if results.get('win_object_recall_pct') is not None:
+        print(f"  Window Object Recall (20px):{results['win_object_recall_pct']}%")
     print("=" * 65 + "\n")
 
     return results
@@ -267,7 +349,7 @@ def run_full_comparative_benchmark(split: str = "test", max_samples: Optional[in
     print("\n" + "=" * 80)
     print(f"                   OVERALL MODEL COMPARISON TABLE ({split.upper()} SET)")
     print("=" * 80)
-    header = f"{'Metric':<28} | {'Baseline (ResNet34)':<20} | {'MultiTask (15ep)':<18} | {'Hybrid (Engine)':<15}"
+    header = f"{'Metric':<28} | {'Baseline (ResNet34)':<20} | {'MultiTask':<18} | {'Hybrid (Engine)':<15}"
     print(header)
     print("-" * 80)
 
@@ -275,11 +357,15 @@ def run_full_comparative_benchmark(split: str = "test", max_samples: Optional[in
         ("Merged Wall IoU", f"{res_baseline['wall_merged_iou']}%", f"{res_multitask['wall_merged_iou']}%", f"{res_hybrid['wall_merged_iou']}%"),
         ("Door IoU", f"{res_baseline['door_iou']}%", f"{res_multitask['door_iou']}%", f"{res_hybrid['door_iou']}%"),
         ("Window IoU", f"{res_baseline['window_iou']}%", f"{res_multitask['window_iou']}%", f"{res_hybrid['window_iou']}%"),
+        ("Door Object Recall (20px)", f"{res_baseline.get('door_object_recall_pct', 'N/A')}%", f"{res_multitask.get('door_object_recall_pct', 'N/A')}%", f"{res_hybrid.get('door_object_recall_pct', 'N/A')}%"),
+        ("Window Object Recall (20px)", f"{res_baseline.get('win_object_recall_pct', 'N/A')}%", f"{res_multitask.get('win_object_recall_pct', 'N/A')}%", f"{res_hybrid.get('win_object_recall_pct', 'N/A')}%"),
         ("Structure Foreground mIoU", f"{res_baseline['struct_miou']}%", f"{res_multitask['struct_miou']}%", f"{res_hybrid['struct_miou']}%"),
         ("Room Semantic mIoU", "N/A", f"{res_multitask['room_miou']}%", f"{res_hybrid['room_miou']}%"),
         ("Room Pixel Accuracy", "N/A", f"{res_multitask['room_pixel_accuracy']}%", f"{res_hybrid['room_pixel_accuracy']}%"),
+        ("Living Area Footprint IoU", "N/A", f"{res_multitask.get('living_area_iou', 'N/A')}%", f"{res_hybrid.get('living_area_iou', 'N/A')}%"),
+        ("Room Count MAE", "N/A", f"{res_multitask.get('room_count_mae', 'N/A')}", f"{res_hybrid.get('room_count_mae', 'N/A')}"),
+        ("Perimeter Relative Error", f"{res_baseline.get('perimeter_relative_error_pct', 'N/A')}%", f"{res_multitask.get('perimeter_relative_error_pct', 'N/A')}%", f"{res_hybrid.get('perimeter_relative_error_pct', 'N/A')}%"),
         ("Watertight 3D Shell Rate", f"{res_baseline['watertight_shell_rate_pct']}%", f"{res_multitask['watertight_shell_rate_pct']}%", f"{res_hybrid['watertight_shell_rate_pct']}%"),
-        ("3D Polygon Validity Rate", f"{res_baseline['polygon_validity_rate_pct']}%", f"{res_multitask['polygon_validity_rate_pct']}%", f"{res_hybrid['polygon_validity_rate_pct']}%"),
         ("Avg Rooms / Plan", f"{res_baseline['avg_rooms_per_plan']}", f"{res_multitask['avg_rooms_per_plan']}", f"{res_hybrid['avg_rooms_per_plan']}")
     ]
 

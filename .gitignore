@@ -16,6 +16,7 @@
 *.bin
 models/checkpoints/
 models/saved/
+models/samples/
 
 # --- Datasets & Raw Images (Managed strictly by DVC, NOT Git) ---
 data/raw/*
