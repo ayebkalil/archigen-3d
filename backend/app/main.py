@@ -3,6 +3,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Requ
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 import io
+from typing import Optional, List, Dict, Any
 
 from app.schemas import (
     HealthResponse,
@@ -106,10 +107,16 @@ async def get_model_metadata():
     )
 
 @app.post("/predict/floorplan", response_model=FloorPlanAnalysisResponse, tags=["Vision Inference"])
-async def analyze_floorplan(file: UploadFile = File(...)):
+async def analyze_floorplan(
+    file: UploadFile = File(...),
+    scale_override: Optional[float] = Form(default=None),
+    num_floors: int = Form(default=1),
+    front_wall_id: Optional[str] = Form(default=None)
+):
     """
     Parses an uploaded 2D floor plan image, segments walls/doors/windows/rooms using Deep Learning,
-    vectorizes geometry to rectilinear polygons, and produces Three.js 3D extrusion coordinates.
+    vectorizes geometry to rectilinear polygons, synthesizes photorealistic facade textures,
+    and produces Three.js 3D extrusion coordinates.
     """
     if not file.content_type.startswith("image/"):
         raise HTTPException(
@@ -127,7 +134,12 @@ async def analyze_floorplan(file: UploadFile = File(...)):
     try:
         from app.floorplan_engine import FloorplanPipeline
         pipeline = FloorplanPipeline.get_instance()
-        result = pipeline.process_image(content)
+        result = pipeline.process_image(
+            image_bytes=content,
+            scale_override=scale_override,
+            num_floors=num_floors,
+            front_wall_id=front_wall_id
+        )
         layout = result["layout"]
         threejs_scene = result["threejs_scene"]
 
@@ -147,14 +159,15 @@ async def analyze_floorplan(file: UploadFile = File(...)):
                 polygon_meters=w["polygon_meters"],
                 height_m=w.get("height_m", 2.8),
                 is_exterior=w.get("is_exterior", False),
-                openings=w.get("openings", [])
+                is_front=w.get("is_front", False),
+                openings=w.get("openings", []),
+                facade_texture=w.get("facade_texture", None)
             )
             for w in layout.get("walls", [])
         ]
 
-
         return FloorPlanAnalysisResponse(
-            total_area_m2=layout["metadata"].get("total_surface_m2", 0.0),
+            total_area_m2=layout["metadata"].get("total_area_m2", layout["metadata"].get("total_surface_m2", 0.0)),
             num_rooms=len(rooms),
             rooms=rooms,
             walls=walls,

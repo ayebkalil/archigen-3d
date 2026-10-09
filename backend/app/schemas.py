@@ -31,7 +31,9 @@ class WallSegment(BaseModel):
     polygon_meters: List[List[float]] = Field(...)
     height_m: float = Field(default=2.8)
     is_exterior: bool = Field(default=False)
+    is_front: bool = Field(default=False)
     openings: List[Dict[str, Any]] = Field(default=[])
+    facade_texture: Optional[Dict[str, Any]] = Field(default=None)
 
 
 class FloorPlanAnalysisResponse(BaseModel):

@@ -1,21 +1,28 @@
 """
-Procedural 3D Wall Extrusion and Three.js Mesh Generation Engine.
+Procedural 3D Wall Extrusion, Three.js Mesh Generation, and OBJ+MTL Texturing Engine.
 Converts vector layout JSON into:
-1. Three.js BufferGeometry compatible JSON specs for client-side rendering.
-2. Standard Wavefront OBJ format for standalone 3D rendering.
-3. Exterior facade boundary extraction for Pix2Pix texture mapping.
+1. Three.js BufferGeometry compatible JSON specs for client-side rendering with texture maps.
+2. Standard Wavefront OBJ + MTL format with UV coordinates for Blender rendering.
+3. Exterior facade boundary extraction and texture attachment.
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from pathlib import Path
+import math
 import numpy as np
 from shapely.geometry import Polygon
 
 class Floorplan3DExtruder:
     """
-    Extrudes 2D wall polygons along the Z-axis into 3D meshes with openings.
+    Extrudes 2D wall polygons along the vertical axis into 3D meshes with openings and texture mapping.
     """
-    def __init__(self, wall_height_m: float = 2.80, door_height_m: float = 2.10, window_height_m: float = 1.40, window_sill_m: float = 0.90):
+    def __init__(
+        self,
+        wall_height_m: float = 2.80,
+        door_height_m: float = 2.10,
+        window_height_m: float = 1.40,
+        window_sill_m: float = 0.90
+    ):
         self.wall_height_m = wall_height_m
         self.door_height_m = door_height_m
         self.window_height_m = window_height_m
@@ -25,14 +32,18 @@ class Floorplan3DExtruder:
         """
         Creates a JSON payload ready for Three.js scene creation in the frontend.
         Includes:
-        - Wall geometries (coordinates, height, thickness)
+        - Wall geometries (coordinates, height, thickness, is_exterior, is_front)
+        - Facade texture mapping metadata (texture file, UV bounds)
         - Floor slab geometries
         - Room labels and bounding boxes
         - Door / window cutout locations
         """
+        num_floors = layout.get("metadata", {}).get("num_floors", 1)
+        total_h = self.wall_height_m * num_floors
+
         walls_3d = []
         for wall in layout.get("walls", []):
-            pts_2d = wall["polygon_meters"]
+            pts_2d = wall.get("polygon_meters", [])
             if len(pts_2d) < 3:
                 continue
 
@@ -40,13 +51,17 @@ class Floorplan3DExtruder:
             poly = Polygon(pts_2d)
             is_valid = poly.is_valid
 
-            walls_3d.append({
+            wall_entry = {
                 "id": wall["id"],
                 "points_2d": pts_2d,
-                "height": self.wall_height_m,
+                "height": total_h,
+                "is_exterior": wall.get("is_exterior", False),
+                "is_front": wall.get("is_front", False),
                 "is_valid_geometry": is_valid,
-                "openings": wall.get("openings", [])
-            })
+                "openings": wall.get("openings", []),
+                "facade_texture": wall.get("facade_texture", None)
+            }
+            walls_3d.append(wall_entry)
 
         rooms_3d = []
         for room in layout.get("rooms", []):
@@ -62,35 +77,66 @@ class Floorplan3DExtruder:
 
         return {
             "type": "ArchiGen3D_Floorplan_Scene",
-            "version": "1.0",
-            "scale": layout["metadata"].get("scale_meters_per_pixel", 0.025),
-            "total_surface_m2": layout["metadata"].get("total_surface_m2", 0.0),
+            "version": "2.0",
+            "scale": layout.get("metadata", {}).get("scale_m_per_px", 0.025),
+            "total_surface_m2": layout.get("metadata", {}).get("total_area_m2", 0.0),
+            "num_floors": num_floors,
+            "wall_height_m": total_h,
             "walls": walls_3d,
             "rooms": rooms_3d,
             "doors": layout.get("doors", []),
             "windows": layout.get("windows", [])
         }
 
-    def export_obj(self, layout: Dict[str, Any], output_path: str):
+    def export_obj_with_mtl(
+        self,
+        layout: Dict[str, Any],
+        output_obj_path: str,
+        texture_relative_path: Optional[str] = None
+    ):
         """
-        Exports the extruded 3D walls and floor slabs as a standard Wavefront .OBJ file.
+        Exports the extruded 3D building as Wavefront .OBJ with texture coordinates (vt)
+        and an accompanying .MTL material file so that Blender renders textured walls.
         """
+        obj_file = Path(output_obj_path)
+        obj_file.parent.mkdir(parents=True, exist_ok=True)
+        mtl_file = obj_file.with_suffix(".mtl")
+
+        num_floors = layout.get("metadata", {}).get("num_floors", 1)
+        h = self.wall_height_m * num_floors
+
         vertices = []
-        faces = []
+        texcoords = []  # (u, v)
+        faces = []      # (v_idx, vt_idx) for each vertex in face
+        material_faces = {"Wall_Interior": [], "Wall_Exterior": [], "Wall_Front_Facade": []}
 
         def add_vertex(x, y, z):
-            vertices.append((x, z, y)) # In Three.js / standard 3D, Y is up
+            # In Blender / Three.js standard coords: X is right, Y is up, Z is depth
+            vertices.append((x, z, -y))
             return len(vertices)
 
-        # 1. Extrude walls
-        h = self.wall_height_m
+        def add_vt(u, v):
+            texcoords.append((u, v))
+            return len(texcoords)
+
+        # Standard default UV corners
+        vt_bl = add_vt(0.0, 0.0)
+        vt_br = add_vt(1.0, 0.0)
+        vt_tr = add_vt(1.0, 1.0)
+        vt_tl = add_vt(0.0, 1.0)
+
         for wall in layout.get("walls", []):
-            pts = wall["polygon_meters"]
+            pts = wall.get("polygon_meters", [])
             if len(pts) < 3:
                 continue
 
             num_pts = len(pts)
             base_idx = len(vertices) + 1
+
+            is_front = wall.get("is_front", False)
+            is_exterior = wall.get("is_exterior", False)
+
+            mat_name = "Wall_Front_Facade" if is_front else ("Wall_Exterior" if is_exterior else "Wall_Interior")
 
             # Bottom vertices
             for pt in pts:
@@ -107,16 +153,40 @@ class Floorplan3DExtruder:
                 t1 = base_idx + num_pts + i
                 t2 = base_idx + num_pts + next_i
 
-                faces.append((b1, b2, t2))
-                faces.append((b1, t2, t1))
+                # Assign texture coordinates
+                f1 = ((b1, vt_bl), (b2, vt_br), (t2, vt_tr))
+                f2 = ((b1, vt_bl), (t2, vt_tr), (t1, vt_tl))
+
+                material_faces[mat_name].append(f1)
+                material_faces[mat_name].append(f2)
+
+        # Write MTL file
+        with open(mtl_file, "w", encoding="utf-8") as fm:
+            fm.write("# ArchiGen 3D Material Library\n")
+            fm.write("newmtl Wall_Interior\nKd 0.90 0.90 0.88\nKa 0.2 0.2 0.2\nillum 2\n\n")
+            fm.write("newmtl Wall_Exterior\nKd 0.80 0.78 0.75\nKa 0.2 0.2 0.2\nillum 2\n\n")
+            fm.write("newmtl Wall_Front_Facade\nKd 1.0 1.0 1.0\nKa 0.3 0.3 0.3\nillum 2\n")
+            if texture_relative_path:
+                fm.write(f"map_Kd {texture_relative_path}\n")
 
         # Write OBJ file
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write("# ArchiGen 3D Extruded Architectural Floorplan\n")
+        with open(obj_file, "w", encoding="utf-8") as f:
+            f.write("# ArchiGen 3D Textured Architectural Mesh\n")
+            f.write(f"mtllib {mtl_file.name}\n")
             for v in vertices:
                 f.write(f"v {v[0]:.4f} {v[1]:.4f} {v[2]:.4f}\n")
-            for face in faces:
-                f.write(f"f {face[0]} {face[1]} {face[2]}\n")
+            for vt in texcoords:
+                f.write(f"vt {vt[0]:.4f} {vt[1]:.4f}\n")
 
-        print(f"[SUCCESS] 3D Floorplan exported to OBJ: {output_path} ({len(vertices)} vertices, {len(faces)} faces)")
+            for mat_name, f_list in material_faces.items():
+                if f_list:
+                    f.write(f"\nusemtl {mat_name}\n")
+                    for tri in f_list:
+                        f.write(f"f {tri[0][0]}/{tri[0][1]} {tri[1][0]}/{tri[1][1]} {tri[2][0]}/{tri[2][1]}\n")
+
+        print(f"[SUCCESS] 3D Floorplan exported to OBJ+MTL: {output_obj_path} ({len(vertices)} vertices, {sum(len(l) for l in material_faces.values())} faces)")
+
+    def export_obj(self, layout: Dict[str, Any], output_path: str):
+        """Backwards-compatible alias for export_obj_with_mtl."""
+        self.export_obj_with_mtl(layout, output_path)
+
