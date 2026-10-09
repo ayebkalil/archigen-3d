@@ -310,6 +310,27 @@ class FloorplanVectorizer:
                     })
                     room_idx += 1
 
+        # 7. Refine Exterior Walls using Room Union Outer Boundary (handles L and U-shaped buildings)
+        try:
+            from shapely.ops import unary_union
+            valid_room_polys = [
+                Polygon(r["polygon_meters"])
+                for r in rooms
+                if len(r.get("polygon_meters", [])) >= 3 and Polygon(r["polygon_meters"]).is_valid
+            ]
+            if len(valid_room_polys) > 0:
+                room_envelope = unary_union(valid_room_polys)
+                envelope_boundary = room_envelope.boundary
+                for w_item in walls:
+                    poly_pts = w_item.get("polygon_meters", [])
+                    if len(poly_pts) >= 3:
+                      w_poly = Polygon(poly_pts)
+                      if w_poly.is_valid:
+                        if envelope_boundary.distance(w_poly) < 0.45:
+                          w_item["is_exterior"] = True
+        except Exception:
+            pass
+
         return {
             "metadata": {
                 "canvas_size": [w, h],

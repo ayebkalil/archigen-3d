@@ -234,3 +234,11 @@ async def generate_photorealistic_render(
         # Fallback if running in lightweight test mode without weights
         print(f"[INFERENCE WARNING] ONNX Runtime error: {e}")
         return Response(content=content, media_type="image/png")
+
+# Mount frontend/dist for 1-click single-port full-stack serving
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")

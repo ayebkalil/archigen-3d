@@ -18,20 +18,21 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 import io
 import math
+import base64
 import numpy as np
 from PIL import Image, ImageDraw
 
 # Exact CMP 12-Class Colormap matching trained generator distribution
 CMP_PALETTE = {
-    "background": (0, 0, 128),     # Sky / Void
-    "facade": (0, 48, 255),         # Main Wall
-    "window": (0, 128, 255),        # Window Glass / Bay
-    "door": (174, 0, 1),            # Entrance Door
-    "cornice": (0, 0, 222),         # Top Roof Trim / Cornice
-    "sill": (255, 80, 0),           # Window Sill
-    "balcony": (192, 255, 54),      # Balcony / Ledge
-    "base": (0, 0, 222),            # Foundation / Bottom Base Molding
-    "molding": (0, 0, 222)          # Architectural Horizontal Trim
+    "background": (0, 48, 255),    # Wall color for seamless padding (avoids border artifacts)
+    "facade": (0, 48, 255),        # Main Wall
+    "window": (0, 128, 255),       # Window Glass / Bay
+    "door": (0, 207, 255),         # Entrance Door (true CMP Cyan, not dark red)
+    "cornice": (0, 0, 222),        # Top Roof Trim / Cornice
+    "sill": (255, 80, 0),          # Window Sill
+    "balcony": (192, 255, 54),     # Balcony / Ledge
+    "base": (0, 0, 222),           # Foundation / Bottom Base Molding
+    "molding": (0, 0, 222)         # Architectural Horizontal Trim
 }
 
 class FacadeBridge:
@@ -265,6 +266,7 @@ class FacadeBridge:
             "is_front": is_front,
             "sketch_image": sketch_img,
             "photo_image": photo_img,
+            "photo_bytes": photo_bytes,
             "uv_bounds": uv_bounds,
             "wall_length_m": uv_bounds["wall_length_m"],
             "wall_height_m": uv_bounds["wall_height_m"]
@@ -314,10 +316,14 @@ class FacadeBridge:
                 output_path=tex_filepath
             )
 
+            # Encode as base64 data URI for instant web rendering
+            b64_str = base64.b64encode(res["photo_bytes"]).decode("ascii")
+
             # Attach texture metadata to wall
             w["facade_texture"] = {
                 "texture_file": tex_filename,
                 "texture_path": tex_filepath,
+                "texture_base64": f"data:image/png;base64,{b64_str}",
                 "uv_bounds": res["uv_bounds"],
                 "is_front": is_front
             }

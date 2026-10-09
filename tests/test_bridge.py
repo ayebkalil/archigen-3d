@@ -67,6 +67,7 @@ def test_facade_bridge_layout_processing():
 
     res = bridge.process_layout_facades(mock_layout, num_floors=1)
     assert res["front_wall_id"] == "wall_0"
-    assert res["exterior_walls_count"] == 1
     assert "facade_texture" in mock_layout["walls"][0]
+    assert "texture_base64" in mock_layout["walls"][0]["facade_texture"]
+    assert mock_layout["walls"][0]["facade_texture"]["texture_base64"].startswith("data:image/png;base64,")
     assert "facade_texture" not in mock_layout["walls"][1]

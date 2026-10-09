@@ -120,35 +120,50 @@ class CubiCasaDataset(Dataset):
         struct_mask = np.zeros((size, size), dtype=np.uint8)
         room_mask = np.zeros((size, size), dtype=np.uint8)
 
-        for elem in root.iter():
-            c = elem.attrib.get("class", "")
-            # Check for Room Spaces
-            if "Space" in c:
+        # A. Rasterize Room Spaces first
+        for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
+            c = g.attrib.get("class", "")
+            if c.startswith("Space"):
                 for r_name, r_id in ROOM_CLASSES.items():
                     if r_name in c:
-                        for child in elem.iter():
-                            if child.tag.split("}")[-1] == "polygon" and "points" in child.attrib:
-                                pts = parse_svg_points(child.attrib["points"], scale, pad_x, pad_y)
+                        for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
+                            if "points" in poly.attrib:
+                                pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
                                 if len(pts) >= 3:
                                     cv2.fillPoly(room_mask, [pts], r_id)
-                                    break
                         break
 
-            # Check for Structural Elements (Walls, Doors, Windows)
-            for child in elem.iter():
-                tag = child.tag.split("}")[-1]
-                if tag == "polygon" and "points" in child.attrib:
-                    pts = parse_svg_points(child.attrib["points"], scale, pad_x, pad_y)
-                    if len(pts) >= 3:
-                        if "Wall" in c:
-                            if "External" in c:
-                                cv2.fillPoly(struct_mask, [pts], 2) # Wall_External
-                            else:
-                                cv2.fillPoly(struct_mask, [pts], 1) # Wall_Internal
-                        elif "Door" in c:
-                            cv2.fillPoly(struct_mask, [pts], 3)     # Door
-                        elif "Window" in c:
-                            cv2.fillPoly(struct_mask, [pts], 4)     # Window
+        # B. Rasterize Walls (direct polygon children only, strictly excluding WallCabinet)
+        for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
+            c = g.attrib.get("class", "")
+            if c == "Wall External":
+                for poly in g.findall("{http://www.w3.org/2000/svg}polygon"):
+                    if "points" in poly.attrib:
+                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                        if len(pts) >= 3:
+                            cv2.fillPoly(struct_mask, [pts], 2) # Wall_External
+            elif c == "Wall" or (c.startswith("Wall ") and "External" not in c):
+                for poly in g.findall("{http://www.w3.org/2000/svg}polygon"):
+                    if "points" in poly.attrib:
+                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                        if len(pts) >= 3:
+                            cv2.fillPoly(struct_mask, [pts], 1) # Wall_Internal
+
+        # C. Rasterize Doors and Windows (cutouts rendered directly over walls)
+        for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
+            c = g.attrib.get("class", "")
+            if c.startswith("Door"):
+                for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
+                    if "points" in poly.attrib:
+                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                        if len(pts) >= 3:
+                            cv2.fillPoly(struct_mask, [pts], 3) # Door
+            elif c.startswith("Window"):
+                for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
+                    if "points" in poly.attrib:
+                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                        if len(pts) >= 3:
+                            cv2.fillPoly(struct_mask, [pts], 4) # Window
 
         # Legacy 4-class mask (0: bg, 1: wall, 2: door, 3: window)
         mask_4class = np.zeros((size, size), dtype=np.uint8)

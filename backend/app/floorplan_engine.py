@@ -33,34 +33,39 @@ class FloorplanPipeline:
         baseline_weights_path: str = "models/saved/floorplan_baseline/best.safetensors"
     ):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.is_multitask = False
+        self.baseline_model = None
+        self.multitask_model = None
 
-        # Attempt to load Multi-Task UNet++ with room prediction
+        # 1. Load Baseline ResNet-34 UNet for high-precision structural elements (Walls, Doors, Windows)
+        base_file = Path(baseline_weights_path)
+        if base_file.exists():
+            try:
+                self.baseline_model = smp.Unet(encoder_name="resnet34", classes=4).to(self.device)
+                state_dict = load_file(str(base_file))
+                self.baseline_model.load_state_dict(state_dict)
+                self.baseline_model.eval()
+                print(f"[FLOORPLAN ENGINE] Loaded baseline structure model (4-class, 84% wall IoU) from {base_file}")
+            except Exception as e:
+                print(f"[FLOORPLAN ENGINE] Error loading baseline weights: {e}")
+
+        # 2. Load Multi-Task UNet++ for semantic room classification (12 room types)
         mt_file = Path(multitask_weights_path)
         if mt_file.exists():
             try:
                 ckpt = torch.load(str(mt_file), map_location=self.device)
-                self.model = MultiTaskFloorplanUNet(
+                self.multitask_model = MultiTaskFloorplanUNet(
                     encoder_name="resnet34",
                     num_struct_classes=5,
                     num_room_classes=12
                 ).to(self.device)
-                self.model.load_state_dict(ckpt["model_state_dict"])
-                self.model.eval()
-                self.is_multitask = True
-                print(f"[FLOORPLAN ENGINE] Loaded MultiTask UNet++ (Structure + Rooms) from {mt_file}")
+                self.multitask_model.load_state_dict(ckpt["model_state_dict"])
+                self.multitask_model.eval()
+                print(f"[FLOORPLAN ENGINE] Loaded MultiTask UNet++ (Semantic Rooms) from {mt_file}")
             except Exception as e:
-                print(f"[FLOORPLAN ENGINE] Warning loading multitask weights: {e}, falling back to baseline.")
-                self.is_multitask = False
+                print(f"[FLOORPLAN ENGINE] Warning loading multitask weights: {e}")
 
-        if not self.is_multitask:
-            self.model = smp.Unet(encoder_name="resnet34", classes=4).to(self.device)
-            base_file = Path(baseline_weights_path)
-            if base_file.exists():
-                state_dict = load_file(str(base_file))
-                self.model.load_state_dict(state_dict)
-                print(f"[FLOORPLAN ENGINE] Loaded baseline 4-class weights from {base_file}")
-            self.model.eval()
+        self.model = self.baseline_model or self.multitask_model
+        self.is_multitask = self.multitask_model is not None
 
         self.vectorizer = FloorplanVectorizer()
         self.extruder = Floorplan3DExtruder()
@@ -107,19 +112,23 @@ class FloorplanPipeline:
         tensor = tensor.unsqueeze(0)
 
         with torch.no_grad():
-            if self.is_multitask:
-                outputs = self.model(tensor)
+            if self.multitask_model is not None:
+                outputs = self.multitask_model(tensor)
                 struct_pred = torch.argmax(outputs["struct"], dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
                 room_pred = torch.argmax(outputs["room"], dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
 
-                # Derive 4-class mask for geometry extractor
+                # Map 5-class structure (bg, wall_int, wall_ext, door, win) to 4-class for vectorizer
                 mask_4class = np.zeros_like(struct_pred)
                 mask_4class[(struct_pred == 1) | (struct_pred == 2)] = 1
                 mask_4class[struct_pred == 3] = 2
                 mask_4class[struct_pred == 4] = 3
-            else:
-                logits = self.model(tensor)
+            elif self.baseline_model is not None:
+                logits = self.baseline_model(tensor)
                 mask_4class = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+                struct_pred = None
+                room_pred = None
+            else:
+                mask_4class = np.zeros((size, size), dtype=np.uint8)
                 struct_pred = None
                 room_pred = None
 

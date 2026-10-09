@@ -150,6 +150,7 @@ def train_floorplan_multitask(
                 f"[EPOCH {epoch:02d}/{epochs}] "
                 f"Train: {avg_train_loss:.4f} | "
                 f"Val Loss: {val_metrics['val_loss']:.4f} | "
+                f"Merged Wall IoU: {val_metrics['merged_wall_iou']*100:.2f}% | "
                 f"Struct mIoU: {val_metrics['struct_miou']*100:.2f}% "
                 f"(Wall_Ext: {val_metrics['wall_ext_iou']*100:.1f}%, Door: {val_metrics['door_iou']*100:.1f}%, Win: {val_metrics['win_iou']*100:.1f}%) | "
                 f"Room mIoU: {val_metrics['room_miou']*100:.2f}%"
@@ -160,6 +161,7 @@ def train_floorplan_multitask(
                 "train_struct_loss": train_s_loss_accum / n_batches,
                 "train_room_loss": train_r_loss_accum / n_batches,
                 "val_loss": val_metrics["val_loss"],
+                "val_merged_wall_iou": val_metrics["merged_wall_iou"],
                 "val_struct_miou": val_metrics["struct_miou"],
                 "val_wall_ext_iou": val_metrics["wall_ext_iou"],
                 "val_wall_int_iou": val_metrics["wall_int_iou"],
@@ -171,7 +173,7 @@ def train_floorplan_multitask(
             }, step=epoch)
 
             # Combined score for checkpoint selection
-            combined_score = 0.6 * val_metrics["struct_miou"] + 0.4 * val_metrics["room_miou"]
+            combined_score = 0.6 * val_metrics["merged_wall_iou"] + 0.4 * val_metrics["room_miou"]
             if combined_score > best_score:
                 best_score = combined_score
                 torch.save({
@@ -191,6 +193,7 @@ def train_floorplan_multitask(
         test_metrics = evaluate_loader(model, test_loader, device, multitask_loss)
 
         print("\n========== FINAL TEST SET BENCHMARK ==========")
+        print(f"Test Merged Wall IoU: {test_metrics['merged_wall_iou']*100:.2f}%")
         print(f"Test Struct mIoU:     {test_metrics['struct_miou']*100:.2f}%")
         print(f"  - Wall Internal IoU: {test_metrics['wall_int_iou']*100:.2f}%")
         print(f"  - Wall External IoU: {test_metrics['wall_ext_iou']*100:.2f}%")
@@ -212,6 +215,8 @@ def evaluate_loader(model, loader, device, loss_fn) -> Dict[str, float]:
     # Accumulators for structure classes [1: Wall_Int, 2: Wall_Ext, 3: Door, 4: Window]
     s_inter = {c: 0 for c in range(1, 5)}
     s_union = {c: 0 for c in range(1, 5)}
+    merged_wall_inter = 0
+    merged_wall_union = 0
 
     # Accumulators for room classes [1..11]
     r_inter = {c: 0 for c in range(1, 12)}
@@ -244,6 +249,12 @@ def evaluate_loader(model, loader, device, loss_fn) -> Dict[str, float]:
                 s_inter[c] += (p_c & t_c).sum().item()
                 s_union[c] += (p_c | t_c).sum().item()
 
+            # Merged Wall IoU (Internal + External combined)
+            p_m_wall = (s_preds == 1) | (s_preds == 2)
+            t_m_wall = (s_gt == 1) | (s_gt == 2)
+            merged_wall_inter += (p_m_wall & t_m_wall).sum().item()
+            merged_wall_union += (p_m_wall | t_m_wall).sum().item()
+
             # Room IoUs
             for c in range(1, 12):
                 p_c = (r_preds == c)
@@ -262,6 +273,7 @@ def evaluate_loader(model, loader, device, loss_fn) -> Dict[str, float]:
     door_iou = s_inter[3] / max(s_union[3], 1)
     win_iou = s_inter[4] / max(s_union[4], 1)
     struct_miou = (wall_int_iou + wall_ext_iou + door_iou + win_iou) / 4.0
+    merged_wall_iou = merged_wall_inter / max(merged_wall_union, 1)
 
     room_ious = [r_inter[c] / max(r_union[c], 1) for c in range(1, 12) if r_union[c] > 0]
     room_miou = sum(room_ious) / max(len(room_ious), 1) if room_ious else 0.0
@@ -270,6 +282,7 @@ def evaluate_loader(model, loader, device, loss_fn) -> Dict[str, float]:
     return {
         "val_loss": val_loss_accum / n,
         "struct_miou": struct_miou,
+        "merged_wall_iou": merged_wall_iou,
         "wall_int_iou": wall_int_iou,
         "wall_ext_iou": wall_ext_iou,
         "door_iou": door_iou,
