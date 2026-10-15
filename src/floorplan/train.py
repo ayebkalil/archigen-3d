@@ -71,8 +71,8 @@ def train_floorplan_multitask(
     ).to(device)
 
     # 3. Loss Functions
-    # Structure weights: Background=1.0, Wall_Int=5.0, Wall_Ext=5.0, Door=12.0, Window=8.0
-    struct_weights = torch.tensor([1.0, 5.0, 5.0, 12.0, 8.0]).to(device)
+    # Structure weights: Background=0.5, Wall_Int=4.0, Wall_Ext=5.0, Door=25.0, Window=10.0
+    struct_weights = torch.tensor([0.5, 4.0, 5.0, 25.0, 10.0]).to(device)
     criterion_struct_ce = nn.CrossEntropyLoss(weight=struct_weights)
     criterion_struct_dice = smp.losses.DiceLoss(mode="multiclass", classes=[1, 2, 3, 4])
 
@@ -86,7 +86,7 @@ def train_floorplan_multitask(
         s_logits, r_logits = outputs["struct"], outputs["room"]
         s_targets, r_targets = batch["struct_mask"], batch["room_mask"]
 
-        loss_s = criterion_struct_ce(s_logits, s_targets) + 1.2 * criterion_struct_dice(s_logits, s_targets)
+        loss_s = criterion_struct_ce(s_logits, s_targets) + 1.5 * criterion_struct_dice(s_logits, s_targets)
         loss_r = criterion_room_ce(r_logits, r_targets) + 1.0 * criterion_room_dice(r_logits, r_targets)
         return loss_s + 0.8 * loss_r, loss_s, loss_r
 
@@ -141,23 +141,30 @@ def train_floorplan_multitask(
             train_s_loss_accum = 0.0
             train_r_loss_accum = 0.0
 
-            for batch in train_loader:
+            accum_steps = 2
+            optimizer.zero_grad()
+            for b_idx, batch in enumerate(train_loader):
                 imgs = batch["image"].to(device)
                 batch["struct_mask"] = batch["struct_mask"].to(device)
                 batch["room_mask"] = batch["room_mask"].to(device)
 
-                optimizer.zero_grad()
                 with torch.amp.autocast("cuda", enabled=(device.type == "cuda")):
                     outputs = model(imgs)
                     loss, loss_s, loss_r = multitask_loss(outputs, batch)
+                    loss_scaled = loss / accum_steps
 
-                scaler.scale(loss).backward()
-                scaler.step(optimizer)
-                scaler.update()
+                scaler.scale(loss_scaled).backward()
+                if (b_idx + 1) % accum_steps == 0 or (b_idx + 1) == len(train_loader):
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad()
 
                 train_loss_accum += loss.item()
                 train_s_loss_accum += loss_s.item()
                 train_r_loss_accum += loss_r.item()
+
+                if (b_idx + 1) % 250 == 0 or (b_idx + 1) == len(train_loader):
+                    print(f"  [Epoch {epoch:02d} | Batch {b_idx+1:04d}/{len(train_loader)}] Step Loss: {loss.item():.4f}", flush=True)
 
             scheduler.step()
             n_batches = len(train_loader)
@@ -173,7 +180,8 @@ def train_floorplan_multitask(
                 f"Merged Wall IoU: {val_metrics['merged_wall_iou']*100:.2f}% | "
                 f"Struct mIoU: {val_metrics['struct_miou']*100:.2f}% "
                 f"(Wall_Ext: {val_metrics['wall_ext_iou']*100:.1f}%, Door: {val_metrics['door_iou']*100:.1f}%, Win: {val_metrics['win_iou']*100:.1f}%) | "
-                f"Room mIoU: {val_metrics['room_miou']*100:.2f}%"
+                f"Room mIoU: {val_metrics['room_miou']*100:.2f}%",
+                flush=True
             )
 
             mlflow.log_metrics({

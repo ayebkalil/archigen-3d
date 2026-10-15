@@ -55,12 +55,15 @@ class CubiCasaDataset(Dataset):
         root_dir: str = "data/CubiCasa5k/cubicasa5k/cubicasa5k",
         split: str = "train",
         img_size: int = 512,
-        augment: bool = True
+        augment: bool = True,
+        cache_dir: Optional[str] = "data/CubiCasa5k/cached_512"
     ):
         self.root_dir = Path(root_dir)
+        self.split = split
         self.split_file = self.root_dir / f"{split}.txt"
         self.img_size = img_size
         self.augment = augment and (split == "train")
+        self.cache_dir = Path(cache_dir) / split if cache_dir else None
 
         if not self.split_file.exists():
             raise FileNotFoundError(f"Split file not found: {self.split_file}")
@@ -83,93 +86,94 @@ class CubiCasaDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         sample_rel_path = self.valid_samples[idx]
-        folder = self.root_dir / sample_rel_path
-        img_path = folder / "F1_scaled.png"
-        svg_path = folder / "model.svg"
+        file_key = sample_rel_path.replace("/", "_").strip("_")
+        cached_file = (self.cache_dir / f"{file_key}.npz") if self.cache_dir else None
 
-        # 1. Load image
-        img = Image.open(img_path).convert("RGB")
-        iw, ih = img.size
+        if cached_file and cached_file.exists():
+            with np.load(cached_file) as data:
+                canvas_img = Image.fromarray(data["image"])
+                struct_mask = data["struct_mask"].copy()
+                room_mask = data["room_mask"].copy()
+                mask_4class = data["mask"].copy()
+        else:
+            folder = self.root_dir / sample_rel_path
+            img_path = folder / "F1_scaled.png"
+            svg_path = folder / "model.svg"
 
-        # 2. Parse SVG dimensions
-        try:
+            # 1. Load image
+            img = Image.open(img_path).convert("RGB")
+            iw, ih = img.size
+
+            # 2. Calculate aspect-preserving letterbox scaling based on raw image dimensions
+            size = self.img_size
+            scale = min(size / iw, size / ih)
+            nw, nh = int(iw * scale), int(ih * scale)
+            pad_x = (size - nw) // 2
+            pad_y = (size - nh) // 2
+
+            # Resize image preserving true aspect ratio
+            img_resized = img.resize((nw, nh), Image.Resampling.BILINEAR)
+            canvas_img = Image.new("RGB", (size, size), (255, 255, 255))
+            canvas_img.paste(img_resized, (pad_x, pad_y))
+
+            # 3. Parse SVG root
             tree = ET.parse(svg_path)
             root = tree.getroot()
-            vb = root.attrib.get("viewBox", "").split()
-            if vb and len(vb) == 4:
-                svg_w, svg_h = float(vb[2]), float(vb[3])
-            else:
-                svg_w, svg_h = float(root.attrib.get("width", iw)), float(root.attrib.get("height", ih))
-        except Exception:
-            svg_w, svg_h = float(iw), float(ih)
 
-        # 3. Calculate letterbox scaling
-        size = self.img_size
-        scale = min(size / svg_w, size / svg_h)
-        nw, nh = int(svg_w * scale), int(svg_h * scale)
-        pad_x = (size - nw) // 2
-        pad_y = (size - nh) // 2
+            # 4. Rasterize Ground-Truth Masks: Structure + Semantic Room Types
+            struct_mask = np.zeros((size, size), dtype=np.uint8)
+            room_mask = np.zeros((size, size), dtype=np.uint8)
 
-        # Resize image
-        img_resized = img.resize((nw, nh), Image.Resampling.BILINEAR)
-        canvas_img = Image.new("RGB", (size, size), (255, 255, 255))
-        canvas_img.paste(img_resized, (pad_x, pad_y))
+            # A. Rasterize Room Spaces first
+            for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
+                c = g.attrib.get("class", "")
+                if c.startswith("Space"):
+                    for r_name, r_id in ROOM_CLASSES.items():
+                        if r_name in c:
+                            for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
+                                if "points" in poly.attrib:
+                                    pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                                    if len(pts) >= 3:
+                                        cv2.fillPoly(room_mask, [pts], r_id)
+                            break
 
-        # 4. Rasterize Ground-Truth Masks: Structure + Semantic Room Types
+            # B. Rasterize Walls (direct polygon children only, strictly excluding WallCabinet)
+            for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
+                c = g.attrib.get("class", "")
+                if c == "Wall External":
+                    for poly in g.findall("{http://www.w3.org/2000/svg}polygon"):
+                        if "points" in poly.attrib:
+                            pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                            if len(pts) >= 3:
+                                cv2.fillPoly(struct_mask, [pts], 2) # Wall_External
+                elif c == "Wall" or (c.startswith("Wall ") and "External" not in c):
+                    for poly in g.findall("{http://www.w3.org/2000/svg}polygon"):
+                        if "points" in poly.attrib:
+                            pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                            if len(pts) >= 3:
+                                cv2.fillPoly(struct_mask, [pts], 1) # Wall_Internal
 
-        struct_mask = np.zeros((size, size), dtype=np.uint8)
-        room_mask = np.zeros((size, size), dtype=np.uint8)
+            # C. Rasterize Doors and Windows (cutouts rendered directly over walls)
+            for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
+                c = g.attrib.get("class", "")
+                if c.startswith("Door"):
+                    for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
+                        if "points" in poly.attrib:
+                            pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                            if len(pts) >= 3:
+                                cv2.fillPoly(struct_mask, [pts], 3) # Door
+                elif c.startswith("Window"):
+                    for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
+                        if "points" in poly.attrib:
+                            pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
+                            if len(pts) >= 3:
+                                cv2.fillPoly(struct_mask, [pts], 4) # Window
 
-        # A. Rasterize Room Spaces first
-        for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
-            c = g.attrib.get("class", "")
-            if c.startswith("Space"):
-                for r_name, r_id in ROOM_CLASSES.items():
-                    if r_name in c:
-                        for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
-                            if "points" in poly.attrib:
-                                pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
-                                if len(pts) >= 3:
-                                    cv2.fillPoly(room_mask, [pts], r_id)
-                        break
-
-        # B. Rasterize Walls (direct polygon children only, strictly excluding WallCabinet)
-        for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
-            c = g.attrib.get("class", "")
-            if c == "Wall External":
-                for poly in g.findall("{http://www.w3.org/2000/svg}polygon"):
-                    if "points" in poly.attrib:
-                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
-                        if len(pts) >= 3:
-                            cv2.fillPoly(struct_mask, [pts], 2) # Wall_External
-            elif c == "Wall" or (c.startswith("Wall ") and "External" not in c):
-                for poly in g.findall("{http://www.w3.org/2000/svg}polygon"):
-                    if "points" in poly.attrib:
-                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
-                        if len(pts) >= 3:
-                            cv2.fillPoly(struct_mask, [pts], 1) # Wall_Internal
-
-        # C. Rasterize Doors and Windows (cutouts rendered directly over walls)
-        for g in root.findall(".//{http://www.w3.org/2000/svg}g"):
-            c = g.attrib.get("class", "")
-            if c.startswith("Door"):
-                for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
-                    if "points" in poly.attrib:
-                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
-                        if len(pts) >= 3:
-                            cv2.fillPoly(struct_mask, [pts], 3) # Door
-            elif c.startswith("Window"):
-                for poly in g.findall(".//{http://www.w3.org/2000/svg}polygon"):
-                    if "points" in poly.attrib:
-                        pts = parse_svg_points(poly.attrib["points"], scale, pad_x, pad_y)
-                        if len(pts) >= 3:
-                            cv2.fillPoly(struct_mask, [pts], 4) # Window
-
-        # Legacy 4-class mask (0: bg, 1: wall, 2: door, 3: window)
-        mask_4class = np.zeros((size, size), dtype=np.uint8)
-        mask_4class[(struct_mask == 1) | (struct_mask == 2)] = 1
-        mask_4class[struct_mask == 3] = 2
-        mask_4class[struct_mask == 4] = 3
+            # Legacy 4-class mask (0: bg, 1: wall, 2: door, 3: window)
+            mask_4class = np.zeros((size, size), dtype=np.uint8)
+            mask_4class[(struct_mask == 1) | (struct_mask == 2)] = 1
+            mask_4class[struct_mask == 3] = 2
+            mask_4class[struct_mask == 4] = 3
 
         # 5. Data Augmentation (90 deg rotations, flips)
         if self.augment:
