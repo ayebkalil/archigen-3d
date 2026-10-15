@@ -125,9 +125,13 @@ class FloorplanVectorizer:
             if cv2.contourArea(largest_ext) > 100:
                 ext_poly_approx = cv2.approxPolyDP(largest_ext, 3.0, True).reshape(-1, 2)
                 if len(ext_poly_approx) >= 3:
-                    shell_poly = Polygon(ext_poly_approx * scale_m_per_px)
-                    shell_valid = shell_poly.is_valid
-                    building_perimeter_m = round(float(shell_poly.length), 2)
+                    try:
+                        shell_poly = Polygon(ext_poly_approx * scale_m_per_px)
+                        shell_valid = bool(shell_poly.is_valid)
+                        building_perimeter_m = round(float(shell_poly.length), 2)
+                    except Exception:
+                        shell_valid = False
+                        building_perimeter_m = 0.0
 
         # 4. Wall Contour extraction and Rectilinear Polygon simplification
         wall_contours, _ = cv2.findContours(wall_clean, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -158,15 +162,17 @@ class FloorplanVectorizer:
             poly_meters = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in snapped_poly]
 
             # Determine if Exterior Wall:
-            # Method A: from struct_mask (class 2 = Wall_External)
-            # Method B: from building envelope proximity
+            # Method A: from struct_mask (class 2 = Wall_External vs class 1 = Wall_Internal)
+            # Method B: from building envelope proximity (fallback if no struct_mask)
             is_exterior = False
             if struct_mask is not None:
                 # Sample pixels under contour
                 wall_patch = np.zeros((h, w), dtype=np.uint8)
                 cv2.drawContours(wall_patch, [cnt], -1, 1, thickness=-1)
-                ext_pixels = np.logical_and(wall_patch == 1, struct_mask == 2).sum()
-                if ext_pixels > 20:
+                ext_pixels = int(np.logical_and(wall_patch == 1, struct_mask == 2).sum())
+                int_pixels = int(np.logical_and(wall_patch == 1, struct_mask == 1).sum())
+                # Exterior if Wall_External pixels dominate Wall_Internal pixels
+                if ext_pixels > int_pixels and ext_pixels > 30:
                     is_exterior = True
             elif len(ext_contours) > 0:
                 # Fallback: check distance to outer contour
@@ -310,26 +316,27 @@ class FloorplanVectorizer:
                     })
                     room_idx += 1
 
-        # 7. Refine Exterior Walls using Room Union Outer Boundary (handles L and U-shaped buildings)
-        try:
-            from shapely.ops import unary_union
-            valid_room_polys = [
-                Polygon(r["polygon_meters"])
-                for r in rooms
-                if len(r.get("polygon_meters", [])) >= 3 and Polygon(r["polygon_meters"]).is_valid
-            ]
-            if len(valid_room_polys) > 0:
-                room_envelope = unary_union(valid_room_polys)
-                envelope_boundary = room_envelope.boundary
-                for w_item in walls:
-                    poly_pts = w_item.get("polygon_meters", [])
-                    if len(poly_pts) >= 3:
-                      w_poly = Polygon(poly_pts)
-                      if w_poly.is_valid:
-                        if envelope_boundary.distance(w_poly) < 0.45:
-                          w_item["is_exterior"] = True
-        except Exception:
-            pass
+        # 7. Refine Exterior Walls using Room Union Outer Boundary (fallback only when struct_mask is None)
+        if struct_mask is None:
+            try:
+                from shapely.ops import unary_union
+                valid_room_polys = [
+                    Polygon(r["polygon_meters"])
+                    for r in rooms
+                    if len(r.get("polygon_meters", [])) >= 3 and Polygon(r["polygon_meters"]).is_valid
+                ]
+                if len(valid_room_polys) > 0:
+                    room_envelope = unary_union(valid_room_polys)
+                    envelope_boundary = room_envelope.boundary
+                    for w_item in walls:
+                        poly_pts = w_item.get("polygon_meters", [])
+                        if len(poly_pts) >= 3:
+                            w_poly = Polygon(poly_pts)
+                            if w_poly.is_valid:
+                                if envelope_boundary.distance(w_poly) < 0.45:
+                                    w_item["is_exterior"] = True
+            except Exception:
+                pass
 
         return {
             "metadata": {

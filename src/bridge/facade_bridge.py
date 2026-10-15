@@ -176,6 +176,12 @@ class FacadeBridge:
         door_w_px = max(int(round(door_w_m * scale_px_per_m)), 12)
         door_h_px = max(int(round(door_h_m * scale_px_per_m)), 20)
 
+        def safe_rect(bx0, by0, bx1, by1, f_color):
+            rx0, rx1 = int(round(min(bx0, bx1))), int(round(max(bx0, bx1)))
+            ry0, ry1 = int(round(min(by0, by1))), int(round(max(by0, by1)))
+            if rx1 > rx0 and ry1 > ry0:
+                draw.rectangle([rx0, ry0, rx1, ry1], fill=f_color)
+
         # 5. Draw Openings Per Floor (Bottom to Top)
         for fl in range(num_floors):
             floor_bottom_y = wall_y1 - int(round(fl * floor_height_m * scale_px_per_m))
@@ -184,7 +190,7 @@ class FacadeBridge:
             # Floor dividing molding (for multi-story buildings)
             if fl > 0:
                 mold_h = max(int(round(0.15 * scale_px_per_m)), 3)
-                draw.rectangle([wall_x0, floor_bottom_y - mold_h, wall_x1, floor_bottom_y], fill=CMP_PALETTE["molding"])
+                safe_rect(wall_x0, floor_bottom_y - mold_h, wall_x1, floor_bottom_y, CMP_PALETTE["molding"])
 
             # Ground Floor Door
             if fl == 0 and has_door and door_x_m is not None:
@@ -193,7 +199,7 @@ class FacadeBridge:
                 d_x1 = d_cx_px + door_w_px // 2
                 d_y1 = floor_bottom_y - base_h
                 d_y0 = d_y1 - door_h_px
-                draw.rectangle([d_x0, d_y0, d_x1, d_y1], fill=CMP_PALETTE["door"])
+                safe_rect(d_x0, d_y0, d_x1, d_y1, CMP_PALETTE["door"])
 
             # Windows on this floor
             for wx_m in window_x_positions_m:
@@ -211,12 +217,12 @@ class FacadeBridge:
                 w_y0 = max(w_y0, floor_top_y + cornice_h + 2)
 
                 # Draw Window
-                draw.rectangle([w_x0, w_y0, w_x1, w_y1], fill=CMP_PALETTE["window"])
+                safe_rect(w_x0, w_y0, w_x1, w_y1, CMP_PALETTE["window"])
 
                 # Draw Window Sill underneath
                 sill_h_px = max(int(round(0.08 * scale_px_per_m)), 3)
                 sill_margin = 2
-                draw.rectangle([w_x0 - sill_margin, w_y1, w_x1 + sill_margin, w_y1 + sill_h_px], fill=CMP_PALETTE["sill"])
+                safe_rect(w_x0 - sill_margin, w_y1, w_x1 + sill_margin, w_y1 + sill_h_px, CMP_PALETTE["sill"])
 
         return canvas, uv_bounds
 

@@ -48,8 +48,13 @@ class Floorplan3DExtruder:
                 continue
 
             # Validate polygon with Shapely
-            poly = Polygon(pts_2d)
-            is_valid = poly.is_valid
+            is_valid = False
+            try:
+                if len(pts_2d) >= 3:
+                    poly = Polygon(pts_2d)
+                    is_valid = bool(poly.is_valid)
+            except Exception:
+                is_valid = False
 
             wall_entry = {
                 "id": wall["id"],
@@ -65,14 +70,22 @@ class Floorplan3DExtruder:
 
         rooms_3d = []
         for room in layout.get("rooms", []):
-            poly = Polygon(room["polygon_meters"])
+            r_pts = room.get("polygon_meters", [])
+            r_valid = False
+            try:
+                if len(r_pts) >= 3:
+                    poly = Polygon(r_pts)
+                    r_valid = bool(poly.is_valid)
+            except Exception:
+                r_valid = False
+
             rooms_3d.append({
                 "id": room["id"],
                 "room_type": room["room_type"],
                 "surface_m2": room["surface_m2"],
-                "centroid": room["centroid_meters"],
-                "points_2d": room["polygon_meters"],
-                "is_valid_geometry": poly.is_valid
+                "centroid": room.get("centroid_meters", [0.0, 0.0]),
+                "points_2d": r_pts,
+                "is_valid_geometry": r_valid
             })
 
         return {
