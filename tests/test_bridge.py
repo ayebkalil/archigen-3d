@@ -71,3 +71,35 @@ def test_facade_bridge_layout_processing():
     assert "texture_base64" in mock_layout["walls"][0]["facade_texture"]
     assert mock_layout["walls"][0]["facade_texture"]["texture_base64"].startswith("data:image/png;base64,")
     assert "facade_texture" not in mock_layout["walls"][1]
+
+def test_facade_bridge_backends():
+    """Verify that FacadeBridge synthesizes valid RGB textures under both native PyTorch and ONNX CPU fallback."""
+    import io
+    from PIL import Image
+    from pathlib import Path
+
+    bridge_default = FacadeBridge()
+    sketch = Image.new("RGB", (256, 256), (0, 48, 255))
+    buf = io.BytesIO()
+    sketch.save(buf, format="PNG")
+    sketch_bytes = buf.getvalue()
+
+    if bridge_default.inference_engine is not None:
+        out_bytes = bridge_default.inference_engine.generate(sketch_bytes)
+        assert isinstance(out_bytes, bytes)
+        assert len(out_bytes) > 0
+        out_img = Image.open(io.BytesIO(out_bytes))
+        assert out_img.size == (256, 256)
+
+    # 2. Explicit ONNX CPU fallback test
+    from backend.app.inference import ArchiGenONNXInference
+    onnx_path = Path("models/saved/generator_perceptual.onnx")
+    if onnx_path.exists():
+        onnx_engine = ArchiGenONNXInference(str(onnx_path))
+        onnx_bytes = onnx_engine.generate(sketch_bytes)
+        assert isinstance(onnx_bytes, bytes)
+        assert len(onnx_bytes) > 0
+        onnx_img = Image.open(io.BytesIO(onnx_bytes))
+        assert onnx_img.size == (256, 256)
+
+

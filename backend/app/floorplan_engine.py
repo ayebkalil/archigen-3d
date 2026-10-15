@@ -29,12 +29,31 @@ class FloorplanPipeline:
 
     def __init__(
         self,
-        multitask_weights_path: str = "models/saved/floorplan_unetpp/multitask_resnet34_best.pth",
-        baseline_weights_path: str = "models/saved/floorplan_baseline/best.safetensors"
+        multitask_weights_path: Optional[str] = None,
+        baseline_weights_path: str = "models/saved/floorplan_baseline/best.safetensors",
+        device: Optional[str] = None
     ):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if device is not None:
+            self.device = torch.device(device)
+        else:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.baseline_model = None
         self.multitask_model = None
+
+        # Resolve multitask weights candidate
+        if multitask_weights_path is None:
+            candidates = [
+                "models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
+                "models/saved/floorplan_unetpp/multitask_resnet34_best.pth",
+                "models/saved/floorplan_unetpp/multitask_resnet34_best_backup_25ep.pth"
+            ]
+            chosen_mt = None
+            for cand in candidates:
+                if Path(cand).exists():
+                    chosen_mt = cand
+                    break
+            multitask_weights_path = chosen_mt or candidates[1]
 
         # 1. Load Baseline ResNet-34 UNet for high-precision structural elements (Walls, Doors, Windows)
         base_file = Path(baseline_weights_path)
@@ -44,7 +63,7 @@ class FloorplanPipeline:
                 state_dict = load_file(str(base_file))
                 self.baseline_model.load_state_dict(state_dict)
                 self.baseline_model.eval()
-                print(f"[FLOORPLAN ENGINE] Loaded baseline structure model (4-class, 84% wall IoU) from {base_file}")
+                print(f"[FLOORPLAN ENGINE] Loaded baseline structure model from {base_file}")
             except Exception as e:
                 print(f"[FLOORPLAN ENGINE] Error loading baseline weights: {e}")
 
@@ -52,7 +71,7 @@ class FloorplanPipeline:
         mt_file = Path(multitask_weights_path)
         if mt_file.exists():
             try:
-                ckpt = torch.load(str(mt_file), map_location=self.device)
+                ckpt = torch.load(str(mt_file), map_location=self.device, weights_only=False)
                 self.multitask_model = MultiTaskFloorplanUNet(
                     encoder_name="resnet34",
                     num_struct_classes=5,
@@ -60,7 +79,7 @@ class FloorplanPipeline:
                 ).to(self.device)
                 self.multitask_model.load_state_dict(ckpt["model_state_dict"])
                 self.multitask_model.eval()
-                print(f"[FLOORPLAN ENGINE] Loaded MultiTask UNet++ (Semantic Rooms) from {mt_file}")
+                print(f"[FLOORPLAN ENGINE] Loaded MultiTask UNet++ from {mt_file} on {self.device}")
             except Exception as e:
                 print(f"[FLOORPLAN ENGINE] Warning loading multitask weights: {e}")
 
@@ -69,7 +88,7 @@ class FloorplanPipeline:
 
         self.vectorizer = FloorplanVectorizer()
         self.extruder = Floorplan3DExtruder()
-        self.bridge = FacadeBridge()
+        self.bridge = FacadeBridge(prefer_cuda=(self.device.type == "cuda"))
 
         # ImageNet Normalization
         self.mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(self.device)

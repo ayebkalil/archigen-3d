@@ -60,3 +60,73 @@ def test_extruder_threejs_and_obj_generation(tmp_path):
     content = obj_file.read_text(encoding="utf-8")
     assert "v " in content
     assert "f " in content
+
+def test_vectorizer_hybrid_room_partitioning_and_absorption():
+    """Verify that hybrid vectorizer splits same-class rooms separated by a wall and absorbs sub-threshold fragments."""
+    vectorizer = FloorplanVectorizer(min_area_habitable_m2=1.5, min_area_service_m2=0.8)
+
+    # 256x256 canvas
+    struct_mask = np.zeros((256, 256), dtype=np.uint8)
+    room_mask = np.zeros((256, 256), dtype=np.uint8)
+
+    # Outer wall enclosing the space
+    cv2.rectangle(struct_mask, (20, 20), (230, 230), 2, 6) # Exterior wall
+
+    # Dividing interior wall at x=125
+    cv2.line(struct_mask, (125, 20), (125, 230), 1, 6) # Interior wall
+
+    # Both sides are LivingRoom (class 1)
+    room_mask[26:224, 26:122] = 1 # Room A
+    room_mask[26:224, 128:224] = 1 # Room B
+
+    # Tiny spurious noise fragment of Closet (class 8, <0.8 m^2) inside Room A
+    room_mask[40:44, 40:44] = 8 # 16 px fragment
+
+    mask_4class = np.zeros_like(struct_mask)
+    mask_4class[struct_mask > 0] = 1
+
+    layout = vectorizer.vectorize(mask=mask_4class, struct_mask=struct_mask, room_mask=room_mask)
+    rooms = layout.get("rooms", [])
+
+    # The dividing wall should separate Room A and Room B into at least 2 distinct rooms
+    assert len(rooms) >= 2, f"Expected at least 2 rooms after wall masking, got {len(rooms)}"
+
+    # The tiny 16px closet fragment should have been absorbed, so no separate closet exists
+    closet_rooms = [r for r in rooms if r.get("room_type") == "Closet"]
+    assert len(closet_rooms) == 0, "Tiny closet fragment was not absorbed into parent room"
+
+def test_vectorizer_no_rooms_detected_status():
+    """Verify that empty floorplans with 0 rooms are explicitly classified as NO_ROOMS_DETECTED."""
+    vectorizer = FloorplanVectorizer()
+    mask = np.zeros((256, 256), dtype=np.uint8)
+    cv2.rectangle(mask, (30, 30), (220, 220), 1, 10) # Empty outer shell, 0 rooms
+    room_mask = np.zeros((256, 256), dtype=np.uint8)
+
+    layout = vectorizer.vectorize(mask, room_mask=room_mask)
+    meta = layout.get("metadata", {})
+
+    assert meta.get("num_rooms") == 0
+    assert meta.get("shell_status") == "NO_ROOMS_DETECTED"
+    assert meta.get("is_building_shell_valid") is False
+
+def test_vectorizer_envelope_shell_validation():
+    """Verify that a continuous outer envelope with >=4 segments is marked valid when enclosing rooms."""
+    vectorizer = FloorplanVectorizer()
+    struct_mask = np.zeros((256, 256), dtype=np.uint8)
+    room_mask = np.zeros((256, 256), dtype=np.uint8)
+
+    # Single continuous outer envelope
+    cv2.rectangle(struct_mask, (30, 30), (220, 220), 2, 8)
+    # One enclosed room
+    room_mask[40:210, 40:210] = 1
+
+    mask_4class = np.zeros_like(struct_mask)
+    mask_4class[struct_mask > 0] = 1
+
+    layout = vectorizer.vectorize(mask=mask_4class, struct_mask=struct_mask, room_mask=room_mask)
+    meta = layout.get("metadata", {})
+
+    assert meta.get("num_rooms") == 1
+    assert meta.get("num_envelope_segments", 0) >= 4
+    assert meta.get("is_building_shell_valid") is True
+

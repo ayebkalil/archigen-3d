@@ -224,29 +224,29 @@ def seed_everything(seed=42):
 \chapter{Résultats Expérimentaux \& Analyse Critique}
 
 \section{Évaluation de la Synthèse Générative de Façades}
-Le tableau~\ref{tab:facades_benchmark} synthétise les performances obtenues sur les 106 images du jeu de test CMP Facades.
+Le tableau~\ref{tab:facades_benchmark} synthétise les performances mesurées de manière reproductible sur les 106 images du jeu de test CMP Facades.
 
 \begin{table}[H]
 \centering
 \caption{Benchmark Comparatif des Modèles Génératifs (CMP Facades Test Split --- $N = 106$)}
 \label{tab:facades_benchmark}
-\begin{tabular}{lcccc}
+\begin{tabular}{lccccc}
 \toprule
-\textbf{Architecture} & \textbf{FID $\downarrow$} & \textbf{KID $(\times 10^3) \downarrow$} & \textbf{SSIM $\uparrow$} & \textbf{$\mathcal{L}_1 \downarrow$} \\
+\textbf{Modèle} & \textbf{LPIPS $\downarrow$} & \textbf{KID $(\times 10^3) \downarrow$} & \textbf{SSIM $\uparrow$} & \textbf{PSNR (dB) $\uparrow$} & \textbf{$\mathcal{L}_1 \downarrow$} \\
 \midrule
-Baseline (100 ep, TransposeConv, $\mathcal{L}_1=100$) & \textbf{351.70} & 149.89 $\pm$ 10.27 & 0.1226 & 0.3986 \\
-Enhanced (150 ep, Nearest+Conv, $\mathcal{L}_1=100$)  & 371.59 & 103.79 $\pm$ 8.89  & \textbf{0.1430} & \textbf{0.3918} \\
-Perceptual (100 ep, LPIPS+SN, $\mathcal{L}_1=30$)     & 369.94 & \textbf{60.40 $\pm$ 5.52} & 0.1058 & 0.3968 \\
+Baseline (100 ep, TransposeConv, $\mathcal{L}_1=100$) & 0.6327 & 150.36 $\pm$ 10.25 & 0.2866 & 13.19 & 0.3483 \\
+Enhanced (150 ep, Nearest+Conv, $\mathcal{L}_1=100$)  & 0.4940 & 109.86 $\pm$ 9.24  & \textbf{0.3345} & 13.15 & \textbf{0.3379} \\
+Perceptual (100 ep, LPIPS+SN, $\mathcal{L}_1=30$)     & \textbf{0.3169} & \textbf{67.65 $\pm$ 5.95} & 0.2792 & 12.69 & 0.3526 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Discussion Scientifique des Désaccords entre Métriques}
-Une analyse rigoureuse impose de reconnaître que les métriques objectives divergent :
+Une analyse rigoureuse impose de reconnaître que les métriques objectives évaluent des propriétés complémentaires et parfois antinomiques :
 \begin{enumerate}
-    \item \textbf{Métrique FID \& Biais d'Échantillonnage :} Le score FID absolu (350--370) s'avère élevé en raison de la dimensionnalité de l'espace Inception ($d = 2048$) vis-à-vis du faible effectif d'échantillons ($N = 106$), rendant l'estimation de la matrice de covariance de Fréchet sous-dimensionnée. Le KID (Kernel Inception Distance), qui fournit un estimateur non biaisé du $\text{MMD}^2$, classe quant à lui le modèle perceptuel en tête ($60.40 \times 10^{-3}$).
-    \item \textbf{Pénalisation de la Netteté par la Perte $\mathcal{L}_1$ et le SSIM :} Le modèle \emph{Enhanced} obtient les meilleurs scores SSIM ($0.1430$) et $\mathcal{L}_1$ ($0.3918$) parce que la minimisation exclusive de l'erreur absolue force le modèle à converger vers la moyenne conditionnelle pixel-par-pixel, ce qui produit un flou moyen statistiquement récompensé mais visuellement pauvre. Le modèle perceptuel, entraîné avec une composante LPIPS, affiche un SSIM ($0.1058$) et un $\mathcal{L}_1$ ($0.3968$) inférieurs, mais une distance perceptuelle et un KID nettement plus favorables.
-    \item \textbf{Justification du Choix de Production :} Le modèle perceptuel a été sélectionné pour le moteur d'inférence en raison de son acuité visuelle : suppression visible du motif d'échiquier grâce aux blocs Nearest+Conv, stabilisation du discriminateur par normalisation spectrale, encadrements de fenêtres nets et restitution des textures de pierre architecturale.
+    \item \textbf{Métrique KID (Kernel Inception Distance) :} Sur un effectif de test de 106 images, le calcul classique du FID s'avère instable en raison du sous-dimensionnement de la matrice de covariance empirique dans l'espace Inception ($d = 2048$). Le KID, estimateur polynomial cubique non biaisé du $\text{MMD}^2$, confirme la nette supériorité distributionnelle du modèle perceptuel ($67.65 \times 10^{-3}$ vs $150.36 \times 10^{-3}$ pour la baseline, soit une baisse de $55\%$).
+    \item \textbf{Arbitrage entre Lissage Pixel et Acuité Visuelle :} Le modèle \emph{Enhanced} obtient les meilleurs scores SSIM ($0.3345$) et $\mathcal{L}_1$ ($0.3379$). En effet, la minimisation prépondérante de la perte absolue contraint le générateur à prédire la moyenne conditionnelle de la distribution, produisant un lissage récompensé par les métriques pixel mais gommant les textures haute-fréquence. À l'inverse, le modèle \emph{Perceptual}, intégrant la distance LPIPS (SqueezeNet) et stabilisé par normalisation spectrale, divise par deux la distance perceptuelle ($0.3169$ vs $0.6327$) et restitue la netteté des menuiseries et des moulures au prix d'un léger compromis sur le SSIM ($0.2792$).
+    \item \textbf{Justification du Choix de Production :} Le modèle perceptuel a été retenu pour le pipeline 3D en raison de la clarté de ses textures : disparition du motif de damier (remplacement des convolutions transposées par Nearest+Conv) et préservation des contrastes structurels des baies architecturales.
 \end{enumerate}
 
 \section{Évaluation de la Segmentation de Plans d'Étage}
@@ -254,40 +254,74 @@ Le tableau~\ref{tab:floorplan_benchmark} expose les résultats empiriques mesur�
 
 \begin{table}[H]
 \centering
-\caption{Benchmark sur le Jeu de Test CubiCasa5K ($400$ plans complets non vus)}
+\caption{Benchmark Neural Multi-Tâches sur le Jeu de Test CubiCasa5K ($400$ plans non vus)}
 \label{tab:floorplan_benchmark}
-\begin{tabular}{lcc}
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Métrique} & \textbf{Baseline ResNet-34} & \textbf{MultiTask UNet++ (Aligné)} \\
+\textbf{Métrique} & \textbf{Baseline Initiale} & \textbf{Base (25 ép.)} & \textbf{Fine-Tuned (Final)} & \textbf{Signif. ($p$)} \\
 \midrule
-IoU Murs Fusionnés (Merged Wall IoU) & 29.08\% & \textbf{74.32\%} \\
-IoU Murs Extérieurs & N/A & \textbf{73.89\%} \\
-IoU Murs Intérieurs & N/A & \textbf{62.34\%} \\
-IoU Portes (Door IoU) & 7.91\% & \textbf{62.38\%} \\
-IoU Fenêtres (Window IoU) & 7.28\% & \textbf{73.28\%} \\
-mIoU Structurelle Premier Plan & 14.76\% & \textbf{69.99\%} \\
-mIoU Sémantique des Pièces (11 classes) & N/A & \textbf{54.72\%} \\
-Exactitude Pixel des Pièces & N/A & \textbf{85.85\%} (Réf. papier: 82.7\%) \\
-Rappel Portes à 20px (Object Recall) & 53.10\% & \textbf{96.75\%} \\
-Rappel Fenêtres à 20px (Object Recall) & 49.14\% & \textbf{90.59\%} \\
-IoU Empreinte Habitable (Living Area) & N/A & \textbf{74.04\%} \\
-Erreur Absolue Moyenne Nb Pièces (MAE) & N/A & \textbf{2.61} pièces \\
-Exactitude Classification Murs Extérieurs & 42.88\% & \textbf{91.07\%} (Préc: 94.2\%, Rap: 92.4\%) \\
-Erreur Relative d'Échelle Physique & 44.15\% & \textbf{10.14\%} \\
-Taux de Déclenchement Auto-Échelle & 100.0\% & 100.0\% \\
-Erreur Relative de Périmètre & 81.82\% & \textbf{45.08\%} \\
-Taux de Coque 3D Étanche (Watertight) & 9.75\% & \textbf{96.25\%} \\
+Exactitude Pixel des Pièces & N/A & 85.82\% & \textbf{87.47\%} [85.8, 89.1] & $p < 0.001$ (***) \\
+mIoU Sémantique (10 classes réelles) & N/A & 54.80\% & \textbf{56.47\%} [54.0, 58.8] & $p < 0.001$ (***) \\
+IoU Murs Fusionnés (Merged Wall) & 29.08\% & \textbf{74.31\%} & 74.16\% [73.2, 75.1] & $p = 0.121$ (n.s.) \\
+IoU Portes (Door IoU) & 7.91\% & \textbf{62.37\%} & 61.76\% [60.4, 63.2] & $p = 0.005$ (**) \\
+IoU Fenêtres (Window IoU) & 7.28\% & 73.26\% & \textbf{73.49\%} [72.1, 74.9] & $p = 0.126$ (n.s.) \\
+mIoU Structurelle (3 classes) & 14.76\% & \textbf{69.98\%} & 69.80\% [68.7, 70.9] & $p = 0.140$ (n.s.) \\
+IoU Empreinte Bâtiment (Footprint) & N/A & 79.83\% & \textbf{80.83\%} [78.7, 82.8] & $p = 0.005$ (**) \\
+Rappel Portes à 20px (Object Recall) & 53.10\% & \textbf{96.75\%} & 96.60\% & n.s. \\
+Rappel Fenêtres à 20px (Object Recall) & 49.14\% & 90.59\% & \textbf{90.85\%} & n.s. \\
+Précision Murs Extérieurs & 42.88\% & 91.07\% & \textbf{91.15\%} & n.s. \\
+Erreur Relative d'Échelle Métrique & 44.15\% & 10.14\% & \textbf{9.88\%} & n.s. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Diagnostic et Résolution du Problème Fondamental d'Alignement Données-Masques}
-L'historique de développement démontre une avancée méthodologique cruciale :
+\subsection{Analyse Statistique par Bootstrap \& Attribution des Gains}
+L'évaluation statistique appariée ($1\,000$ ré-échantillonnages sur les 400 plans de test) apporte un éclairage méthodologique déterminant :
 \begin{itemize}
-    \item \textbf{Cause Racine Identifiée (Désynchronisation Vectorielle-Raster) :} L'analyse fine a révélé un décalage géométrique systématique dans le pipeline d'ingestion initial : les coordonnées des polygones vectoriels SVG bruts de CubiCasa5K n'étaient pas correctement recalées sur le canevas matriciel $512 \times 512$ letterboxé. Ce décalage induisait une pénalisation artificielle où les cloisons réelles et prédites ne se superposaient jamais exactement, bridant l'IoU des murs à $22.44\%$ et des portes à $10.71\%$.
-    \item \textbf{Résolution et Preuve d'Apprentissage :} Après réécriture rigoureuse de la mise à l'échelle géométrique dans \texttt{src/floorplan/dataset.py} et mise en cache \texttt{.npz}, un test de sur-apprentissage contrôlé a immédiatement confirmé la convergence exacte ($>90\%$ d'IoU). Le ré-entraînement complet sur 25 époques a validé ce bond qualitatif sur les 400 plans de test : $+51.88$ pts sur les murs ($74.32\%$), $+51.67$ pts sur les portes ($62.38\%$), et $+49.90$ pts sur les fenêtres ($73.28\%$).
-    \item \textbf{Comparaison aux Résultats Publiés :} L'exactitude pixel des pièces atteint $85.85\%$, surpassant le benchmark officiel de l'article CubiCasa5K ($82.7\%$). Le mIoU sémantique des pièces s'établit à $54.72\%$, proche du score publié ($57.5\%$), tout en opérant sans aucun post-traitement de nettoyage manuel.
+    \item \textbf{Significativité des Gains Sémantiques :} Le gain global sur l'exactitude pixel des pièces ($+1.65$ pt, IC 95\% : $[+1.00, +2.38]$, $p < 0.001$) et le mIoU ($+1.66$ pt, IC 95\% : $[+0.73, +2.58]$, $p < 0.001$) est statistiquement significatif. Au niveau des catégories fonctionnelles, les pièces humides et de service enregistrent les progrès les plus probants : Cuisine ($+3.20$ pts, $p = 0.001$), Salle de bain ($+1.75$ pt, $p = 0.013$) et Garage ($+6.58$ pts, $p = 0.015$). En revanche, les classes principales déjà bien apprises restent stables sans différence significative (Séjour $+1.19$ pt, $p = 0.132$ ; Chambre $+0.04$ pt, $p = 0.480$).
+    \item \textbf{Facteur de Confusion (Allongement d'Entraînement vs Augmentations) :} Sur le plan méthodologique, le modèle fine-tuné a bénéficié de 12 époques supplémentaires avec un ordonnanceur OneCycleLR sur la base du checkpoint de 25 époques. Le gain mesuré ne peut donc pas être attribué isolément aux seules augmentations CAD, mais résulte de l'effet combiné du prolongement de la descente de gradient et de la régularisation par augmentations.
+    \item \textbf{Comparaison aux Résultats Publiés :} L'exactitude pixel des pièces atteint $87.50\%$, à comparer aux $82.7\%$ publiés dans l'article de référence CubiCasa5K. Le mIoU sémantique des pièces s'établit à $56.40\%$ (sur les 10 classes réelles du test, la classe « Autre » ayant 0 pixel de vérité terrain), proche des $57.5\%$ publiés. Il est à noter que les protocoles de polygonisation et les groupements de classes de l'article diffèrent de notre pipeline matriciel direct, rendant la comparaison indicative.
+    \item \textbf{Traçabilité du Checkpoint :} Le modèle évalué correspond au fichier \texttt{multitask\_resnet34\_finetuned\_best.pth} (Époque 12, empreinte SHA256 : \texttt{80fa1ea7780f7cb2f48d720abed8a62104ac90e0e40d99661f3022f3b472fcca}).
 \end{itemize}
+
+\subsection{Ablation du Vectoriseur Géométrique Hybride}
+Afin d'isoler l'impact du post-traitement géométrique de l'apprentissage profond, le tableau~\ref{tab:vectorizer_ablation} compare l'ancien vectoriseur à composantes connexes directes et le nouveau vectoriseur hybride (partitionnement sémantique masqué par les murs et absorption des fragments sous-seuil) sur les 400 plans de test, à modèle neuronal identique (\texttt{multitask\_resnet34\_finetuned\_best.pth}).
+
+\begin{table}[H]
+\centering
+\caption{Ablation du Post-Traitement Vectoriel sur le Jeu de Test ($N=400$, Modèle Fixé)}
+\label{tab:vectorizer_ablation}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Métrique Vectorielle} & \textbf{Ancien Vectoriseur} & \textbf{Nouveau Hybride} & \textbf{Évolution} \\
+\midrule
+Erreur Absolue Nb Pièces (MAE) & 2.44 pièces & \textbf{1.62 pièces} & -33.6\% d'erreur \\
+Biais Signé (Sur-segmentation) & +2.02 pièces & \textbf{+1.19 pièces} & -41.1\% de fragmentation \\
+Taux de Coque Étanche (Watertight Shell) & 96.25\% & \textbf{99.75\%} & 399/400 plans valides \\
+Plafond Théorique sur Vérité Terrain & N/A & 98.25\% & 393/400 plans valides (7 sans pièces) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Évaluation Contrôlée de la Robustesse aux Dérives CAD}
+Afin de quantifier directement l'apport des augmentations de type CAD sur la résilience aux variations graphiques, 50 plans de validation fixes ont été soumis à différentes dégradations synthétiques contrôlées (tableau~\ref{tab:robustness_eval}).
+
+\begin{table}[H]
+\centering
+\caption{Résilience aux Dérives Graphiques : Modèle Base vs Fine-Tuned ($N=50$ plans fixes)}
+\label{tab:robustness_eval}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Style de Perturbation} & \textbf{Exact. Pièces Base} & \textbf{Exact. Pièces FT} & \textbf{IoU Murs Base} & \textbf{IoU Murs FT} \\
+\midrule
+Plans Standards (Propres) & 81.36\% & \textbf{84.61\%} (+3.2) & \textbf{70.45\%} & 70.16\% (-0.3) \\
+CAD Inversé (Fond Noir, Lignes Claires) & 25.68\% & \textbf{83.47\%} (+57.8) & 27.18\% & \textbf{67.23\%} (+40.1) \\
+Numérisation Bruitée (Niveaux de gris + Bruit) & 47.70\% & \textbf{71.05\%} (+23.4) & 61.79\% & \textbf{65.55\%} (+3.8) \\
+Impression Décolorée (Faible Contraste) & 78.70\% & \textbf{84.73\%} (+6.0) & 70.08\% & \textbf{70.19\%} (+0.1) \\
+\bottomrule
+\end{tabular}
+\end{table}
+Cette évaluation démontre que le modèle de base s'effondre face à une inversion photométrique ($25.68\%$ d'exactitude), tandis que le modèle fine-tuné maintient $83.47\%$ d'exactitude pixel et $67.23\%$ d'IoU sur les murs porteurs, attestant d'une robustesse matricielle accrue face aux dérives graphiques courantes.
 
 \newpage
 
@@ -306,8 +340,8 @@ Le serveur MLflow assure le suivi automatique de chaque itération :
     \item Sauvegarde automatique d'artefacts visuels : une planche comparative de 6 plans fixes de validation est générée et loggée toutes les 5 époques.
 \end{itemize}
 
-\section{Moteur d'Inférence ONNX Runtime \& Parité Numérique}
-Pour découpler le service en production des dépendances lourdes de PyTorch et optimiser le débit d'exécution, le modèle génératif a été converti au format ONNX Runtime. Sur station GPU locale (NVIDIA GeForce RTX 3050 Laptop, 4 Go VRAM, CPU AMD Ryzen 5), la latence de l'inférence tensorielle UNet++ s'établit à $45\text{ ms}$, tandis que le pipeline complet de bout en bout (segmentation multi-tâches, vectorisation polygonale Shapely, synthèse de texture de façade cGAN et extrusion 3D OBJ/MTL) s'exécute en $2.03\text{ s}$ ($2\,031.9\text{ ms}$) en moyenne. La parité numérique entre PyTorch et ONNX Runtime est rigoureusement confirmée :
+\section{Moteur d'Inférence \& Parité Numérique}
+Pour découpler le service en production des dépendances lourdes de PyTorch et optimiser le débit d'exécution, le pipeline a fait l'objet d'un profilage fin et d'un double runtime (PyTorch CUDA accéléré et fallback ONNX Runtime). Sur station GPU locale (NVIDIA GeForce RTX 3050 Laptop, 4 Go VRAM, CPU AMD Ryzen 5), l'inférence neuronale UNet++ s'établit à $56.0\text{ ms}$ (médiane), la vectorisation polygonale hybride s'exécute en $34.0\text{ ms}$, la synthèse neuronale de textures de façade s'exécute en $164.6\text{ ms}$ pour l'ensemble des murs extérieurs via l'accélérateur PyTorch CUDA natif, et l'extrusion 3D en $0.7\text{ ms}$. La latence médiane de bout en bout atteint ainsi \textbf{$297.3\text{ ms}$} (moyenne: $342.1\text{ ms}$, P90: $480.8\text{ ms}$, P95: $780.1\text{ ms}$), respectant strictement le budget opérationnel exigé pour la démonstration ($< 400\text{ ms}$). En mode dégradé exclusivement CPU (via ONNX Runtime), la latence médiane s'établit à $1\,358.8\text{ ms}$ ($1.36\text{ s}$). La parité numérique entre PyTorch et ONNX Runtime est rigoureusement confirmée :
 \begin{equation}
     \Delta_{\max} = \max_{x \in \mathcal{D}} | \mathcal{M}_{\text{PyTorch}}(x) - \mathcal{M}_{\text{ONNXRuntime}}(x) | = 6.31 \times 10^{-6}
 \end{equation}
@@ -332,22 +366,22 @@ Afin de sonder les limites de robustesse et la sensibilité aux dérives de dist
 
 \begin{table}[H]
 \centering
-\caption{Synthèse des Tests de Robustesse Synthétiques ($10$ cas hors CubiCasa5K)}
+\caption{Synthèse Comparative des Tests de Robustesse Synthétiques ($10$ cas hors CubiCasa5K)}
 \label{tab:external_benchmark}
-\begin{tabular}{clccccl}
+\begin{tabular}{clccccc}
 \toprule
-\textbf{\#} & \textbf{Cas de Stress} & \textbf{GT} & \textbf{Préd.} & \textbf{$\Delta R$} & \textbf{Coque} & \textbf{Statut Rigoureux / Mode de Défaillance} \\
+\textbf{\#} & \textbf{Cas de Stress} & \textbf{GT} & \textbf{Base (Préd/$\Delta$)} & \textbf{Coque Base} & \textbf{FT (Préd/$\Delta$)} & \textbf{Coque FT} \\
 \midrule
-1 & CAD N\&B épuré & 4 & 0 & -4 & Échec & ÉCHEC : Aucune pièce détectée (baies ouvertes) \\
-2 & Brochure pastel & 3 & 0 & -3 & Échec & ÉCHEC : Dérive spectrale des textures de sol \\
-3 & Esquisse main levée & 3 & 1 & -2 & Valide & SOUS-SEGMENTÉ : 1 pièce (flou de traits ondulés) \\
-4 & Plan encombré mobilier & 4 & 2 & -2 & Valide & SOUS-SEGMENTÉ : 2 pièces (occlusion par mobilier) \\
-5 & Cotes \& textes techniques & 4 & 0 & -4 & Échec & ÉCHEC : Textes confondus avec cloisons \\
-6 & Basse résolution (140px) & 4 & 7 & +3 & Incomplète & SUR-SEGMENTÉ : Artefacts de compression flous \\
-7 & Loft ouvert moderne & 2 & 0 & -2 & Échec & ÉCHEC : Absence de cloisons physiques fermées \\
-8 & Logement allongé (couloir) & 5 & 0 & -5 & Échec & ÉCHEC : Cloisonnement longitudinal non refermé \\
-9 & CAD sombre inversé & 4 & 10 & +6 & Incomplète & DÉFAILLANCE : Inversion contraste fond/murs \\
-10 & Murs en diagonale (45\textdegree) & 2 & 0 & -2 & Échec & ÉCHEC : Snapping rectilinéaire orthogonal \\
+1 & CAD N\&B épuré & 4 & 0 (-4) & NO\_ROOMS & 1 (-3) & Valide \\
+2 & Brochure pastel & 3 & 0 (-3) & NO\_ROOMS & 0 (-3) & NO\_ROOMS \\
+3 & Esquisse main levée & 3 & 1 (-2) & Valide & 0 (-3) & NO\_ROOMS \\
+4 & Plan encombré mobilier & 4 & 0 (-4) & NO\_ROOMS & 1 (-3) & Valide \\
+5 & Cotes \& textes techniques & 4 & 0 (-4) & NO\_ROOMS & 0 (-4) & NO\_ROOMS \\
+6 & Basse résolution (140px) & 4 & 0 (-4) & NO\_ROOMS & 0 (-4) & NO\_ROOMS \\
+7 & Loft ouvert moderne & 2 & 0 (-2) & NO\_ROOMS & 0 (-2) & NO\_ROOMS \\
+8 & Logement allongé (couloir) & 5 & 0 (-5) & NO\_ROOMS & 4 (-1) & Valide \\
+9 & CAD sombre inversé & 4 & 1 (-3) & Valide & 0 (-4) & NO\_ROOMS \\
+10 & Murs en diagonale (45\textdegree) & 2 & 0 (-2) & NO\_ROOMS & 0 (-2) & NO\_ROOMS \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -355,9 +389,9 @@ Afin de sonder les limites de robustesse et la sensibilité aux dérives de dist
 \section{Analyse Approfondie des Dérives de Domaine}
 Cette campagne de stress tests dissipe toute ambiguïté quant à la capacité de généralisation :
 \begin{enumerate}
-    \item \textbf{Échecs de Détection Complète (6/10 cas) :} Pour 6 des 10 plans, aucune pièce n'est détectée. Les versions antérieures qualifiaient à tort ces sorties vides de << coques valides >>. Le système renvoie désormais un statut explicite \texttt{NO\_ROOMS\_DETECTED}, signalant à l'API et à l'utilisateur que l'enveloppe ne contient aucun espace habitable.
-    \item \textbf{Sensibilité Extrême aux Ruptures de Style :} L'entraînement exclusif sur CubiCasa5K (styles scandinaves vectorisés standardisés) rend le réseau vulnérable aux styles de dessin alternatifs : les fonds noirs inversés activent faussement le décodeur convolutif ($+6$ pièces parasites), et le flou de sous-échantillonnage fragmente les parois minces en cellules orphelines.
-    \item \textbf{Nécessité de Garde-Fous Interactifs :} Ces constats justifient pleinement l'intégration dans l'application web de l'outil de calibration d'échelle à 2 points et d'une porte de plausibilité architecturale, avertissant l'utilisateur lorsque l'agencement extrait s'écarte des normes physiques résidentielles.
+    \item \textbf{Évolution de l'Erreur Globale :} Le modèle fine-tuné améliore la MAE de décompte des pièces ($2.90$ pièces vs $3.30$ pour la base). Il parvient notamment à reconstituer l'agencement quasi-complet du plan allongé (\#8 : 4 pièces détectées pour 5 en GT) et à extraire les espaces habitables malgré l'encombrement par du mobilier (\#4).
+    \item \textbf{Persistance des Échecs de Détection Complète (7/10 cas) :} Pour 7 des 10 plans de stress, aucune pièce n'est détectée (\texttt{NO\_ROOMS\_DETECTED}). Ce constat montre qu'en présence de dégradations extrêmes (traits de cotes techniques denses, croquis à main levée discontinus, résolution extrême de 140px), le réseau échoue à refermer les contours de cloisons.
+    \item \textbf{Nécessité de Garde-Fous Interactifs :} Ces observations prouvent que les augmentations de données réduisent les dérives matricielles standard (inversion de contraste, bruit de numérisation), mais ne peuvent suppléer à l'absence de contraintes architecturales fortes face à des dessins non normalisés. D'où la pertinence en production de l'outil de calibration à 2 points et du contrôle de plausibilité de surface.
 \end{enumerate}
 
 \newpage
@@ -367,14 +401,20 @@ Cette campagne de stress tests dissipe toute ambiguïté quant à la capacité d
 % =========================================================================
 \chapter{Conclusion \& Perspectives}
 
-Le projet \textbf{ArchiGen 3D} concrétise l'industrialisation réussie d'une solution complète d'IA architecturale, reliant vision par ordinateur, géométrie computationnelle, génération d'images antagoniste et développement full-stack moderne. 
+Le projet \textbf{ArchiGen 3D} concrétise l'industrialisation d'une solution complète de Computer Vision et d'IA Générative reliant vision par ordinateur, géométrie computationnelle, génération conditionnelle de textures et développement full-stack moderne.
 
-L'entraînement rigoureux du modèle MultiTask UNet++ pendant 60 époques sur CubiCasa5K a permis d'atteindre un taux d'étanchéité de coque de $99.75\%$, un IoU d'empreinte habitable de $61.91\%$ et une exactitude de classification des pièces de $71.11\%$. Côté génération, l'architecture Pix2Pix intégrant normalisation spectrale et perte perceptuelle LPIPS produit des textures de façades d'une grande finesse architecturale sous ONNX Runtime.
+L'entraînement du modèle MultiTask UNet++ (ResNet-34) couplé au fine-tuning régularisé et au vectoriseur hybride a permis d'atteindre sur les 400 plans de test non vus :
+\begin{itemize}
+    \item Une exactitude pixel des pièces de \textbf{$87.47\%$} (surpassant les $82.7\%$ publiés dans CubiCasa5K) et un mIoU sémantique de \textbf{$56.47\%$} (proche des $57.5\%$ publiés).
+    \item Une préservation géométrique rigoureuse des cloisons ($74.16\%$ sur les murs fusionnés, $73.49\%$ sur les fenêtres, $61.76\%$ sur les portes).
+    \item Un taux de coque étanche de \textbf{$99.75\%$} (399/400 plans) et une erreur absolue de décompte des pièces réduite à \textbf{$1.62$ pièce} (-33.6\%).
+\end{itemize}
+Côté génération, l'architecture Pix2Pix stabilisée par normalisation spectrale et perte perceptuelle LPIPS (SqueezeNet) atteint un KID de \textbf{$67.65 \times 10^{-3}$} et un LPIPS de \textbf{$0.3169$}. Le pipeline s'exécute avec une latence médiane de bout en bout de \textbf{$297.3\text{ ms}$} sur GPU (P95 : $780.1\text{ ms}$), respectant le budget de démonstration en direct ($< 400\text{ ms}$).
 
 \textbf{Perspectives d'évolution :}
 \begin{enumerate}
-    \item Remplacement de la segmentation purement matricielle des cloisons par un graphe relationnel de pièces (\emph{Room Layout Graphs} avec Graph Neural Networks - GNN).
-    \item Intégration de modèles de diffusion latente conditionnés par la structure géométrique (ControlNet / Stable Diffusion) pour offrir une variété de styles de rendu encore plus étendue.
+    \item Structuration de l'espace intérieur par graphes relationnels de pièces (\emph{Room Layout Graphs} avec Graph Neural Networks - GNN) pour imposer une cohérence topologique globale indépendante du style de dessin.
+    \item Synthèse de façades conditionnée par diffusion latente (ControlNet / Stable Diffusion) pour étendre le catalogue de styles architecturaux.
 \end{enumerate}
 
 \end{document}

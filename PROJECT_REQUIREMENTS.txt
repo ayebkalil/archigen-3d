@@ -1,0 +1,262 @@
+================================================================================
+ARCHIGEN 3D — FULL SYSTEM REQUIREMENTS, ENVIRONMENT & PROJECT IDEA
+================================================================================
+
+TEAM MEMBERS:
+- Khalil Ayeb
+- Amine Ben Fadhel
+- Khawla Hawari
+
+ACADEMIC CONTEXT:
+- Course: Advanced Deep Learning & MLOps (15% Continuous Assessment)
+- Institution: TEK-UP University (Cycle Ingenieur IA & Data Science, Year 3)
+- Instructor: Prof. Haythem Ghazouani (haythem.ghazouani@tekup.de)
+- Repository: https://github.com/ayebk/archigen-3d
+- Active Branch: feature/floorplan-segmentation-3d
+
+================================================================================
+1. THE PROJECT IDEA (WHAT IS ARCHIGEN 3D?)
+================================================================================
+
+1.1 Industrial Motivation
+In current architecture, interior design, and real-estate workflows (e.g., HomeByMe,
+Matterport, Planner 5D), transforming a 2D floorplan scan (PDF, cadastral sketch, 
+or paper blueprint) into an interactive 3D digital twin requires 2 to 4 hours of 
+tedious manual CAD modeling per plan.
+
+1.2 The ArchiGen 3D Solution
+ArchiGen 3D is an end-to-end automated AI system that converts an uncalibrated 2D 
+raster floorplan into a textured, BIM-ready 3D digital twin in ~297 ms (GPU interactive mode, meeting the <400 ms defense SLA) or ~1.36 s (CPU fallback):
+
+1. 2D Plan Input: Receives a raster image (PNG/JPG/PDF) and applies isotropic 
+   letterboxing to 512x512 with coordinate transform preservation.
+2. Multi-Task Segmentation: A single UNet++ deep network with a shared ResNet-34 
+   backbone concurrently predicts:
+   - Structural Layout (5 classes): Background, Interior Wall, Exterior Wall, Door, Window.
+   - Semantic Rooms (12 classes): Living Room, Bedroom, Kitchen, Bathroom, Hallway, etc.
+3. Rectilinear Vectorization & Auto-Scaling: Applies morphological closing, filters 
+   small noise (<100 px), aligns wall segments orthogonally via Douglas-Peucker, 
+   and calculates real metric scale (m^2) using detected door passage slots (0.90 m).
+4. Procedural 3D Extrusion: Builds a watertight 3D building mesh with true wall 
+   thicknesses, vertical door openings (2.10 m height), and window openings 
+   (0.90 m sill, 2.10 m lintel).
+5. Conditional Generative Facade Synthesis: A Pix2Pix cGAN model generates 
+   photorealistic exterior building textures from semantic facade layouts.
+6. Real-Time WebGL Visualization: Renders the textured 3D digital twin in browser 
+   via Three.js, supporting orbit controls, material swapping, and standard 
+   Wavefront OBJ/MTL export.
+
+================================================================================
+2. HARDWARE & OPERATING SYSTEM REQUIREMENTS
+================================================================================
+
+- Operating System: Windows 10/11 (64-bit) OR Linux (Ubuntu 22.04 LTS+)
+- GPU (Recommended): NVIDIA GPU with >= 4 GB VRAM (CUDA 12.1+ support)
+  * Tested on: NVIDIA GeForce RTX 3050 Laptop GPU (4 GB GDDR6)
+  * Training VRAM footprint:
+    - UNet++ (batch size 8, FP16): ~3.1 GB VRAM
+    - Pix2Pix cGAN (batch size 4, 256x256): ~2.8 GB VRAM
+  * Note: Inference can run on CPU, but GPU is recommended for interactive speed.
+- CPU: 6-Core / 12-Thread x86_64 processor (Tested on AMD Ryzen 5)
+- System Memory (RAM): Minimum 16 GB DDR4/DDR5
+- Disk Storage: Minimum 20 GB free space (datasets, model weights, Docker images)
+- Python Runtime: Python 3.11 or 3.12 (64-bit)
+- Node.js Runtime: Node.js 18.x or 20.x LTS + npm 9.x+
+- Containerization: Docker Desktop >= 24.0 with Docker Compose v2
+
+================================================================================
+3. COMPLETE INVENTORY OF LIBRARIES & TOOLS
+================================================================================
+
+3.1 Python Libraries (Backend & Deep Learning)
+--------------------------------------------------------------------------------
+Library                         Version        Purpose
+--------------------------------------------------------------------------------
+torch                           >= 2.2.0       Core deep learning framework (CUDA 12.1)
+torchvision                     >= 0.17.0      Pretrained ResNet weights & image transforms
+segmentation-models-pytorch     >= 0.3.3       UNet++ architecture with ResNet-34 encoder
+lpips                           >= 0.1.4       Learned Perceptual Image Patch Similarity loss
+onnx                            >= 1.15.0      Model serialization & graph export
+onnxruntime                     >= 1.17.0      High-performance inference engine for cGAN
+opencv-python                   >= 4.9.0       Morphology, binarization, contour analysis
+Pillow                          >= 10.0.0      Image loading, letterbox padding, texture save
+numpy                           >= 1.24.0      Array processing & compressed .npz cache
+scipy                           >= 1.12.0      Matrix ops for FID / KID evaluation
+shapely                         >= 2.0.0       2D planar geometry, polygon validation, envelope
+trimesh                         >= 4.0.0       3D mesh geometry inspection & normal calculation
+fastapi                         >= 0.110.0     Asynchronous REST API framework
+uvicorn[standard]               >= 0.28.0      High-performance ASGI server
+pydantic                        >= 2.6.0       Data validation & API schema contracts
+python-multipart                >= 0.0.9       Handling file uploads (PNG, JPG)
+httpx                           >= 0.27.0      Asynchronous HTTP testing client
+mlflow                          >= 2.10.0      Experiment tracking, loss logs & validation grids
+dvc                             >= 3.0.0       Data Version Control for datasets & .pth/.onnx
+pytest                          >= 8.0.0       Test automation (22 passing unit/integ tests)
+tqdm                            >= 4.66.0      Progress bars for training & benchmarks
+pyyaml                          >= 6.0         Configuration file management
+reportlab                       >= 4.0.0       Technical report & Cadrage PDF generation
+--------------------------------------------------------------------------------
+
+3.2 Frontend Tools & Libraries (React 18 + Three.js)
+--------------------------------------------------------------------------------
+Package                         Version        Purpose
+--------------------------------------------------------------------------------
+react                           ^18.2.0        UI component framework
+react-dom                       ^18.2.0        React DOM rendering
+vite                            ^5.1.6         Next-gen build tool & hot-reloading dev server
+three                           ^0.162.0       WebGL 3D engine
+@react-three/fiber              ^8.15.19       Declarative React wrapper for Three.js
+@react-three/drei               ^9.102.6       Orbit controls, camera helpers, OBJ/MTL loader
+tailwindcss                     ^3.4.1         Utility-first CSS styling
+lucide-react                    ^0.359.0       Vector iconography for UI controls
+axios                           ^1.6.8         HTTP client for backend REST API calls
+clsx                            ^2.1.0         Dynamic class utility
+tailwind-merge                  ^2.2.2         Tailwind class conflict resolution
+--------------------------------------------------------------------------------
+
+3.3 DevOps & Quality Tools
+--------------------------------------------------------------------------------
+- Docker & Docker Compose: Multi-container orchestration (archigen_backend + archigen_frontend).
+- GitHub Actions: Automated CI running `pytest tests/ backend/tests/ -v` on push/PR.
+- Git: Branching workflow (feature/floorplan-segmentation-3d, feature/pix2pix-facades).
+
+===============================================================================
+4. DEEP LEARNING MODELS & VERIFIED TEST RESULTS
+================================================================================
+
+4.1 Model 1: Multi-Task UNet++ Floorplan Segmentation
+- Dataset: CubiCasa5K (4,200 train / 400 val / 400 test)
+  * Dataset License: CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial 4.0)
+- Architecture: UNet++ with ImageNet-pretrained ResNet-34 encoder and dual decoders:
+  * Structural Head (5 channels): Background, Internal Wall, External Wall, Door, Window.
+  * Semantic Room Head (12 channels): 11 room classes + background.
+- Loss: Composite Loss (Focal-Tversky + Lovasz-Softmax for structure; CrossEntropy + Dice for rooms).
+- Verified Test Results on 400 Unseen Plans (multitask_resnet34_finetuned_best.pth):
+  * Room Pixel Accuracy: 87.47% (95% CI: [86.76%, 88.16%], p < 0.001 vs Base 85.82%)
+  * Room Semantic Macro mIoU (10 real classes): 56.47% (95% CI: [55.57%, 57.41%], p < 0.001 vs Base 54.80%)
+  * Per-Class Room Breakdown (N=400 test plans):
+    - Living Room:   74.35% (p = 0.132 n.s. vs Base 73.16%)
+    - Bedroom:       74.76% (p = 0.480 n.s. vs Base 74.72%)
+    - Kitchen:       67.56% (95% CI: [+0.92, +5.48], p = 0.001 vs Base 64.36%)
+    - Bath:          69.79% (95% CI: [+0.20, +3.38], p = 0.013 vs Base 68.04%)
+    - Entry:         61.44% (Base: 60.59%)
+    - Outdoor:       72.95% (Base: 71.30%)
+    - Storage:       42.65% (Base: 42.15%)
+    - Closet:        62.43% (Base: 61.22%)
+    - Garage:        38.92% (95% CI: [+0.62, +12.67], p = 0.015 vs Base 32.34%)
+    - Office:         0.00% (GT: 27,067 px, 0.09% of pixels - failure on tiny class)
+  * Structural Elements:
+    - Merged Wall IoU: 74.16% (External: 73.86%, Internal: 62.18%, p = 0.121 n.s. vs Base 74.31%)
+    - Door IoU: 61.76% (Base: 62.37%, -0.61 pts, p = 0.005)
+    - Window IoU: 73.49% (Base: 73.26%, +0.23 pts, p = 0.126 n.s.)
+    - Structural mIoU (3-class foreground): 69.80%
+    - Structural mIoU (4-class complete): 67.82%
+  * Geometric Vectorization & Shell Integrity (N=400 test plans):
+    - Room Count MAE: 1.62 rooms (-33.6% error reduction from 2.44 via hybrid wall-masked partitioning & absorption)
+    - Signed Room Over-Split: +1.19 rooms (reduced from +2.02, -41.1% fragmentation)
+    - Building Footprint IoU: 80.83% (95% CI: [+0.17, +1.85], p = 0.005 vs Base 79.83%)
+    - Watertight 3D Shell Rate: 99.75% (399/400 plans produce a closed, valid 3D shell; 98.25% on GT SVGs where 7 have 0 rooms)
+    - Exterior Wall Classification Accuracy: 91.07% (Precision: 94.21%, Recall: 92.41%)
+    - Metric Scale Error: 10.14% median relative error
+
+4.2 Model 2: Pix2Pix cGAN Facade Synthesis
+- Dataset: CMP Facades (400 train / 106 test), 12 architectural classes.
+- Architecture:
+  * Generator: UNet-256 with Nearest-Neighbor upsampling + Conv2D (removes visible checkerboard).
+  * Discriminator: PatchGAN 70x70 with Spectral Normalization (stabilizes Lipschitz continuity).
+- Loss: LSGAN Adversarial + 30 * L1 + 10 * Feature Matching + 10 * LPIPS (SqueezeNet).
+- Authoritative Verified Test Results (N = 106 CMP Facades Test Split):
+  * Baseline (100ep):   L1 = 0.3483 | SSIM = 0.2866 | PSNR = 13.19 dB | LPIPS = 0.6327 | KID = 150.36 ± 10.25 x 10^-3
+  * Enhanced (150ep):   L1 = 0.3379 | SSIM = 0.3345 | PSNR = 13.15 dB | LPIPS = 0.4940 | KID = 109.86 ± 9.24 x 10^-3
+  * Perceptual (100ep): L1 = 0.3526 | SSIM = 0.2792 | PSNR = 12.69 dB | LPIPS = 0.3169 | KID = 67.65 ± 5.95 x 10^-3
+  * Trade-off Note: Enhanced model achieves highest pixel-averaging SSIM (0.3345) and lowest L1 (0.3379) 
+    due to L1 blurring, while Perceptual model achieves lowest perceptual distance (LPIPS: 0.3169, KID: 67.65 x 10^-3) 
+    with sharp architectural elements (windows, cornices, mouldings).
+  * ONNX Parity: Numerical delta max = 6.31 x 10^-6 against native PyTorch.
+
+================================================================================
+5. SYSTEM LATENCY PROFILE (BENCHMARKED ON RTX 3050 GPU / RYZEN 5 CPU, N=20 PLANS)
+================================================================================
+
+Pipeline Stage                  | CUDA (GPU) Mode (Median) | CPU Fallback Mode (Median)
+--------------------------------|--------------------------|---------------------------
+Image Preprocess & Padding      | 25.7 ms                  | 32.7 ms
+UNet++ Multi-Task Inference     | 56.0 ms                  | 685.3 ms
+Geometric Vectorization         | 34.0 ms                  | 37.3 ms
+Facade Synthesis (all ext walls)| 164.6 ms (PyTorch CUDA)  | 574.8 ms (ONNX CPU)
+3D Extrusion & Serialization    | 0.7 ms                   | 0.8 ms
+--------------------------------|--------------------------|---------------------------
+TOTAL PIPELINE LATENCY (Median) | 297.3 ms                 | 1,358.8 ms (~1.36 s)
+Total Mean Latency              | 342.1 ms                 | 1,536.9 ms
+90th Percentile (P90)           | 480.8 ms                 | 1,992.5 ms
+95th Percentile (P95)           | 780.1 ms                 | 3,026.3 ms
+--------------------------------------------------------------------------------
+* Result: Strictly satisfies the defense SLA budget of < 400 ms on interactive GPU mode.
+
+================================================================================
+6. QUICKSTART: INSTALLATION GUIDE FOR TEAMMATES
+================================================================================
+
+STEP 1: Clone the Repository & Checkout Branch
+--------------------------------------------------
+git clone https://github.com/ayebk/archigen-3d.git
+cd archigen-3d
+git checkout feature/floorplan-segmentation-3d
+
+STEP 2: Set Up Python Virtual Environment
+--------------------------------------------------
+# Windows PowerShell:
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+
+# Linux / MacOS:
+python3 -m venv venv
+source venv/bin/activate
+
+# Install Core Python Dependencies:
+pip install --upgrade pip
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+pip install segmentation-models-pytorch lpips onnx onnxruntime opencv-python Pillow numpy scipy shapely trimesh fastapi uvicorn[standard] pydantic python-multipart httpx mlflow dvc pytest tqdm pyyaml reportlab
+
+STEP 3: Pull Data & Model Weights via DVC
+--------------------------------------------------
+dvc pull
+
+STEP 4: Set Up & Run Frontend
+--------------------------------------------------
+cd frontend
+npm install
+npm run dev
+# Frontend runs at: http://localhost:5173 (dev) or http://localhost:3000 (docker)
+cd ..
+
+STEP 5: Run the Backend Locally
+--------------------------------------------------
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# API docs available at: http://localhost:8000/docs
+# Health check: http://localhost:8000/health
+cd ..
+
+STEP 6: Alternatively, Run Entire Stack via Docker Compose
+--------------------------------------------------
+docker-compose up --build
+# Web Application: http://localhost:3000
+# Backend Swagger API: http://localhost:8000/docs
+
+STEP 7: Run Automated Verification Tests
+--------------------------------------------------
+pytest tests/ backend/tests/ -v
+# Expected result: 22 passed in ~13s
+
+================================================================================
+7. KEY CONTACT & REPOSITORY INFORMATION
+================================================================================
+
+- Repository: https://github.com/ayebk/archigen-3d
+- Documentation:
+  * Technical Report: report/rapport_technique.tex
+  * 15-Minute Defense Runbook: docs/defense_runbook.md
+  * 10-Page Cadrage PDF: ArchiGen3D_Cadrage_DeepLearning_Medamine_Benfadhel.pdf
+- Team: Khalil Ayeb, Amine Ben Fadhel, Khawla Hawari
+================================================================================

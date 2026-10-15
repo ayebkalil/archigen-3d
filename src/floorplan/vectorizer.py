@@ -5,6 +5,7 @@ clean, simplified vector geometry and structured 3D extrusion JSON specification
 """
 
 import math
+from collections import Counter
 from typing import Dict, List, Any, Tuple
 import numpy as np
 import cv2
@@ -33,13 +34,17 @@ class FloorplanVectorizer:
         polygon_epsilon_ratio: float = 0.015,
         snap_angle_deg_tolerance: float = 12.0,
         default_door_width_m: float = 0.85,
-        wall_height_m: float = 2.80
+        wall_height_m: float = 2.80,
+        min_area_habitable_m2: float = 1.5,
+        min_area_service_m2: float = 0.8
     ):
         self.min_wall_area = min_wall_area
         self.polygon_epsilon_ratio = polygon_epsilon_ratio
         self.snap_angle_deg_tolerance = snap_angle_deg_tolerance
         self.default_door_width_m = default_door_width_m
         self.wall_height_m = wall_height_m
+        self.min_area_habitable_m2 = min_area_habitable_m2
+        self.min_area_service_m2 = min_area_service_m2
 
     def snap_angle_rectilinear(self, p1: Tuple[float, float], p2: Tuple[float, float]) -> Tuple[float, float]:
         """Snaps an edge to rectilinear axes (0, 90, 180, 270 deg) if within tolerance."""
@@ -265,33 +270,99 @@ class FloorplanVectorizer:
         total_interior_area_m2 = 0.0
 
         if room_mask is not None and np.max(room_mask) > 0:
-            # Semantic rooms extracted directly from room_mask
-            for r_id in range(1, 12):
-                r_bin = (room_mask == r_id).astype(np.uint8)
-                r_cnts, _ = cv2.findContours(r_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                for c in r_cnts:
-                    area_px = cv2.contourArea(c)
-                    if area_px < 100:
+            # Hybrid Room Partitioning:
+            # 1. Mask room predictions with walls to split same-class adjacent rooms
+            clean_room = room_mask.copy()
+            clean_room[wall_clean > 0] = 0
+
+            px_area_habitable = int(round(self.min_area_habitable_m2 / (scale_m_per_px ** 2)))
+            px_area_service = int(round(self.min_area_service_m2 / (scale_m_per_px ** 2)))
+
+            # 2. Connected components per class
+            labeled_map = np.zeros((h, w), dtype=np.int32)
+            region_info = {}
+            current_label = 1
+
+            for c_id in range(1, 12):
+                c_bin = (clean_room == c_id).astype(np.uint8)
+                num_c, labels_c = cv2.connectedComponents(c_bin)
+                for lbl in range(1, num_c):
+                    r_mask = (labels_c == lbl)
+                    area = int(r_mask.sum())
+                    if area < 10:
                         continue
-                    area_m2 = round(area_px * (scale_m_per_px ** 2), 2)
-                    total_interior_area_m2 += area_m2
-                    r_approx = cv2.approxPolyDP(c, 2.5, True).reshape(-1, 2)
-                    r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
+                    labeled_map[r_mask] = current_label
+                    is_service = c_id in [4, 7, 8]  # Bathroom, Storage, Closet
+                    min_thresh = px_area_service if is_service else px_area_habitable
+                    region_info[current_label] = {
+                        "class_id": c_id,
+                        "area_px": area,
+                        "min_thresh": min_thresh
+                    }
+                    current_label += 1
 
-                    M = cv2.moments(c)
-                    cx = (M["m10"] / max(M["m00"], 1e-4)) * scale_m_per_px
-                    cy = (M["m01"] / max(M["m00"], 1e-4)) * scale_m_per_px
+            # 3. Sub-threshold fragment absorption into longest-boundary neighbor
+            kernel_absorb = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+            small_labels = [lbl for lbl, info in region_info.items() if info["area_px"] < info["min_thresh"]]
 
-                    rooms.append({
-                        "id": f"room_{room_idx}",
-                        "room_type": ROOM_NAMES.get(r_id, "Other Room"),
-                        "surface_m2": area_m2,
-                        "centroid_meters": [round(cx, 3), round(cy, 3)],
-                        "polygon_meters": r_poly_m
-                    })
-                    room_idx += 1
+            for s_lbl in small_labels:
+                if s_lbl not in region_info:
+                    continue
+                s_mask = (labeled_map == s_lbl).astype(np.uint8)
+                dilated = cv2.dilate(s_mask, kernel_absorb, iterations=1)
+                border = dilated - s_mask
+
+                neighbor_pixels = labeled_map[border > 0]
+                neighbor_candidates = [n for n in neighbor_pixels if n > 0 and n != s_lbl]
+
+                if neighbor_candidates:
+                    counts = Counter(neighbor_candidates)
+                    best_neighbor = counts.most_common(1)[0][0]
+                    labeled_map[s_mask > 0] = best_neighbor
+                    region_info[best_neighbor]["area_px"] += region_info[s_lbl]["area_px"]
+                    del region_info[s_lbl]
+                else:
+                    # Isolated noise without neighboring room: clear it
+                    labeled_map[s_mask > 0] = 0
+                    del region_info[s_lbl]
+
+            # 4. Construct vectorized room instances
+            for lbl, info in region_info.items():
+                r_mask = (labeled_map == lbl).astype(np.uint8)
+                area_px = int(r_mask.sum())
+                if area_px < 20:
+                    continue
+                area_m2 = round(area_px * (scale_m_per_px ** 2), 2)
+                r_cnts, _ = cv2.findContours(r_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if not r_cnts:
+                    continue
+                largest_c = max(r_cnts, key=cv2.contourArea)
+                if cv2.contourArea(largest_c) < 15:
+                    continue
+                r_approx = cv2.approxPolyDP(largest_c, 2.5, True).reshape(-1, 2)
+                if len(r_approx) < 3:
+                    continue
+                r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
+
+                M = cv2.moments(largest_c)
+                cx = (M["m10"] / max(M["m00"], 1e-4)) * scale_m_per_px
+                cy = (M["m01"] / max(M["m00"], 1e-4)) * scale_m_per_px
+                c_id = info["class_id"]
+                total_interior_area_m2 += area_m2
+
+                rooms.append({
+                    "id": f"room_{room_idx}",
+                    "room_type": ROOM_NAMES.get(c_id, "Other Room"),
+                    "surface_m2": area_m2,
+                    "centroid_meters": [round(cx, 3), round(cy, 3)],
+                    "polygon_meters": r_poly_m
+                })
+                room_idx += 1
+        elif room_mask is not None:
+            # Explicit room_mask provided with zero detected rooms
+            rooms = []
         else:
-            # Geometric Connected Components fallback
+            # Geometric Connected Components fallback (only when room_mask is None)
             interior_mask = (wall_clean == 0).astype(np.uint8)
             num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(interior_mask)
             for lbl in range(1, num_labels):
@@ -341,11 +412,14 @@ class FloorplanVectorizer:
                 pass
 
         # Strict Building Shell Validation:
-        # A valid residential shell must enclose at least 1 room and have at least 4 walls
+        # A valid residential shell must enclose at least 1 room and have at least 4 walls or segments
+        envelope_segments = sum(len(w.get("polygon_meters", [])) for w in walls)
+        has_enough_walls = (len(walls) >= 4) or (envelope_segments >= 4 and len(walls) >= 1)
+
         if len(rooms) == 0:
             shell_status = "NO_ROOMS_DETECTED"
             strict_shell_valid = False
-        elif len(walls) < 4:
+        elif not has_enough_walls:
             shell_status = "INCOMPLETE_ENVELOPE"
             strict_shell_valid = False
         elif not shell_valid:
@@ -366,6 +440,7 @@ class FloorplanVectorizer:
                 "total_surface_m2": round(total_interior_area_m2, 2),
                 "num_walls": len(walls),
                 "num_exterior_walls": sum(1 for w in walls if w.get("is_exterior", False)),
+                "num_envelope_segments": envelope_segments,
                 "num_rooms": len(rooms),
                 "num_doors": len(doors),
                 "num_windows": len(windows)
