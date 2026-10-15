@@ -112,3 +112,7 @@ desktop.ini
 scripts/map_hyp_*.png
 scripts/cadrage_extracted.txt
 
+
+# Generated 3D outputs
+outputs/
+
