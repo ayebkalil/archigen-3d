@@ -194,7 +194,17 @@ class CubiCasaDataset(Dataset):
                 room_mask = np.rot90(room_mask, rot_k)
                 mask_4class = np.rot90(mask_4class, rot_k)
 
-        # 6. Tensor conversion and normalization
+        # 6. Compute exact ground-truth physical scale (meters per pixel in 512x512 canvas)
+        img_path = self.root_dir / sample_rel_path / "F1_scaled.png"
+        try:
+            with Image.open(img_path) as orig_img:
+                iw, ih = orig_img.size
+            scale_factor = min(self.img_size / iw, self.img_size / ih)
+            gt_scale = 0.01 / scale_factor
+        except Exception:
+            gt_scale = 0.030
+
+        # 7. Tensor conversion and normalization
         img_tensor = TF.to_tensor(canvas_img)
         img_tensor = (img_tensor - self.mean) / self.std
 
@@ -203,6 +213,7 @@ class CubiCasaDataset(Dataset):
             "mask": torch.from_numpy(np.ascontiguousarray(mask_4class)).long(),
             "struct_mask": torch.from_numpy(np.ascontiguousarray(struct_mask)).long(),
             "room_mask": torch.from_numpy(np.ascontiguousarray(room_mask)).long(),
+            "gt_scale": torch.tensor(gt_scale, dtype=torch.float32),
             "sample_id": sample_rel_path
         }
 

@@ -32,7 +32,7 @@ class FloorplanVectorizer:
         min_wall_area: int = 40,
         polygon_epsilon_ratio: float = 0.015,
         snap_angle_deg_tolerance: float = 12.0,
-        default_door_width_m: float = 0.90,
+        default_door_width_m: float = 0.85,
         wall_height_m: float = 2.80
     ):
         self.min_wall_area = min_wall_area
@@ -66,8 +66,9 @@ class FloorplanVectorizer:
 
     def estimate_scale(self, door_mask: np.ndarray) -> float:
         """
-        Estimates meters per pixel scale factor using median door width.
-        Falls back to 0.025 m/pixel (~40 px per meter) if no doors are detected.
+        Estimates meters per pixel scale factor using median door clearance width.
+        The door opening clearance corresponds to the longer dimension of the door bounding rectangle.
+        Falls back to 0.030 m/pixel (~33 px per meter) if no doors are detected.
         """
         contours, _ = cv2.findContours(door_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         door_widths = []
@@ -76,14 +77,15 @@ class FloorplanVectorizer:
                 continue
             rect = cv2.minAreaRect(cnt)
             w, h = rect[1]
-            short_dim = min(w, h)
-            if short_dim > 3:
-                door_widths.append(short_dim)
+            door_dim = max(w, h)
+            # Standard residential door slot in 512x512 plans is between 8 and 60 px
+            if 8 <= door_dim <= 60:
+                door_widths.append(door_dim)
 
         if len(door_widths) > 0:
             median_door_px = float(np.median(door_widths))
             return self.default_door_width_m / median_door_px
-        return 0.025  # Standard fallback: 1 pixel ~ 2.5 cm
+        return 0.030  # Standard fallback: 1 pixel ~ 3.0 cm
 
     def vectorize(
 
@@ -269,7 +271,7 @@ class FloorplanVectorizer:
                 r_cnts, _ = cv2.findContours(r_bin, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 for c in r_cnts:
                     area_px = cv2.contourArea(c)
-                    if area_px < 50:
+                    if area_px < 100:
                         continue
                     area_m2 = round(area_px * (scale_m_per_px ** 2), 2)
                     total_interior_area_m2 += area_m2
@@ -338,13 +340,29 @@ class FloorplanVectorizer:
             except Exception:
                 pass
 
+        # Strict Building Shell Validation:
+        # A valid residential shell must enclose at least 1 room and have at least 4 walls
+        if len(rooms) == 0:
+            shell_status = "NO_ROOMS_DETECTED"
+            strict_shell_valid = False
+        elif len(walls) < 4:
+            shell_status = "INCOMPLETE_ENVELOPE"
+            strict_shell_valid = False
+        elif not shell_valid:
+            shell_status = "INVALID_GEOMETRY"
+            strict_shell_valid = False
+        else:
+            shell_status = "VALID"
+            strict_shell_valid = True
+
         return {
             "metadata": {
                 "canvas_size": [w, h],
                 "scale_meters_per_pixel": round(scale_m_per_px, 5),
                 "scale_source": scale_source,
                 "building_perimeter_m": building_perimeter_m,
-                "is_building_shell_valid": shell_valid,
+                "is_building_shell_valid": strict_shell_valid,
+                "shell_status": shell_status,
                 "total_surface_m2": round(total_interior_area_m2, 2),
                 "num_walls": len(walls),
                 "num_exterior_walls": sum(1 for w in walls if w.get("is_exterior", False)),

@@ -90,6 +90,13 @@ def evaluate_model_pipeline(
     living_area_union = 0
     room_count_errors = []
     perimeter_rel_errors = []
+    scale_errors = []
+    autoscale_count = 0
+    ext_wall_correct = 0
+    ext_wall_total = 0
+    ext_wall_tp = 0
+    ext_wall_fp = 0
+    ext_wall_fn = 0
 
     # Object-level detection accumulators (within 20px radius)
     door_gt_total = 0
@@ -212,8 +219,12 @@ def evaluate_model_pipeline(
                     living_area_inter += np.logical_and(p_living, t_living).sum()
                     living_area_union += np.logical_or(p_living, t_living).sum()
 
-                    # Ground truth room count vs predicted room count
-                    gt_num_rooms = len(np.unique(t_r[t_r > 0]))
+                    # Ground truth room instances (connected components >= 100px)
+                    gt_num_rooms = 0
+                    for c in range(1, 12):
+                        c_mask = (t_r == c).astype(np.uint8)
+                        cnts, _ = cv2.findContours(c_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                        gt_num_rooms += sum(1 for cnt in cnts if cv2.contourArea(cnt) >= 100)
 
                 # 3D Vectorizer and Geometric Quality
                 p_s_input = pred_struct5[b] if pred_struct5 is not None else None
@@ -225,11 +236,13 @@ def evaluate_model_pipeline(
                     room_mask=p_r_input
                 )
 
+                meta = layout.get("metadata", {})
+                pred_scale = meta.get("scale_meters_per_pixel", 0.030)
+
                 if pred_room is not None:
                     pred_num_rooms = len(layout.get("rooms", []))
                     room_count_errors.append(abs(pred_num_rooms - gt_num_rooms))
 
-                meta = layout.get("metadata", {})
                 if meta.get("is_building_shell_valid", False):
                     valid_shell_count += 1
 
@@ -241,16 +254,41 @@ def evaluate_model_pipeline(
                         if poly.is_valid:
                             valid_polygon_count += 1
 
+                        # Vectorizer exterior wall vs GT evaluation
+                        poly_px = (np.array(pts) / max(pred_scale, 1e-4)).astype(np.int32)
+                        patch = np.zeros((512, 512), dtype=np.uint8)
+                        cv2.fillPoly(patch, [poly_px], 1)
+                        ext_px = int(np.logical_and(patch == 1, t_s5 == 2).sum())
+                        int_px = int(np.logical_and(patch == 1, t_s5 == 1).sum())
+                        if ext_px + int_px >= 20:
+                            gt_is_ext = (ext_px > int_px)
+                            pred_is_ext = w.get("is_exterior", False)
+                            if pred_is_ext == gt_is_ext:
+                                ext_wall_correct += 1
+                            ext_wall_total += 1
+                            if pred_is_ext and gt_is_ext:
+                                ext_wall_tp += 1
+                            elif pred_is_ext and not gt_is_ext:
+                                ext_wall_fp += 1
+                            elif not pred_is_ext and gt_is_ext:
+                                ext_wall_fn += 1
+
                 total_rooms_count += len(layout.get("rooms", []))
 
-                # Exterior Perimeter relative error
-                # Compute GT exterior wall perimeter in pixels
+                # Scale Relative Error & Auto-scale Trigger
+                gt_scale_for_plan = float(batch["gt_scale"][b]) if "gt_scale" in batch else pred_scale
+                if meta.get("scale_source") == "door_width_estimation":
+                    autoscale_count += 1
+                if gt_scale_for_plan > 0:
+                    err_s = abs(pred_scale - gt_scale_for_plan) / gt_scale_for_plan
+                    scale_errors.append(min(err_s, 2.0))
+
+                # Exterior Perimeter relative error vs GT
                 gt_ext_mask = (t_s5 == 2).astype(np.uint8) if pred_struct5 is not None else (t_wall).astype(np.uint8)
                 gt_cnts, _ = cv2.findContours(gt_ext_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 if gt_cnts:
                     gt_perimeter_px = sum(cv2.arcLength(c, True) for c in gt_cnts)
-                    scale_m = meta.get("scale_meters_per_pixel", 0.03)
-                    gt_perimeter_m = gt_perimeter_px * scale_m
+                    gt_perimeter_m = gt_perimeter_px * gt_scale_for_plan
                     pred_perimeter_m = meta.get("building_perimeter_m", 0)
                     if gt_perimeter_m > 1.0:
                         rel_err = abs(pred_perimeter_m - gt_perimeter_m) / gt_perimeter_m
@@ -277,6 +315,12 @@ def evaluate_model_pipeline(
     living_area_iou = (living_area_inter / max(living_area_union, 1)) if living_area_union > 0 else 0.0
     room_count_mae = float(np.mean(room_count_errors)) if room_count_errors else 0.0
     perimeter_rel_err = float(np.mean(perimeter_rel_errors)) * 100.0 if perimeter_rel_errors else 0.0
+    scale_rel_err = float(np.mean(scale_errors)) * 100.0 if scale_errors else 0.0
+    autoscale_rate = (autoscale_count / max(processed_samples, 1)) * 100.0
+
+    ext_wall_acc = (ext_wall_correct / max(ext_wall_total, 1)) * 100.0 if ext_wall_total > 0 else 0.0
+    ext_wall_prec = (ext_wall_tp / max(ext_wall_tp + ext_wall_fp, 1)) * 100.0 if (ext_wall_tp + ext_wall_fp) > 0 else 0.0
+    ext_wall_rec = (ext_wall_tp / max(ext_wall_tp + ext_wall_fn, 1)) * 100.0 if (ext_wall_tp + ext_wall_fn) > 0 else 0.0
 
     door_obj_recall = (door_gt_detected / max(door_gt_total, 1)) * 100.0
     win_obj_recall = (win_gt_detected / max(win_gt_total, 1)) * 100.0
@@ -298,6 +342,11 @@ def evaluate_model_pipeline(
         "living_area_iou": round(living_area_iou * 100, 2) if living_area_union > 0 else None,
         "room_count_mae": round(room_count_mae, 2) if room_count_errors else None,
         "perimeter_relative_error_pct": round(perimeter_rel_err, 2) if perimeter_rel_errors else None,
+        "scale_relative_error_pct": round(scale_rel_err, 2) if scale_errors else None,
+        "autoscale_trigger_rate_pct": round(autoscale_rate, 2),
+        "ext_wall_accuracy_pct": round(ext_wall_acc, 2) if ext_wall_total > 0 else None,
+        "ext_wall_precision_pct": round(ext_wall_prec, 2) if ext_wall_total > 0 else None,
+        "ext_wall_recall_pct": round(ext_wall_rec, 2) if ext_wall_total > 0 else None,
         "door_object_recall_pct": round(door_obj_recall, 2) if door_gt_total > 0 else None,
         "win_object_recall_pct": round(win_obj_recall, 2) if win_gt_total > 0 else None,
         "watertight_shell_rate_pct": round(shell_valid_rate, 2),
@@ -328,6 +377,11 @@ def evaluate_model_pipeline(
         print(f"  Room Count MAE:           {results['room_count_mae']}")
     if results.get('perimeter_relative_error_pct') is not None:
         print(f"  Perimeter Rel Error:      {results['perimeter_relative_error_pct']}%")
+    if results.get('scale_relative_error_pct') is not None:
+        print(f"  Scale Relative Error:     {results['scale_relative_error_pct']}%")
+    print(f"  Auto-Scale Trigger Rate:  {results['autoscale_trigger_rate_pct']}%")
+    if results.get('ext_wall_accuracy_pct') is not None:
+        print(f"  Exterior Wall Accuracy:   {results['ext_wall_accuracy_pct']}% (Prec: {results['ext_wall_precision_pct']}%, Rec: {results['ext_wall_recall_pct']}%)")
     if results.get('door_object_recall_pct') is not None:
         print(f"  Door Object Recall (20px):{results['door_object_recall_pct']}%")
     if results.get('win_object_recall_pct') is not None:
@@ -355,6 +409,8 @@ def run_full_comparative_benchmark(split: str = "test", max_samples: Optional[in
 
     rows = [
         ("Merged Wall IoU", f"{res_baseline['wall_merged_iou']}%", f"{res_multitask['wall_merged_iou']}%", f"{res_hybrid['wall_merged_iou']}%"),
+        ("Wall Internal IoU", "N/A", f"{res_multitask.get('wall_internal_iou', 'N/A')}%", f"{res_hybrid.get('wall_internal_iou', 'N/A')}%"),
+        ("Wall External IoU", "N/A", f"{res_multitask.get('wall_external_iou', 'N/A')}%", f"{res_hybrid.get('wall_external_iou', 'N/A')}%"),
         ("Door IoU", f"{res_baseline['door_iou']}%", f"{res_multitask['door_iou']}%", f"{res_hybrid['door_iou']}%"),
         ("Window IoU", f"{res_baseline['window_iou']}%", f"{res_multitask['window_iou']}%", f"{res_hybrid['window_iou']}%"),
         ("Door Object Recall (20px)", f"{res_baseline.get('door_object_recall_pct', 'N/A')}%", f"{res_multitask.get('door_object_recall_pct', 'N/A')}%", f"{res_hybrid.get('door_object_recall_pct', 'N/A')}%"),
@@ -364,7 +420,10 @@ def run_full_comparative_benchmark(split: str = "test", max_samples: Optional[in
         ("Room Pixel Accuracy", "N/A", f"{res_multitask['room_pixel_accuracy']}%", f"{res_hybrid['room_pixel_accuracy']}%"),
         ("Living Area Footprint IoU", "N/A", f"{res_multitask.get('living_area_iou', 'N/A')}%", f"{res_hybrid.get('living_area_iou', 'N/A')}%"),
         ("Room Count MAE", "N/A", f"{res_multitask.get('room_count_mae', 'N/A')}", f"{res_hybrid.get('room_count_mae', 'N/A')}"),
+        ("Exterior Wall Accuracy", "N/A", f"{res_multitask.get('ext_wall_accuracy_pct', 'N/A')}%", f"{res_hybrid.get('ext_wall_accuracy_pct', 'N/A')}%"),
         ("Perimeter Relative Error", f"{res_baseline.get('perimeter_relative_error_pct', 'N/A')}%", f"{res_multitask.get('perimeter_relative_error_pct', 'N/A')}%", f"{res_hybrid.get('perimeter_relative_error_pct', 'N/A')}%"),
+        ("Scale Relative Error", f"{res_baseline.get('scale_relative_error_pct', 'N/A')}%", f"{res_multitask.get('scale_relative_error_pct', 'N/A')}%", f"{res_hybrid.get('scale_relative_error_pct', 'N/A')}%"),
+        ("Auto-Scale Trigger Rate", f"{res_baseline['autoscale_trigger_rate_pct']}%", f"{res_multitask['autoscale_trigger_rate_pct']}%", f"{res_hybrid['autoscale_trigger_rate_pct']}%"),
         ("Watertight 3D Shell Rate", f"{res_baseline['watertight_shell_rate_pct']}%", f"{res_multitask['watertight_shell_rate_pct']}%", f"{res_hybrid['watertight_shell_rate_pct']}%"),
         ("Avg Rooms / Plan", f"{res_baseline['avg_rooms_per_plan']}", f"{res_multitask['avg_rooms_per_plan']}", f"{res_hybrid['avg_rooms_per_plan']}")
     ]
