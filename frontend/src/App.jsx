@@ -7,6 +7,9 @@ import Viewer3D from './components/Viewer3D';
 import MetricsSummary from './components/MetricsSummary';
 
 export default function App() {
+  const [currentView, setCurrentView] = useState(() => {
+    return window.location.hash === '#studio' ? 'studio' : 'showcase';
+  });
   const [activeTab, setActiveTab] = useState('split');
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('/sample_floorplan.png');
@@ -33,6 +36,27 @@ export default function App() {
 
     // Automatically analyze default sample floorplan on initial startup
     loadDefaultSample();
+
+    // Listen for cross-frame messages from the Casa Serra Hero Showcase
+    const handleHash = () => {
+      if (window.location.hash === '#studio') {
+        setCurrentView('studio');
+      } else if (window.location.hash === '#showcase' || !window.location.hash) {
+        setCurrentView('showcase');
+      }
+    };
+    const handleMsg = (e) => {
+      if (e.data && e.data.type === 'LAUNCH_STUDIO') {
+        window.location.hash = '#studio';
+        setCurrentView('studio');
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    window.addEventListener('message', handleMsg);
+    return () => {
+      window.removeEventListener('hashchange', handleHash);
+      window.removeEventListener('message', handleMsg);
+    };
   }, []);
 
   const loadDefaultSample = async () => {
@@ -150,6 +174,18 @@ export default function App() {
     }
   };
 
+  if (currentView === 'showcase') {
+    return (
+      <div className="relative w-screen h-screen overflow-hidden bg-[#efebe2]">
+        <iframe
+          src="/showcase/index.html"
+          title="ArchiGen 3D Showcase Tour"
+          className="w-full h-full border-none"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* 1. Header */}
@@ -158,6 +194,10 @@ export default function App() {
         latency={latency}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        onReturnToShowcase={() => {
+          window.location.hash = '#showcase';
+          setCurrentView('showcase');
+        }}
       />
 
       {/* 2. Main Work Area */}

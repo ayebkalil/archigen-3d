@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Layers, Activity, Cpu, Sparkles } from 'lucide-react';
 
-export default function Navbar({ health, latency, activeTab, setActiveTab }) {
+export default function Navbar({ health, latency, activeTab, setActiveTab, onReturnToShowcase }) {
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 flex items-center justify-between z-30 select-none">
       <div className="flex items-center space-x-4">
@@ -26,8 +26,19 @@ export default function Navbar({ health, latency, activeTab, setActiveTab }) {
           </div>
         </div>
 
+        {/* Return to Showcase Button */}
+        {onReturnToShowcase && (
+          <button
+            onClick={onReturnToShowcase}
+            className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#b8452a]/20 border border-[#b8452a]/40 text-[#f59e0b] hover:bg-[#b8452a]/30 hover:border-[#b8452a]/60 transition-all font-medium text-xs ml-3 shadow-sm"
+            title="Return to the Casa Serra 3D Scroll Walkthrough"
+          >
+            <span>← 3D Showcase Tour</span>
+          </button>
+        )}
+
         {/* View Switcher */}
-        <div className="ml-8 hidden md:flex items-center p-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-medium">
+        <div className="ml-4 hidden md:flex items-center p-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-medium">
           <button
             onClick={() => setActiveTab('split')}
             className={`px-3 py-1.5 rounded-md transition-all ${
