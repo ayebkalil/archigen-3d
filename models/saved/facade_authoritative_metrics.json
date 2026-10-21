@@ -1,0 +1,32 @@
+{
+  "Baseline (100ep)": {
+    "checkpoint": "models/saved/generator_best.pth",
+    "upsample_mode": "transpose",
+    "l1_loss": 0.3483,
+    "ssim": 0.2866,
+    "psnr_db": 13.19,
+    "lpips": 0.6327,
+    "kid_x1000": 150.357,
+    "kid_std_x1000": 10.248
+  },
+  "Enhanced (150ep)": {
+    "checkpoint": "models/saved/generator_enhanced_best.pth",
+    "upsample_mode": "nearest",
+    "l1_loss": 0.3379,
+    "ssim": 0.3345,
+    "psnr_db": 13.15,
+    "lpips": 0.494,
+    "kid_x1000": 109.857,
+    "kid_std_x1000": 9.238
+  },
+  "Perceptual (100ep)": {
+    "checkpoint": "models/saved/generator_perceptual_best.pth",
+    "upsample_mode": "nearest",
+    "l1_loss": 0.3526,
+    "ssim": 0.2792,
+    "psnr_db": 12.69,
+    "lpips": 0.3169,
+    "kid_x1000": 67.649,
+    "kid_std_x1000": 5.946
+  }
+}

@@ -14,9 +14,13 @@
 *.ckpt
 *.safetensors
 *.bin
-models/checkpoints/
-models/saved/
-models/samples/
+models/checkpoints/*
+!models/checkpoints/.gitkeep
+models/saved/*
+!models/saved/.gitkeep
+!models/saved/*.json
+models/samples/*
+!models/samples/.gitkeep
 
 # --- Datasets & Raw Images (Managed strictly by DVC, NOT Git) ---
 data/raw/*
