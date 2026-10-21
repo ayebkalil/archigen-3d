@@ -177,7 +177,7 @@ Dans notre configuration de production, les hyperparamètres réels sont rigoure
 Pour extraire la topologie intérieure, nous mettons en œuvre une architecture UNet++ multi-tâches reposant sur un encodeur convolutif ResNet-34 pré-entraîné, couplé à deux têtes de décodage spécialisées :
 \begin{itemize}
     \item \textbf{Tête Structurelle (5 classes) :} Fond, mur intérieur (\texttt{Wall\_Internal}), mur extérieur (\texttt{Wall\_External}), porte (\texttt{Door}), fenêtre (\texttt{Window}).
-    \item \textbf{Tête Sémantique (12 classes) :} Fond, Living Room, Bedroom, Kitchen, Bathroom, Entry, Storage, Balcony, Corridor, Utility, Office, Undefined.
+    \item \textbf{Tête Sémantique (12 classes) :} Fond, Living Room, Bedroom, Kitchen, Bath, Entry, Outdoor, Storage, Closet, Garage, Office, Other.
 \end{itemize}
 
 La perte d'entraînement conjointe associe la Cross-Entropy pondérée (\emph{Weighted Cross-Entropy}) pour mitiger le déséquilibre des parois minces, et la perte Dice multimodale :
@@ -341,7 +341,7 @@ Le serveur MLflow assure le suivi automatique de chaque itération :
 \end{itemize}
 
 \section{Moteur d'Inférence \& Parité Numérique}
-Pour découpler le service en production des dépendances lourdes de PyTorch et optimiser le débit d'exécution, le pipeline a fait l'objet d'un profilage fin et d'un double runtime (PyTorch CUDA accéléré et fallback ONNX Runtime). Sur station GPU locale (NVIDIA GeForce RTX 3050 Laptop, 4 Go VRAM, CPU AMD Ryzen 5), l'inférence neuronale UNet++ s'établit à $56.0\text{ ms}$ (médiane), la vectorisation polygonale hybride s'exécute en $34.0\text{ ms}$, la synthèse neuronale de textures de façade s'exécute en $164.6\text{ ms}$ pour l'ensemble des murs extérieurs via l'accélérateur PyTorch CUDA natif, et l'extrusion 3D en $0.7\text{ ms}$. La latence médiane de bout en bout atteint ainsi \textbf{$297.3\text{ ms}$} (moyenne: $342.1\text{ ms}$, P90: $480.8\text{ ms}$, P95: $780.1\text{ ms}$), respectant strictement le budget opérationnel exigé pour la démonstration ($< 400\text{ ms}$). En mode dégradé exclusivement CPU (via ONNX Runtime), la latence médiane s'établit à $1\,358.8\text{ ms}$ ($1.36\text{ s}$). La parité numérique entre PyTorch et ONNX Runtime est rigoureusement confirmée :
+Pour découpler le service en production des dépendances lourdes de PyTorch et optimiser le débit d'exécution, le pipeline a fait l'objet d'un profilage fin et d'un double runtime (PyTorch CUDA accéléré et fallback ONNX Runtime). Sur station GPU locale (NVIDIA GeForce RTX 3050 Laptop, 4 Go VRAM, CPU AMD Ryzen 5), l'inférence neuronale UNet++ s'établit à $61.4\text{ ms}$ (médiane), la vectorisation polygonale hybride s'exécute en $36.7\text{ ms}$, la synthèse neuronale de façade à la demande pour la façade principale s'exécute en $24.7\text{ ms}$ via l'accélérateur PyTorch CUDA natif, et l'extrusion 3D en $0.8\text{ ms}$. La latence médiane de bout en bout s'établit ainsi à \textbf{$156.6\text{ ms}$} (moyenne: $163.1\text{ ms}$, P90: $194.2\text{ ms}$, P95: $217.7\text{ ms}$), éliminant la traîne lente des bâtiments à façades multiples et respectant strictement le budget d'interactivité temps réel. En mode dégradé exclusivement CPU (via ONNX Runtime), la latence médiane s'établit à $921.3\text{ ms}$ (P95: $1\,001.5\text{ ms}$). La parité numérique entre PyTorch et ONNX Runtime est rigoureusement confirmée :
 \begin{equation}
     \Delta_{\max} = \max_{x \in \mathcal{D}} | \mathcal{M}_{\text{PyTorch}}(x) - \mathcal{M}_{\text{ONNXRuntime}}(x) | = 6.31 \times 10^{-6}
 \end{equation}

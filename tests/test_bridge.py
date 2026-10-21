@@ -102,4 +102,39 @@ def test_facade_bridge_backends():
         onnx_img = Image.open(io.BytesIO(onnx_bytes))
         assert onnx_img.size == (256, 256)
 
+def test_facade_bridge_batch_and_front_only_modes():
+    """Verify that FacadeBridge executes front-only on-demand mode and batched GPU mode correctly."""
+    bridge = FacadeBridge()
+    mock_layout = {
+        "metadata": {"scale_m_per_px": 0.03, "total_area_m2": 80.0, "is_building_shell_valid": True},
+        "walls": [
+            {
+                "id": "wall_ext_1",
+                "is_exterior": True,
+                "polygon_meters": [[0.0, 0.0], [6.0, 0.0], [6.0, 0.25], [0.0, 0.25]],
+                "openings": [{"type": "door", "position_along_wall_m": 2.0}]
+            },
+            {
+                "id": "wall_ext_2",
+                "is_exterior": True,
+                "polygon_meters": [[6.0, 0.0], [6.0, 5.0], [5.75, 5.0], [5.75, 0.0]],
+                "openings": [{"type": "window", "position_along_wall_m": 2.5}]
+            }
+        ],
+        "rooms": []
+    }
+
+    # 1. Test front_only mode (default)
+    res_front = bridge.process_layout_facades(mock_layout, front_only=True)
+    assert res_front["front_wall_id"] == "wall_ext_1"
+    assert mock_layout["walls"][0]["facade_texture"]["mode"] == "neural_generated"
+    assert mock_layout["walls"][1]["facade_texture"]["mode"] == "procedural_exterior"
+
+    # 2. Test batched mode across all walls
+    res_batch = bridge.process_layout_facades(mock_layout, front_only=False)
+    assert len(res_batch["facade_results"]) == 2
+    assert mock_layout["walls"][0]["facade_texture"]["mode"] in ["neural_batch", "neural_generated"]
+    assert mock_layout["walls"][1]["facade_texture"]["mode"] in ["neural_batch", "neural_generated"]
+
+
 

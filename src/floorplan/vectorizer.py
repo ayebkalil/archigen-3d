@@ -122,15 +122,26 @@ class FloorplanVectorizer:
             scale_m_per_px = self.estimate_scale(door_binary)
             scale_source = "door_width_estimation"
 
-        # 3. Outer Building Shell (Watertight Exterior Envelope)
-        ext_contours, _ = cv2.findContours(wall_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 3. Outer Building Shell (Watertight Exterior Envelope from Filled Footprint)
+        if room_mask is not None and np.max(room_mask) > 0:
+            envelope_raw = ((wall_clean > 0) | (room_mask > 0)).astype(np.uint8)
+        else:
+            envelope_raw = wall_clean.copy()
+
+        # Fill internal courtyard/corridor holes to construct watertight exterior footprint
+        env_cnts, _ = cv2.findContours(envelope_raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        filled_envelope = np.zeros_like(envelope_raw)
+        if env_cnts:
+            cv2.drawContours(filled_envelope, env_cnts, -1, 1, -1)
+
+        footprint_contours, _ = cv2.findContours(filled_envelope, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         shell_valid = False
         building_perimeter_m = 0.0
 
-        if len(ext_contours) > 0:
-            largest_ext = max(ext_contours, key=cv2.contourArea)
+        if len(footprint_contours) > 0:
+            largest_ext = max(footprint_contours, key=cv2.contourArea)
             if cv2.contourArea(largest_ext) > 100:
-                ext_poly_approx = cv2.approxPolyDP(largest_ext, 3.0, True).reshape(-1, 2)
+                ext_poly_approx = cv2.approxPolyDP(largest_ext, 2.0, True).reshape(-1, 2)
                 if len(ext_poly_approx) >= 3:
                     try:
                         shell_poly = Polygon(ext_poly_approx * scale_m_per_px)
@@ -181,7 +192,7 @@ class FloorplanVectorizer:
                 # Exterior if Wall_External pixels dominate Wall_Internal pixels
                 if ext_pixels > int_pixels and ext_pixels > 30:
                     is_exterior = True
-            elif len(ext_contours) > 0:
+            elif len(footprint_contours) > 0 and len(largest_ext) >= 3:
                 # Fallback: check distance to outer contour
                 M = cv2.moments(cnt)
                 if M["m00"] > 0:
