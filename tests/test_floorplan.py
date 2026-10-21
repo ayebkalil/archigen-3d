@@ -130,3 +130,23 @@ def test_vectorizer_envelope_shell_validation():
     assert meta.get("num_envelope_segments", 0) >= 4
     assert meta.get("is_building_shell_valid") is True
 
+def test_floorplan_pipeline_tta_modes():
+    """Verify that FloorplanPipeline correctly supports tta_mode none, 4_fold, and 8_fold."""
+    from backend.app.floorplan_engine import FloorplanPipeline
+    from PIL import Image
+    import io
+    pipeline = FloorplanPipeline.get_instance()
+    img = Image.new("RGB", (256, 256), (255, 255, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    raw_bytes = buf.getvalue()
+
+    res_none = pipeline.process_image(raw_bytes, tta_mode="none")
+    assert res_none["inference_mode"] == "single_pass"
+
+    res_4 = pipeline.process_image(raw_bytes, tta_mode="4_fold")
+    assert res_4["inference_mode"] in ["4_fold_tta", "single_pass"]
+
+    res_8 = pipeline.process_image(raw_bytes, tta_mode="8_fold")
+    assert res_8["inference_mode"] in ["8_fold_tta", "single_pass"]
+

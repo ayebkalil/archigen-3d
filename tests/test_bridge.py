@@ -136,5 +136,19 @@ def test_facade_bridge_batch_and_front_only_modes():
     assert mock_layout["walls"][0]["facade_texture"]["mode"] in ["neural_batch", "neural_generated"]
     assert mock_layout["walls"][1]["facade_texture"]["mode"] in ["neural_batch", "neural_generated"]
 
+def test_enhance_facade_details():
+    """Verify that enhance_facade_details enhances micro-contrast and edge sharpness."""
+    from PIL import ImageDraw
+    from src.bridge.facade_bridge import enhance_facade_details
+    img = Image.new("RGB", (256, 256), (128, 128, 128))
+    draw = ImageDraw.Draw(img)
+    draw.line([(0, 128), (256, 128)], fill=(255, 255, 255), width=2)
+    enhanced = enhance_facade_details(img)
+    assert isinstance(enhanced, Image.Image)
+    assert enhanced.size == (256, 256)
+    arr_orig = np.array(img).astype(np.float32)
+    arr_enh = np.array(enhanced).astype(np.float32)
+    assert not np.array_equal(arr_orig, arr_enh)
+
 
 

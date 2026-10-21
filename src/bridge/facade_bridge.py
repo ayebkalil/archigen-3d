@@ -20,7 +20,7 @@ import io
 import math
 import base64
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 
 # Exact CMP 12-Class Colormap matching trained generator distribution
 CMP_PALETTE = {
@@ -35,14 +35,33 @@ CMP_PALETTE = {
     "molding": (0, 0, 222)         # Architectural Horizontal Trim
 }
 
+def enhance_facade_details(
+    img: Image.Image,
+    radius: float = 1.2,
+    percent: int = 125,
+    threshold: int = 3,
+    contrast_factor: float = 1.04
+) -> Image.Image:
+    """
+    Applies contrast-adaptive unsharp masking and subtle micro-contrast pop to
+    synthesized neural facade textures. Sharpens window frames, sill moldings,
+    and stone/brick textures while preventing ringing artifacts or pixel clipping.
+    """
+    sharpened = img.filter(ImageFilter.UnsharpMask(radius=radius, percent=percent, threshold=threshold))
+    if contrast_factor != 1.0:
+        enhancer = ImageEnhance.Contrast(sharpened)
+        return enhancer.enhance(contrast_factor)
+    return sharpened
+
 class PyTorchFacadeInference:
     """
     Ultra-low-latency PyTorch CUDA Generator (~10ms per 256x256 facade).
     Provides native GPU execution when PyTorch with CUDA is available.
     """
-    def __init__(self, generator: Any, device: str = "cuda"):
+    def __init__(self, generator: Any, device: str = "cuda", enhance: bool = True):
         self.generator = generator
         self.device = device
+        self.enhance = enhance
 
     def generate(self, image_bytes: bytes) -> bytes:
         import torch
@@ -57,6 +76,8 @@ class PyTorchFacadeInference:
         out_arr = np.transpose(out_arr, (1, 2, 0))
         out_arr = np.clip((out_arr + 1.0) * 127.5, 0, 255).astype(np.uint8)
         out_img = Image.fromarray(out_arr)
+        if self.enhance:
+            out_img = enhance_facade_details(out_img)
         buf = io.BytesIO()
         out_img.save(buf, format="PNG")
         return buf.getvalue()
@@ -83,18 +104,23 @@ class PyTorchFacadeInference:
         out_np = out.detach().cpu().numpy()
         out_np = np.transpose(out_np, (0, 2, 3, 1))
         out_np = np.clip((out_np + 1.0) * 127.5, 0, 255).astype(np.uint8)
-        return [Image.fromarray(out_np[i]) for i in range(len(pil_images))]
+        out_imgs = [Image.fromarray(out_np[i]) for i in range(len(pil_images))]
+        if self.enhance:
+            out_imgs = [enhance_facade_details(im) for im in out_imgs]
+        return out_imgs
 
 class FacadeBridge:
     def __init__(
         self,
         onnx_model_path: str = "models/saved/generator_perceptual.onnx",
         pytorch_model_path: str = "models/saved/generator_perceptual_best.pth",
-        prefer_cuda: bool = True
+        prefer_cuda: bool = True,
+        enhance_textures: bool = True
     ):
         self.onnx_model_path = Path(onnx_model_path)
         self.pytorch_model_path = Path(pytorch_model_path)
         self.prefer_cuda = prefer_cuda
+        self.enhance_textures = enhance_textures
         self.inference_engine = None
         self.device_name = "CPU"
         self._init_inference_engine()
@@ -115,7 +141,7 @@ class FacadeBridge:
                     else:
                         gen.load_state_dict(ckpt)
                     gen.to("cuda").eval()
-                    self.inference_engine = PyTorchFacadeInference(gen, device="cuda")
+                    self.inference_engine = PyTorchFacadeInference(gen, device="cuda", enhance=self.enhance_textures)
                     self.device_name = f"PyTorch CUDA ({torch.cuda.get_device_name(0)})"
                     print(f"[FACADE BRIDGE] Accelerated with {self.device_name} (~10ms latency)")
                     return
@@ -339,6 +365,11 @@ class FacadeBridge:
         if self.inference_engine is not None:
             photo_bytes = self.inference_engine.generate(sketch_bytes)
             photo_img = Image.open(io.BytesIO(photo_bytes))
+            if self.enhance_textures and not isinstance(self.inference_engine, PyTorchFacadeInference):
+                photo_img = enhance_facade_details(photo_img)
+                buf_enh = io.BytesIO()
+                photo_img.save(buf_enh, format="PNG")
+                photo_bytes = buf_enh.getvalue()
         else:
             # Fallback mock texture if ONNX engine not loaded
             photo_img = sketch_img
@@ -447,6 +478,8 @@ class FacadeBridge:
                 generated_imgs = self.inference_engine.generate_batch(sketches)
             else:
                 generated_imgs = sketches  # fallback
+                if self.enhance_textures:
+                    generated_imgs = [enhance_facade_details(im) for im in generated_imgs]
 
             for idx, (w, s_img, uv_bounds) in enumerate(wall_order):
                 w_id = w.get("id")

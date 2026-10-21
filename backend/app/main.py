@@ -122,6 +122,7 @@ async def analyze_floorplan(
     num_floors: int = Form(default=1),
     front_wall_id: Optional[str] = Form(default=None),
     use_tta: bool = Form(default=False),
+    tta_mode: str = Form(default="none"),
     front_only: bool = Form(default=True)
 ):
     """
@@ -130,7 +131,8 @@ async def analyze_floorplan(
     and produces Three.js 3D extrusion coordinates.
 
     Features:
-    - use_tta: Optional 4-fold test-time augmentation (+1.56% mIoU, +0.90% Door IoU).
+    - use_tta: Optional test-time augmentation (+1.56% mIoU, +0.90% Door IoU).
+    - tta_mode: "none", "4_fold", or "8_fold" (full D4 dihedral group ensembling).
     - front_only: High-performance on-demand front facade synthesis (P95 latency < 35ms).
     """
     if not file.content_type.startswith("image/"):
@@ -155,6 +157,7 @@ async def analyze_floorplan(
             num_floors=num_floors,
             front_wall_id=front_wall_id,
             use_tta=use_tta,
+            tta_mode=tta_mode,
             front_only=front_only
         )
         layout = result["layout"]
