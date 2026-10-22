@@ -1,0 +1,51 @@
+{
+  "dataset": "CubiCasa5K Validation Split",
+  "num_plans": 400,
+  "shell_validity": {
+    "single_pass_rate_pct": 93.25,
+    "tta_rate_pct": 94.25,
+    "fallback_rate_pct": 98.75,
+    "plans_broken_by_tta_count": 18,
+    "plans_fixed_by_tta_count": 22,
+    "broken_plan_indices": [
+      29,
+      36,
+      72,
+      94,
+      109,
+      125,
+      151,
+      163,
+      182,
+      186,
+      232,
+      235,
+      238,
+      244,
+      260,
+      264,
+      283,
+      319
+    ]
+  },
+  "topology_repair": {
+    "needed_count": 25,
+    "success_count": 25,
+    "success_rate_pct": 100.0,
+    "mean_area_alteration_pct": 0.0033235150221348174
+  },
+  "perimeter_decomposition": {
+    "footprint_iou_pct": 79.05463015768596,
+    "footprint_area_error_pct": 50.748477819014234,
+    "mean_islands": 7.2475,
+    "mean_holes": 18.5625,
+    "mean_gt_vertices": 38.165,
+    "mean_pred_vertices": 59.7825,
+    "vertices_ratio": 1.7405166060807913,
+    "error_raw_pct": 23.10799110962653,
+    "error_filled_pct": 23.10799110962653,
+    "error_clean_pct": 23.10799110962653,
+    "error_smoothed_pct": 21.280117350634317,
+    "error_dp_eps35_pct": 23.10799110962653
+  }
+}
