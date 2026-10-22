@@ -1,0 +1,5 @@
+outs:
+- md5: 69219d64f81a9a3e590c89448f006522
+  size: 156600733
+  hash: md5
+  path: generator_perceptual_best.pth

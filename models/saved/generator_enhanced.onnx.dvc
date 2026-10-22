@@ -1,0 +1,5 @@
+outs:
+- md5: 6c22ab0127a9d9bf1ff1b33726ef7234
+  size: 156648234
+  hash: md5
+  path: generator_enhanced.onnx

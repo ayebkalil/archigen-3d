@@ -16,9 +16,10 @@
 *.bin
 models/checkpoints/*
 !models/checkpoints/.gitkeep
-models/saved/*
-!models/saved/.gitkeep
-!models/saved/*.json
+# Model weights are globally ignored above (*.pth, *.onnx, *.safetensors)
+!models/saved/**/.gitkeep
+!models/saved/**/*.json
+!models/saved/**/*.dvc
 models/samples/*
 !models/samples/.gitkeep
 

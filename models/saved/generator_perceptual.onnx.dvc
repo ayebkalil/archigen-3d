@@ -1,0 +1,5 @@
+outs:
+- md5: bad5e7947fb6713cd00cac37896c877a
+  size: 156648208
+  hash: md5
+  path: generator_perceptual.onnx

@@ -1,0 +1,125 @@
+{
+  "generated_at": "2026-10-22T21:20:06+0100",
+  "models": {
+    "models\\saved\\generator.onnx": {
+      "sha256": "3074dd8439b94049cb3aa4bc208bccb6556fe1bd7bc3dc666f83b561235df591",
+      "size_bytes": 217672141,
+      "size_mb": 207.59,
+      "last_modified": "2026-10-06T10:33:52"
+    },
+    "models\\saved\\generator_best.pth": {
+      "sha256": "114837457e23c4fead038c87fb7bb80f2d55098e0c50732f24d8f44066cb1453",
+      "size_bytes": 217624694,
+      "size_mb": 207.54,
+      "last_modified": "2026-10-06T09:58:14"
+    },
+    "models\\saved\\generator_enhanced.onnx": {
+      "sha256": "15b7c6a415256dc42ec09457f0e70ccdcd89bb746fedc0aa7bd2988dc7188e6f",
+      "size_bytes": 156648234,
+      "size_mb": 149.39,
+      "last_modified": "2026-10-22T21:19:35"
+    },
+    "models\\saved\\generator_enhanced_best.pth": {
+      "sha256": "be30c60bfb69b9b9e1d6964b0a78758016a307a4caa12afe39515d36e7500af7",
+      "size_bytes": 156600691,
+      "size_mb": 149.35,
+      "last_modified": "2026-10-22T21:19:26"
+    },
+    "models\\saved\\generator_perceptual.onnx": {
+      "sha256": "70fc49a3a4320f5d150e883ce15320061a7c129fd0cda8aa94e0b2f28014ac74",
+      "size_bytes": 156648208,
+      "size_mb": 149.39,
+      "last_modified": "2026-10-22T21:19:17"
+    },
+    "models\\saved\\generator_perceptual_best.pth": {
+      "sha256": "8bac2333cc5db48bf726b69a35e63b87a3be436d12fd079cdbdab9e2f6e95452",
+      "size_bytes": 156600733,
+      "size_mb": 149.35,
+      "last_modified": "2026-10-22T21:19:11"
+    },
+    "models\\saved\\baseline_100ep\\generator_100ep.onnx": {
+      "sha256": "3074dd8439b94049cb3aa4bc208bccb6556fe1bd7bc3dc666f83b561235df591",
+      "size_bytes": 217672141,
+      "size_mb": 207.59,
+      "last_modified": "2026-10-06T10:33:52"
+    },
+    "models\\saved\\baseline_100ep\\generator_best_100ep.pth": {
+      "sha256": "114837457e23c4fead038c87fb7bb80f2d55098e0c50732f24d8f44066cb1453",
+      "size_bytes": 217624694,
+      "size_mb": 207.54,
+      "last_modified": "2026-10-06T09:58:14"
+    },
+    "models\\saved\\floorplan_baseline\\best.safetensors": {
+      "sha256": "d7f6a0fd06e2931aecfc8c4849192c5e153701578026efc78d9a6246731a8d6c",
+      "size_bytes": 97851168,
+      "size_mb": 93.32,
+      "last_modified": "2026-10-22T21:19:42"
+    },
+    "models\\saved\\floorplan_unetpp\\finetune_epoch_12.pth": {
+      "sha256": "320afaf463f76f627810a7fc05477175d3b2a1633c9796e6b1fea2922c7b08bc",
+      "size_bytes": 104541274,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-15T19:41:04"
+    },
+    "models\\saved\\floorplan_unetpp\\floorplan_multitask.onnx": {
+      "sha256": "8f58ee58b7229e81aaa6139e69528d7f640747ba30a325d1fc321d80a5832be0",
+      "size_bytes": 104321167,
+      "size_mb": 99.49,
+      "last_modified": "2026-10-22T21:18:59"
+    },
+    "models\\saved\\floorplan_unetpp\\lovasz_epoch_01.pth": {
+      "sha256": "56fe5ade98acc707a762f8ed5b9883167a7fb258f50f5988ad8288c422b26637",
+      "size_bytes": 104541074,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-21T20:51:18"
+    },
+    "models\\saved\\floorplan_unetpp\\lovasz_epoch_02.pth": {
+      "sha256": "bf4c4c8e60a7b7d8c6b73d0e47790bbf459d884a3ecc0779215eed9aa3c90f4a",
+      "size_bytes": 104541074,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-21T21:49:40"
+    },
+    "models\\saved\\floorplan_unetpp\\lovasz_epoch_03.pth": {
+      "sha256": "b76e187ebab0fd736ba324c5fdc9f3d5d78d6a94643d980c198aaafd240e4047",
+      "size_bytes": 104541074,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-21T22:42:05"
+    },
+    "models\\saved\\floorplan_unetpp\\lovasz_epoch_04.pth": {
+      "sha256": "3a9621aab4004224fdb326857f5f634e27243f787b16c2e4299a3d5ccc52107f",
+      "size_bytes": 104541074,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-21T23:28:23"
+    },
+    "models\\saved\\floorplan_unetpp\\lovasz_epoch_05.pth": {
+      "sha256": "ef88c3630cb45b54e7bf0a83221983aed4c8d1c5137ed3e59996f904ff590040",
+      "size_bytes": 104541074,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-22T00:14:14"
+    },
+    "models\\saved\\floorplan_unetpp\\lovasz_epoch_06.pth": {
+      "sha256": "81cb46761af14d29787e3de09e05f7ba5da45107c981d8a0728df79fef94d6ed",
+      "size_bytes": 104541074,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-22T00:59:35"
+    },
+    "models\\saved\\floorplan_unetpp\\multitask_resnet34_best.pth": {
+      "sha256": "a937ddeb4e17cfca616283829c9ee85263111083d82ba7687b270b89e14fb091",
+      "size_bytes": 313349478,
+      "size_mb": 298.83,
+      "last_modified": "2026-10-22T21:18:57"
+    },
+    "models\\saved\\floorplan_unetpp\\multitask_resnet34_best_backup_25ep.pth": {
+      "sha256": "a937ddeb4e17cfca616283829c9ee85263111083d82ba7687b270b89e14fb091",
+      "size_bytes": 313349478,
+      "size_mb": 298.83,
+      "last_modified": "2026-10-13T15:31:19"
+    },
+    "models\\saved\\floorplan_unetpp\\multitask_resnet34_finetuned_best.pth": {
+      "sha256": "80fa1ea7780f7cb2f48d720abed8a62104ac90e0e40d99661f3022f3b472fcca",
+      "size_bytes": 104547098,
+      "size_mb": 99.7,
+      "last_modified": "2026-10-22T21:18:26"
+    }
+  }
+}

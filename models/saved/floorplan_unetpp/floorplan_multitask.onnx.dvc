@@ -1,0 +1,5 @@
+outs:
+- md5: 5226f5d01721b14ec10361c16cac9369
+  size: 104321167
+  hash: md5
+  path: floorplan_multitask.onnx

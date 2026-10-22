@@ -1,0 +1,5 @@
+outs:
+- md5: 6d68a4fe0deb0e965558a52496946ab5
+  size: 156600691
+  hash: md5
+  path: generator_enhanced_best.pth

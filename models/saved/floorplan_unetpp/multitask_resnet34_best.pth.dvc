@@ -1,0 +1,5 @@
+outs:
+- md5: 3915cdcc4dae3924f38f0383679bcf83
+  size: 313349478
+  hash: md5
+  path: multitask_resnet34_best.pth
