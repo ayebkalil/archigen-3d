@@ -1,0 +1,248 @@
+{
+  "dataset": "Real External Floorplans (Wikimedia Commons / HABS / Library of Congress)",
+  "total_plans_tested": 12,
+  "watertight_shell_success_rate": "75.0%",
+  "room_detection_success_rate": "100.0%",
+  "plan_evaluations": [
+    {
+      "id": "real_01",
+      "filename": "real_01_Latrobe_White_House_cropa2.jpg.jpg",
+      "title": "File:Latrobe White House cropa2.jpg",
+      "license": "Public domain",
+      "num_walls": 30,
+      "num_exterior_walls": 20,
+      "num_rooms": 7,
+      "num_doors": 32,
+      "num_windows": 15,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 117.24,
+      "total_surface_m2": 168.17,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_01_vector_overlay.png"
+    },
+    {
+      "id": "real_02",
+      "filename": "real_02_Putnam_House_-_floor_plans.jpg.jpg",
+      "title": "File:Putnam House - floor plans.jpg",
+      "license": "Public domain",
+      "num_walls": 38,
+      "num_exterior_walls": 21,
+      "num_rooms": 25,
+      "num_doors": 35,
+      "num_windows": 27,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 150.85,
+      "total_surface_m2": 222.68,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_02_vector_overlay.png"
+    },
+    {
+      "id": "real_03",
+      "filename": "real_03_Floor_plan_of_Wanstead_House.png.png",
+      "title": "File:Floor plan of Wanstead House.png",
+      "license": "CC0",
+      "num_walls": 43,
+      "num_exterior_walls": 29,
+      "num_rooms": 11,
+      "num_doors": 30,
+      "num_windows": 37,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 60.94,
+      "total_surface_m2": 101.74,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_03_vector_overlay.png"
+    },
+    {
+      "id": "real_04",
+      "filename": "real_04_Bolduc_House_Floor_Plan--Ste_Gen.png",
+      "title": "File:Bolduc House Floor Plan--Ste Genevieve MO.png",
+      "license": "Public domain",
+      "num_walls": 23,
+      "num_exterior_walls": 14,
+      "num_rooms": 3,
+      "num_doors": 19,
+      "num_windows": 15,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 128.6,
+      "total_surface_m2": 142.58,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_04_vector_overlay.png"
+    },
+    {
+      "id": "real_05",
+      "filename": "real_05_Hills-Decaro_House_First_Floor_P.jpg",
+      "title": "File:Hills-Decaro House First Floor Plan 1906.jpg",
+      "license": "CC BY-SA 3.0",
+      "num_walls": 16,
+      "num_exterior_walls": 10,
+      "num_rooms": 5,
+      "num_doors": 17,
+      "num_windows": 16,
+      "is_building_shell_valid": false,
+      "shell_status": "INVALID_GEOMETRY",
+      "building_perimeter_m": 97.69,
+      "total_surface_m2": 44.76,
+      "status": "FAIL_GEOMETRY",
+      "diagnostics": [
+        "Failure: Non-watertight building envelope (INVALID_GEOMETRY)."
+      ],
+      "overlay_artifact": "real_05_vector_overlay.png"
+    },
+    {
+      "id": "real_06",
+      "filename": "real_06_Hills-Decaro_House_Second_Floor_.jpg",
+      "title": "File:Hills-Decaro House Second Floor Plan 1906.jpg",
+      "license": "CC BY-SA 3.0",
+      "num_walls": 22,
+      "num_exterior_walls": 11,
+      "num_rooms": 8,
+      "num_doors": 21,
+      "num_windows": 17,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 119.93,
+      "total_surface_m2": 80.14,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_06_vector_overlay.png"
+    },
+    {
+      "id": "real_07",
+      "filename": "real_07_Hills-Decaro_House_Second_Floor_.jpg",
+      "title": "File:Hills-Decaro House Second Floor Plan Pre-Fire.jpg",
+      "license": "CC BY-SA 3.0",
+      "num_walls": 17,
+      "num_exterior_walls": 13,
+      "num_rooms": 12,
+      "num_doors": 19,
+      "num_windows": 14,
+      "is_building_shell_valid": false,
+      "shell_status": "INVALID_GEOMETRY",
+      "building_perimeter_m": 155.74,
+      "total_surface_m2": 78.45,
+      "status": "FAIL_GEOMETRY",
+      "diagnostics": [
+        "Failure: Non-watertight building envelope (INVALID_GEOMETRY)."
+      ],
+      "overlay_artifact": "real_07_vector_overlay.png"
+    },
+    {
+      "id": "real_08",
+      "filename": "real_08_Hills-DeCaro_House_First_Floor_P.jpg",
+      "title": "File:Hills-DeCaro House First Floor Plan Pre-Fire.jpg",
+      "license": "CC BY-SA 3.0",
+      "num_walls": 19,
+      "num_exterior_walls": 14,
+      "num_rooms": 9,
+      "num_doors": 18,
+      "num_windows": 17,
+      "is_building_shell_valid": false,
+      "shell_status": "INVALID_GEOMETRY",
+      "building_perimeter_m": 107.87,
+      "total_surface_m2": 71.41,
+      "status": "FAIL_GEOMETRY",
+      "diagnostics": [
+        "Failure: Non-watertight building envelope (INVALID_GEOMETRY)."
+      ],
+      "overlay_artifact": "real_08_vector_overlay.png"
+    },
+    {
+      "id": "real_09",
+      "filename": "real_09_Hills-DeCaro_House_Second_Floor_.jpg",
+      "title": "File:Hills-DeCaro House Second Floor Plan Post-Fire.jpg",
+      "license": "CC BY-SA 3.0",
+      "num_walls": 15,
+      "num_exterior_walls": 10,
+      "num_rooms": 7,
+      "num_doors": 13,
+      "num_windows": 16,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 103.64,
+      "total_surface_m2": 83.41,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_09_vector_overlay.png"
+    },
+    {
+      "id": "real_10",
+      "filename": "real_10_New_Place_Ground_Floor_Plan_Luty.jpg",
+      "title": "File:New Place Ground Floor Plan Lutyens Houses and Gardens 1913 Page221.jpg",
+      "license": "Public domain",
+      "num_walls": 46,
+      "num_exterior_walls": 21,
+      "num_rooms": 15,
+      "num_doors": 48,
+      "num_windows": 30,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 178.95,
+      "total_surface_m2": 127.6,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_10_vector_overlay.png"
+    },
+    {
+      "id": "real_11",
+      "filename": "real_11_Hills-DeCaro_House_First_Floor_P.jpg",
+      "title": "File:Hills-DeCaro House First Floor Plan Post-Fire.jpg",
+      "license": "CC BY-SA 3.0",
+      "num_walls": 20,
+      "num_exterior_walls": 14,
+      "num_rooms": 9,
+      "num_doors": 18,
+      "num_windows": 19,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 86.89,
+      "total_surface_m2": 66.53,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_11_vector_overlay.png"
+    },
+    {
+      "id": "real_12",
+      "filename": "real_12_GROUND_FLOOR_PLAN_-_FITZGERALD_H.jpg",
+      "title": "File:GROUND FLOOR PLAN - FITZGERALD HOUSE.jpg",
+      "license": "CC BY-SA 3.0",
+      "num_walls": 4,
+      "num_exterior_walls": 2,
+      "num_rooms": 2,
+      "num_doors": 9,
+      "num_windows": 3,
+      "is_building_shell_valid": true,
+      "shell_status": "VALID",
+      "building_perimeter_m": 61.54,
+      "total_surface_m2": 8.34,
+      "status": "PASS",
+      "diagnostics": [
+        "Success: Watertight building envelope and rectilinear room partition established."
+      ],
+      "overlay_artifact": "real_12_vector_overlay.png"
+    }
+  ]
+}

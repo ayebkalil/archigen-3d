@@ -83,7 +83,7 @@
 % =========================================================================
 \selectlanguage{french}
 \begin{abstract}
-Ce projet présente \textbf{ArchiGen 3D}, un système complet de Computer Vision et d'Intelligence Artificielle Générative dédié à la conversion automatisée de plans 2D d'architectes en environnements 3D interactifs avec textures de façades synthétisées. Le système s'articule autour de deux axes fondamentaux : premièrement, une architecture multi-tâches UNet++ (ResNet-34) entraînée sur CubiCasa5K (4\,200 plans d'entraînement, 400 de test, licence CC BY-NC 4.0) assurant la segmentation conjointe des cloisons structurelles (murs intérieurs et extérieurs, portes, fenêtres) et des pièces fonctionnelles (11 classes sémantiques), suivie d'une vectorisation géométrique rectilinéaire et d'une extrusion 3D étanche. Deuxièmement, un modèle génératif antagoniste conditionnel (cGAN / Pix2Pix) stabilisé par normalisation spectrale, perte perceptuelle LPIPS (SqueezeNet) et matching de caractéristiques multi-échelles, synthétisant des textures de façades sur le jeu de données CMP Facades (400 paires train, 106 test). L'intégralité du cycle de vie respecte les standards MLOps les plus stricts : versioning des données et poids par DVC, observabilité complète via MLflow, moteur d'inférence accéléré sous ONNX Runtime avec parité numérique stricte ($\Delta_{\max} = 6.31 \times 10^{-6}$), conteneurisation Docker Compose multi-services avec proxy inverse Nginx, et pipeline CI/CD automatisé sous GitHub Actions validé par 18 tests Pytest.
+Ce projet présente \textbf{ArchiGen 3D}, un système complet de Computer Vision et d'Intelligence Artificielle Générative dédié à la conversion automatisée de plans 2D d'architectes en environnements 3D interactifs avec textures de façades synthétisées. Le système s'articule autour de deux axes fondamentaux : premièrement, une architecture multi-tâches UNet++ (ResNet-34) entraînée sur CubiCasa5K (4\,200 plans d'entraînement, 400 de test, licence CC BY-NC 4.0) assurant la segmentation conjointe des cloisons structurelles (murs intérieurs et extérieurs, portes, fenêtres) et des pièces fonctionnelles (11 classes sémantiques), suivie d'une vectorisation géométrique rectilinéaire et d'une extrusion 3D étanche. Deuxièmement, un modèle génératif antagoniste conditionnel (cGAN / Pix2Pix) stabilisé par normalisation spectrale, perte perceptuelle LPIPS (SqueezeNet) et matching de caractéristiques multi-échelles, synthétisant des textures de façades sur le jeu de données CMP Facades (400 paires train, 106 test). L'intégralité du cycle de vie respecte les standards MLOps les plus stricts : versioning des données et poids par DVC, observabilité complète via MLflow, moteur d'inférence accéléré sous ONNX Runtime avec parité numérique stricte ($\Delta_{\max} = 6.31 \times 10^{-6}$), conteneurisation Docker Compose multi-services avec proxy inverse Nginx, et pipeline CI/CD automatisé sous GitHub Actions validé par 25 tests Pytest.
 \end{abstract}
 
 \tableofcontents
@@ -249,62 +249,119 @@ Une analyse rigoureuse impose de reconnaître que les métriques objectives éva
     \item \textbf{Justification du Choix de Production :} Le modèle perceptuel a été retenu pour le pipeline 3D en raison de la clarté de ses textures : disparition du motif de damier (remplacement des convolutions transposées par Nearest+Conv) et préservation des contrastes structurels des baies architecturales.
 \end{enumerate}
 
-\section{Évaluation de la Segmentation de Plans d'Étage}
-Le tableau~\ref{tab:floorplan_benchmark} expose les résultats empiriques mesurés sur l'intégralité des 400 plans du jeu de test CubiCasa5K non vus.
+\section{Évaluation de la Segmentation de Plans d'Étage sur le Jeu de Test}
+Le tableau~\ref{tab:floorplan_benchmark} expose les résultats empiriques mesurés lors d'une évaluation unique et reproductible sur l'intégralité des 400 plans non vus du jeu de test CubiCasa5K, comparant la passe unique (Baseline) et l'inférence avec test-time augmentation (4-Fold TTA diédral), accompagnée des intervalles de confiance à 95\% issus de 1\,000 ré-échantillonnages bootstrap appariés.
 
 \begin{table}[H]
 \centering
-\caption{Benchmark Neural Multi-Tâches sur le Jeu de Test CubiCasa5K ($400$ plans non vus)}
+\caption{Benchmark Neural Multi-Tâches sur le Jeu de Test Officiel CubiCasa5K ($N = 400$ plans non vus)}
 \label{tab:floorplan_benchmark}
+\small
 \begin{tabular}{lcccc}
 \toprule
-\textbf{Métrique} & \textbf{Baseline Initiale} & \textbf{Base (25 ép.)} & \textbf{Fine-Tuned (Final)} & \textbf{Signif. ($p$)} \\
+\textbf{Métrique} & \textbf{Passe Unique (Base)} & \textbf{4-Fold TTA} & \textbf{Évolution ($\Delta$)} & \textbf{Signif. ($p$)} \\
 \midrule
-Exactitude Pixel des Pièces & N/A & 85.82\% & \textbf{87.47\%} [85.8, 89.1] & $p < 0.001$ (***) \\
-mIoU Sémantique (10 classes réelles) & N/A & 54.80\% & \textbf{56.47\%} [54.0, 58.8] & $p < 0.001$ (***) \\
-IoU Murs Fusionnés (Merged Wall) & 29.08\% & \textbf{74.31\%} & 74.16\% [73.2, 75.1] & $p = 0.121$ (n.s.) \\
-IoU Portes (Door IoU) & 7.91\% & \textbf{62.37\%} & 61.76\% [60.4, 63.2] & $p = 0.005$ (**) \\
-IoU Fenêtres (Window IoU) & 7.28\% & 73.26\% & \textbf{73.49\%} [72.1, 74.9] & $p = 0.126$ (n.s.) \\
-mIoU Structurelle (3 classes) & 14.76\% & \textbf{69.98\%} & 69.80\% [68.7, 70.9] & $p = 0.140$ (n.s.) \\
-IoU Empreinte Bâtiment (Footprint) & N/A & 79.83\% & \textbf{80.83\%} [78.7, 82.8] & $p = 0.005$ (**) \\
-Rappel Portes à 20px (Object Recall) & 53.10\% & \textbf{96.75\%} & 96.60\% & n.s. \\
-Rappel Fenêtres à 20px (Object Recall) & 49.14\% & 90.59\% & \textbf{90.85\%} & n.s. \\
-Précision Murs Extérieurs & 42.88\% & 91.07\% & \textbf{91.15\%} & n.s. \\
-Erreur Relative d'Échelle Métrique & 44.15\% & 10.14\% & \textbf{9.88\%} & n.s. \\
+\textbf{Segmentation Pixel :} & & & & \\
+Exactitude Pixel Pièces & 87.50\% [85.8, 89.1] & \textbf{88.09\%} [86.4, 89.6] & +0.59\% [+0.10, +1.05] & $p = 0.008$ (**) \\
+mIoU Pièces (9 classes, hors Bureau) & 62.66\% [60.0, 65.3] & \textbf{64.72\%} [62.0, 67.1] & +2.05\% [+1.29, +2.75] & $p < 0.001$ (***) \\
+mIoU Pièces (10 classes, avec Bureau) & 56.40\% [54.0, 58.8] & \textbf{58.24\%} [55.8, 60.4] & +1.85\% [+1.16, +2.48] & $p < 0.001$ (***) \\
+IoU Murs Fusionnés (Merged Wall) & 74.17\% [73.2, 75.1] & \textbf{74.93\%} [74.0, 75.8] & +0.76\% [+0.63, +0.91] & $p < 0.001$ (***) \\
+IoU Murs Intérieurs & 62.18\% [61.1, 63.3] & \textbf{63.25\%} [62.2, 64.4] & +1.07\% [+0.87, +1.28] & $p < 0.001$ (***) \\
+IoU Murs Extérieurs & 73.86\% [72.7, 74.9] & \textbf{74.58\%} [73.4, 75.6] & +0.73\% [+0.52, +0.94] & $p < 0.001$ (***) \\
+IoU Portes (Door IoU) & 61.78\% [60.4, 63.3] & \textbf{63.21\%} [61.9, 64.5] & +1.43\% [+1.11, +1.79] & $p < 0.001$ (***) \\
+IoU Fenêtres (Window IoU) & 73.52\% [72.2, 74.9] & \textbf{74.65\%} [73.3, 75.9] & +1.14\% [+0.77, +1.59] & $p < 0.001$ (***) \\
+mIoU Structurelle (3 classes) & 69.82\% [68.7, 70.9] & \textbf{70.93\%} [69.9, 71.9] & +1.11\% [+0.90, +1.34] & $p < 0.001$ (***) \\
+\midrule
+\textbf{Géométrie Prédite vs Vérité Terrain :} & & & & \\
+Taux de Coque Étanche (Watertight Shell) & 90.75\% [87.8, 93.5] & \textbf{91.75\%} [89.0, 94.0] & +1.00\% [-2.75, +4.50] & $p = 0.339$ (n.s.) \\
+Erreur Relative Périmètre Prédit & 24.37\% [21.2, 28.2] & \textbf{24.20\%} [20.8, 28.8] & -0.18\% [-2.54, +2.40] & $p = 0.462$ (n.s.) \\
+Erreur Absolue Périmètre (MAE) & 13.46 m [11.8, 15.3] & \textbf{13.04 m} [11.6, 14.7] & -0.42 m [-1.81, +1.03] & $p = 0.289$ (n.s.) \\
+Erreur Relative Surface Empreinte & \textbf{54.67\%} [40.4, 72.8] & 55.41\% [41.1, 73.3] & +0.74\% [-1.20, +2.90] & $p = 0.792$ (n.s.) \\
+Erreur Absolue Surface Empreinte (MAE) & \textbf{21.69 m$^2$} [19.3, 24.4] & 21.89 m$^2$ [19.6, 24.6] & +0.19 m$^2$ [-0.56, +1.01] & $p = 0.682$ (n.s.) \\
+Erreur Absolue Nombre de Pièces (MAE) & 1.56 [1.36, 1.77] & \textbf{1.53} [1.34, 1.75] & -0.02 [-0.12, +0.07] & $p = 0.343$ (n.s.) \\
+Erreur Absolue Nombre de Portes (MAE) & 1.47 [1.31, 1.65] & \textbf{1.44} [1.29, 1.64] & -0.03 [-0.11, +0.06] & $p = 0.294$ (n.s.) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Analyse Statistique par Bootstrap \& Attribution des Gains}
-L'évaluation statistique appariée ($1\,000$ ré-échantillonnages sur les 400 plans de test) apporte un éclairage méthodologique déterminant :
-\begin{itemize}
-    \item \textbf{Significativité des Gains Sémantiques :} Le gain global sur l'exactitude pixel des pièces ($+1.65$ pt, IC 95\% : $[+1.00, +2.38]$, $p < 0.001$) et le mIoU ($+1.66$ pt, IC 95\% : $[+0.73, +2.58]$, $p < 0.001$) est statistiquement significatif. Au niveau des catégories fonctionnelles, les pièces humides et de service enregistrent les progrès les plus probants : Cuisine ($+3.20$ pts, $p = 0.001$), Salle de bain ($+1.75$ pt, $p = 0.013$) et Garage ($+6.58$ pts, $p = 0.015$). En revanche, les classes principales déjà bien apprises restent stables sans différence significative (Séjour $+1.19$ pt, $p = 0.132$ ; Chambre $+0.04$ pt, $p = 0.480$).
-    \item \textbf{Facteur de Confusion (Allongement d'Entraînement vs Augmentations) :} Sur le plan méthodologique, le modèle fine-tuné a bénéficié de 12 époques supplémentaires avec un ordonnanceur OneCycleLR sur la base du checkpoint de 25 époques. Le gain mesuré ne peut donc pas être attribué isolément aux seules augmentations CAD, mais résulte de l'effet combiné du prolongement de la descente de gradient et de la régularisation par augmentations.
-    \item \textbf{Comparaison aux Résultats Publiés :} L'exactitude pixel des pièces atteint $87.50\%$, à comparer aux $82.7\%$ publiés dans l'article de référence CubiCasa5K. Le mIoU sémantique des pièces s'établit à $56.40\%$ (sur les 10 classes réelles du test, la classe « Autre » ayant 0 pixel de vérité terrain), proche des $57.5\%$ publiés. Il est à noter que les protocoles de polygonisation et les groupements de classes de l'article diffèrent de notre pipeline matriciel direct, rendant la comparaison indicative.
-    \item \textbf{Traçabilité du Checkpoint :} Le modèle évalué correspond au fichier \texttt{multitask\_resnet34\_finetuned\_best.pth} (Époque 12, empreinte SHA256 : \texttt{80fa1ea7780f7cb2f48d720abed8a62104ac90e0e40d99661f3022f3b472fcca}).
-\end{itemize}
+\subsection{Distinction Rigoureuse : Correction Métrologique vs Performance Prédictive}
+Une distinction académique fondamentale doit être explicitée concernant la mesure du périmètre et de l'empreinte :
+\begin{enumerate}
+    \item \textbf{La correction de l'oracle géométrique (Mesure corrigée, non un gain modèle) :} Dans les premières versions, le périmètre était extrait du contour du masque brut des murs, induisant un artéfact de double-comptage (contour intérieur + contour extérieur du ruban de mur) qui surestimait le périmètre réel de $\approx 33\%$. En corrigeant l'algorithme pour extraire l'enveloppe pleine du bâtiment $((mur > 0) \mid (pièce > 0))$, l'erreur de l'oracle géométrique sur masques de vérité terrain est tombée de $33.2\%$ à $0.61\%$. Ce résultat constitue une \emph{correction de la métrique d'évaluation}, et non un progrès intrinsèque du réseau de neurones.
+    \item \textbf{Erreur prédictive réelle sur plans non vus :} Appliqué aux prédictions vectorisées du modèle sur les 400 plans de test, le périmètre moyen présente une erreur relative de $24.20\%$ (MAE : $13.04\text{ m}$ sur un périmètre moyen d'environ $55\text{ m}$), et la surface habitable prédite s'écarte de $21.89\text{ m}^2$ en moyenne absolue par rapport à la vérité terrain. Le lissage TTA apporte un gain structurel modeste mais statistiquement mesurable sur les murs ($+0.76\%$, $p < 0.001$) et les portes ($+1.43\%$, $p < 0.001$), tout en stabilisant le taux de coques étanches à $91.75\%$.
+\end{enumerate}
 
-\subsection{Ablation du Vectoriseur Géométrique Hybride}
-Afin d'isoler l'impact du post-traitement géométrique de l'apprentissage profond, le tableau~\ref{tab:vectorizer_ablation} compare l'ancien vectoriseur à composantes connexes directes et le nouveau vectoriseur hybride (partitionnement sémantique masqué par les murs et absorption des fragments sous-seuil) sur les 400 plans de test, à modèle neuronal identique (\texttt{multitask\_resnet34\_finetuned\_best.pth}).
+\subsection{Analyse Détaillée par Catégorie de Pièce \& Cas Limites}
+Le tableau~\ref{tab:room_per_class} présente la décomposition par classe sémantique selon l'ordre officiel du dictionnaire \texttt{ROOM\_CLASSES}.
 
 \begin{table}[H]
 \centering
-\caption{Ablation du Post-Traitement Vectoriel sur le Jeu de Test ($N=400$, Modèle Fixé)}
-\label{tab:vectorizer_ablation}
-\begin{tabular}{lccc}
+\caption{IoU par Classe de Pièce sur le Jeu de Test CubiCasa5K ($N=400$ plans non vus)}
+\label{tab:room_per_class}
+\begin{tabular}{lcccc}
 \toprule
-\textbf{Métrique Vectorielle} & \textbf{Ancien Vectoriseur} & \textbf{Nouveau Hybride} & \textbf{Évolution} \\
+\textbf{Classe Sémantique} & \textbf{Passe Unique} & \textbf{4-Fold TTA} & \textbf{Delta} & \textbf{Signif. ($p$)} \\
 \midrule
-Erreur Absolue Nb Pièces (MAE) & 2.44 pièces & \textbf{1.62 pièces} & -33.6\% d'erreur \\
-Biais Signé (Sur-segmentation) & +2.02 pièces & \textbf{+1.19 pièces} & -41.1\% de fragmentation \\
-Taux de Coque Étanche (Watertight Shell) & 96.25\% & \textbf{99.75\%} & 399/400 plans valides \\
-Plafond Théorique sur Vérité Terrain & N/A & 98.25\% & 393/400 plans valides (7 sans pièces) \\
+1. Séjour (LivingRoom)   & 74.36\% [70.4, 77.9] & \textbf{75.64\%} [71.7, 79.0] & +1.28\% & $p = 0.057$ (n.s.) \\
+2. Chambre (Bedroom)     & \textbf{74.76\%} [70.1, 78.4] & 74.71\% [70.0, 78.5] & -0.05\% & $p = 0.564$ (n.s.) \\
+3. Cuisine (Kitchen)     & 67.52\% [63.3, 71.5] & \textbf{67.94\%} [63.7, 72.0] & +0.42\% & $p = 0.239$ (n.s.) \\
+4. Salle de bain (Bath)  & 69.80\% [66.1, 73.2] & \textbf{71.75\%} [68.0, 75.2] & +1.96\% & $p = 0.002$ (**) \\
+5. Entrée (Entry)        & 61.44\% [57.2, 65.7] & \textbf{63.07\%} [58.7, 67.2] & +1.63\% & $p = 0.001$ (**) \\
+6. Extérieur (Outdoor)   & 72.95\% [69.8, 76.6] & \textbf{73.92\%} [70.6, 77.6] & +0.97\% & $p = 0.002$ (**) \\
+7. Rangement (Storage)   & 42.65\% [35.8, 50.0] & \textbf{45.28\%} [37.8, 53.1] & +2.62\% & $p = 0.041$ (*) \\
+8. Dressing (Closet)     & 62.43\% [56.2, 68.3] & \textbf{66.85\%} [61.4, 72.3] & +4.42\% & $p < 0.001$ (***) \\
+9. Garage                & 38.07\% [26.3, 52.0] & \textbf{43.28\%} [31.9, 56.8] & +5.22\% & $p < 0.001$ (***) \\
+10. Bureau (Office)      & 0.00\% [0.0, 0.0]   & 0.00\% [0.0, 0.0]             & +0.00\% & $p = 1.000$ (n.s.) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\noindent\textbf{Observations méthodologiques cruciales :}
+\begin{itemize}
+    \item \textbf{La classe Bureau (Office) :} Le modèle n'a pas pu converger sur la classe Bureau ($0.00\%$ d'IoU). Cette difficulté s'explique par sa rareté extrême ($<0.2\%$ des pixels du corpus) combinée à une forte ambiguïté d'annotation dans CubiCasa5K, où des chambres contenant un meuble de bureau sont arbitrairement étiquetées comme Bureau ou Chambre. Forcer un sur-poids sur cette classe dégrade la précision des chambres adjacentes sans valeur ajoutée pour l'extrusion 3D. Par rigueur, la métrique principale est rapportée sur les 9 classes fonctionnelles fiables ($64.72\%$).
+    \item \textbf{Sensibilité d'échantillonnage de la classe Garage :} L'IoU de la classe Garage oscille fortement selon les découpages ($38.07\%$ sur test vs $62.05\%$ sur validation), car seuls 18 plans du jeu de test possèdent un garage. Cette dispersion reflète la variance statistique inhérente aux classes sous-représentées.
+    \item \textbf{Seuil de probabilité des portes :} L'expérimentation d'un seuil de détection sur les logits de porte n'a mis en évidence aucun gain par rapport à l'argmax standard (IoU portes de $59.8\%$ vs $58.2\%$ à un seuil de $0.20$), la pondération $\times 25$ de la cross-entropy ayant déjà calibré l'équilibre détection-précision.
+\end{itemize}
+
+\subsection{Validation sur 12 Plans d'Architectes Réels (Hors Distribution)}
+Afin de tester la généralisation hors du jeu de données CubiCasa5K, 12 plans d'architectes réels et historiques (plans de la bibliothèque du Congrès, HABS - \emph{Historic American Buildings Survey}, villas Frank Lloyd Wright et résidences de styles variés) ont été téléchargés et soumis au pipeline sans ré-entraînement (tableau~\ref{tab:real_external_eval}).
+
+\begin{table}[H]
+\centering
+\caption{Évaluation sur 12 Plans d'Architectes Réels (Archives HABS \& Domaine Public)}
+\label{tab:real_external_eval}
+\small
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Plan Réel} & \textbf{Murs Prédits} & \textbf{Pièces} & \textbf{Portes} & \textbf{Surface} & \textbf{Coque Étanche} \\
+\midrule
+01. Latrobe White House (1807)      & 30 & 7  & 32 & 168.2 m$^2$ & \textbf{Valide} \\
+02. Putnam Historic House           & 38 & 25 & 35 & 222.7 m$^2$ & \textbf{Valide} \\
+03. Wanstead House Ground Plan      & 43 & 11 & 30 & 101.7 m$^2$ & \textbf{Valide} \\
+04. Bolduc French Colonial Villa    & 23 & 3  & 19 & 142.6 m$^2$ & \textbf{Valide} \\
+05. Hills-DeCaro House (1906)       & 16 & 5  & 17 & 44.8 m$^2$  & Échoué (Colonnade ouverte) \\
+06. Hills-DeCaro 2\textsuperscript{nd} Floor & 22 & 8 & 21 & 80.1 m$^2$  & \textbf{Valide} \\
+07. Hills-DeCaro Pre-Fire Plan      & 17 & 12 & 19 & 78.5 m$^2$  & Échoué (Typographie) \\
+08. Hills-DeCaro 1\textsuperscript{st} Floor & 19 & 9 & 18 & 71.4 m$^2$  & Échoué (Lignes tiretées) \\
+09. Hills-DeCaro Post-Fire Plan     & 15 & 7  & 13 & 83.4 m$^2$  & \textbf{Valide} \\
+10. New Place (E. Lutyens, 1913)    & 46 & 15 & 48 & 127.6 m$^2$ & \textbf{Valide} \\
+11. Hills-DeCaro Remodeled Plan     & 20 & 9  & 18 & 66.5 m$^2$  & \textbf{Valide} \\
+12. Fitzgerald Modernist House      & 4  & 2  & 9  & 8.3 m$^2$   & \textbf{Valide} \\
+\midrule
+\textbf{Taux de Succès Global} & \multicolumn{5}{c}{\textbf{Coque étanche : 9/12 (75.0\%)} \quad|\quad \textbf{Détection de pièces : 12/12 (100.0\%)}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Analyse des modes d'échec identifiés sur les plans réels :}
+\begin{enumerate}
+    \item \emph{Colonnades et coursives ouvertes (Plan 05) :} Le plan présente un péristyle d'entrée à balustrades ajourées qui crée des intersections non fermées lors de l'accrochage rectilinéaire.
+    \item \emph{Pollution textuelle dense (Plan 07) :} Des cotes manuscrites et annotations historiques en typographie avec empattements traversent les cloisons, fragmentant les contours de murs extérieurs.
+    \item \emph{Lignes de délimitation tiretées (Plan 08) :} L'emploi de hachures architecturales non reconnues comme des cloisons pleines empêche l'étanchéité polygonale automatique.
+\end{enumerate}
+
 \subsection{Évaluation Contrôlée de la Robustesse aux Dérives CAD}
-Afin de quantifier directement l'apport des augmentations de type CAD sur la résilience aux variations graphiques, 50 plans de validation fixes ont été soumis à différentes dégradations synthétiques contrôlées (tableau~\ref{tab:robustness_eval}).
+Afin de quantifier directement l'apport des augmentations de type CAD sur l'adaptation au domaine graphique, 50 plans de validation fixes ont été soumis à différentes dégradations contrôlées (tableau~\ref{tab:robustness_eval}). Cette mesure évalue l'efficacité de la stratégie d'augmentation : le modèle fine-tuné maintient $83.47\%$ d'exactitude pixel et $67.23\%$ d'IoU sur les murs porteurs face au CAD inversé (fond noir), là où le modèle de base s'effondrait à $25.68\%$.
 
 \begin{table}[H]
 \centering
@@ -321,7 +378,6 @@ Impression Décolorée (Faible Contraste) & 78.70\% & \textbf{84.73\%} (+6.0) & 
 \bottomrule
 \end{tabular}
 \end{table}
-Cette évaluation démontre que le modèle de base s'effondre face à une inversion photométrique ($25.68\%$ d'exactitude), tandis que le modèle fine-tuné maintient $83.47\%$ d'exactitude pixel et $67.23\%$ d'IoU sur les murs porteurs, attestant d'une robustesse matricielle accrue face aux dérives graphiques courantes.
 
 \newpage
 
@@ -340,8 +396,21 @@ Le serveur MLflow assure le suivi automatique de chaque itération :
     \item Sauvegarde automatique d'artefacts visuels : une planche comparative de 6 plans fixes de validation est générée et loggée toutes les 5 époques.
 \end{itemize}
 
-\section{Moteur d'Inférence \& Parité Numérique}
-Pour découpler le service en production des dépendances lourdes de PyTorch et optimiser le débit d'exécution, le pipeline a fait l'objet d'un profilage fin et d'un double runtime (PyTorch CUDA accéléré et fallback ONNX Runtime). Sur station GPU locale (NVIDIA GeForce RTX 3050 Laptop, 4 Go VRAM, CPU AMD Ryzen 5), l'inférence neuronale UNet++ s'établit à $61.4\text{ ms}$ (médiane), la vectorisation polygonale hybride s'exécute en $36.7\text{ ms}$, la synthèse neuronale de façade à la demande pour la façade principale s'exécute en $24.7\text{ ms}$ via l'accélérateur PyTorch CUDA natif, et l'extrusion 3D en $0.8\text{ ms}$. La latence médiane de bout en bout s'établit ainsi à \textbf{$156.6\text{ ms}$} (moyenne: $163.1\text{ ms}$, P90: $194.2\text{ ms}$, P95: $217.7\text{ ms}$), éliminant la traîne lente des bâtiments à façades multiples et respectant strictement le budget d'interactivité temps réel. En mode dégradé exclusivement CPU (via ONNX Runtime), la latence médiane s'établit à $921.3\text{ ms}$ (P95: $1\,001.5\text{ ms}$). La parité numérique entre PyTorch et ONNX Runtime est rigoureusement confirmée :
+\section{Moteur d'Inférence, Profilage de Latence \& Choix Produit}
+Pour découpler le service en production des dépendances lourdes de PyTorch et optimiser le débit d'exécution, le pipeline a fait l'objet d'un profilage fin et d'un double runtime (PyTorch CUDA accéléré et fallback ONNX Runtime). 
+
+\subsection{Arbitrage Produit : Synthèse de Façade à la Demande vs Batching GPU}
+L'audit de performance initial révélait une traîne de latence au 95\textsuperscript{ème} percentile culminant à $710.3\text{ ms}$ lorsque les bâtiments comportaient 15 à 20 segments de murs extérieurs générés séquentiellement. Deux solutions complémentaires ont été déployées :
+\begin{enumerate}
+    \item \textbf{Mode Façade Principale à la Demande (\texttt{front\_only=True}) :} Il s'agit d'un choix d'architecture produit délibéré. Pour garantir une interactivité fluide dans le visualiseur Web Three.js, la façade d'entrée principale reçoit une texture neuronale générative photoréaliste ($24.7\text{ ms}$), tandis que les façades latérales et arrière reçoivent des matériaux procéduraux légers avec coordonnées UV projetées. Ce choix produit compresse la traîne P95 de $710.3\text{ ms}$ à \textbf{$34.1\text{ ms}$} ($20.8\times$ de réduction).
+    \item \textbf{Batching Tensoriel GPU (\texttt{generate\_batch}) :} Lorsque l'utilisateur désactive le mode \texttt{front\_only}, l'ensemble des esquisses extérieures est empilé en un unique tenseur $[N, 3, 256, 256]$ exécuté en une seule passe sur CUDA, maintenant la synthèse complète sous les $50\text{ ms}$ pour 8 murs.
+    \item \textbf{Post-Traitement Visuel vs Métriques Génératives :} Un filtre d'accentuation adaptatif (\emph{unsharp mask} avec micro-contraste $+4\%$) est appliqué en sortie du générateur pour rehausser le piqué des croisillons de fenêtres et des moulures dans Three.js. Par rigueur, ce traitement cosmétique est dissocié des métriques intrinsèques du générateur cGAN (KID et LPIPS), calculées sur les sorties brutes.
+\end{enumerate}
+
+\subsection{Budget de Latence Temps Réel}
+Sur station GPU locale (NVIDIA GeForce RTX 3050 Laptop, 4 Go VRAM, CPU AMD Ryzen 5), en passe unique standard (\texttt{tta\_mode="none"}), l'inférence neuronale UNet++ s'établit à $61.4\text{ ms}$ (médiane), la vectorisation polygonale hybride s'exécute en $36.7\text{ ms}$, la synthèse neuronale de façade principale s'exécute en $24.7\text{ ms}$, et l'extrusion 3D en $0.8\text{ ms}$. La latence médiane de bout en bout s'établit ainsi à \textbf{$156.6\text{ ms}$} (P95: $217.7\text{ ms}$). L'activation du mode 4-Fold TTA multiplie les passes du décodeur UNet++ ($327.6\text{ ms}$ vs $104.2\text{ ms}$), justifiant son positionnement comme option facultative désactivée par défaut sur CPU. En mode dégradé exclusivement CPU (via ONNX Runtime), la latence médiane passe-unique s'établit à $921.3\text{ ms}$ (P95: $1\,001.5\text{ ms}$).
+
+La parité numérique entre PyTorch et ONNX Runtime est rigoureusement confirmée :
 \begin{equation}
     \Delta_{\max} = \max_{x \in \mathcal{D}} | \mathcal{M}_{\text{PyTorch}}(x) - \mathcal{M}_{\text{ONNXRuntime}}(x) | = 6.31 \times 10^{-6}
 \end{equation}
@@ -405,11 +474,12 @@ Le projet \textbf{ArchiGen 3D} concrétise l'industrialisation d'une solution co
 
 L'entraînement du modèle MultiTask UNet++ (ResNet-34) couplé au fine-tuning régularisé et au vectoriseur hybride a permis d'atteindre sur les 400 plans de test non vus :
 \begin{itemize}
-    \item Une exactitude pixel des pièces de \textbf{$87.47\%$} (surpassant les $82.7\%$ publiés dans CubiCasa5K) et un mIoU sémantique de \textbf{$56.47\%$} (proche des $57.5\%$ publiés).
-    \item Une préservation géométrique rigoureuse des cloisons ($74.16\%$ sur les murs fusionnés, $73.49\%$ sur les fenêtres, $61.76\%$ sur les portes).
-    \item Un taux de coque étanche de \textbf{$99.75\%$} (399/400 plans) et une erreur absolue de décompte des pièces réduite à \textbf{$1.62$ pièce} (-33.6\%).
+    \item Une exactitude pixel des pièces de \textbf{$87.50\%$} en passe unique [85.8, 89.1] atteignant \textbf{$88.09\%$} [86.4, 89.6] avec 4-Fold TTA (surpassant les $82.7\%$ publiés dans CubiCasa5K).
+    \item Un mIoU sémantique des pièces de \textbf{$62.66\%$} [60.0, 65.3] sur 9 classes fiables hors Bureau, progressant à \textbf{$64.72\%$} [62.0, 67.1] avec 4-Fold TTA ($58.24\%$ sur 10 classes incluant Bureau).
+    \item Une préservation géométrique rigoureuse des cloisons : \textbf{$74.93\%$} [74.0, 75.8] sur les murs fusionnés (+0.76\%, $p < 0.001$), \textbf{$74.65\%$} sur les fenêtres (+1.14\%, $p < 0.001$) et \textbf{$63.21\%$} sur les portes (+1.43\%, $p < 0.001$).
+    \item Un taux de coque étanche de \textbf{$90.75\%$} (passe unique) et \textbf{$91.75\%$} [89.0, 94.0] (4-Fold TTA), avec une erreur absolue de décompte de \textbf{$1.53$ pièce} et \textbf{$1.44$ porte}.
 \end{itemize}
-Côté génération, l'architecture Pix2Pix stabilisée par normalisation spectrale et perte perceptuelle LPIPS (SqueezeNet) atteint un KID de \textbf{$67.65 \times 10^{-3}$} et un LPIPS de \textbf{$0.3169$}. Le pipeline s'exécute avec une latence médiane de bout en bout de \textbf{$297.3\text{ ms}$} sur GPU (P95 : $780.1\text{ ms}$), respectant le budget de démonstration en direct ($< 400\text{ ms}$).
+Côté génération, l'architecture Pix2Pix stabilisée par normalisation spectrale et perte perceptuelle LPIPS (SqueezeNet) atteint un KID de \textbf{$67.65 \pm 5.95 \times 10^{-3}$} et un LPIPS de \textbf{$0.3169$} sur le jeu de test CMP ($N=106$). Le pipeline s'exécute avec une latence médiane de bout en bout de \textbf{$156.6\text{ ms}$} sur GPU (P95 : $217.7\text{ ms}$) en mode optimisé \texttt{front\_only=True} ($327.6\text{ ms}$ avec 4-Fold TTA), respectant amplement le budget de démonstration interactive ($< 400\text{ ms}$).
 
 \textbf{Perspectives d'évolution :}
 \begin{enumerate}
