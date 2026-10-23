@@ -1,0 +1,70 @@
+schema: '2.0'
+stages:
+  validate_data:
+    cmd: python src/data/validate_data.py
+    deps:
+    - path: data/raw/facades
+      hash: md5
+      md5: 0dfe70a3412b5a73917a2c6c74a72fb3.dir
+      size: 31228725
+      nfiles: 606
+    - path: src/data/validate_data.py
+      hash: md5
+      md5: 4dcfe185c706f5d0bc514d3249cfe687
+      size: 2807
+  train_model:
+    cmd: python src/models/train.py
+    deps:
+    - path: configs/params.yaml
+      hash: md5
+      md5: ec9585b3b31a6887a0ee22c6e9811483
+      size: 1768
+    - path: data/raw/facades
+      hash: md5
+      md5: 0dfe70a3412b5a73917a2c6c74a72fb3.dir
+      size: 31228725
+      nfiles: 606
+    - path: src/data/dataset.py
+      hash: md5
+      md5: 9931ab66891bfa257403f6664e391628
+      size: 3719
+    - path: src/models/architecture.py
+      hash: md5
+      md5: 31c8a676e3daefbfcbeac4cb734c6768
+      size: 8256
+    - path: src/models/train.py
+      hash: md5
+      md5: d07baa2e6de2186d9a9d482c47540139
+      size: 12136
+    params:
+      configs/params.yaml:
+        training.batch_size: 4
+        training.epochs: 100
+        training.lambda_l1: 30.0
+        training.lr_g: 0.0002
+    outs:
+    - path: models/saved/generator_best.pth
+      hash: md5
+      md5: 3de547253ccfbd3a664d865bd7858b5f
+      size: 217624694
+  evaluate_and_export:
+    cmd: python src/models/evaluate.py
+    deps:
+    - path: data/raw/facades
+      hash: md5
+      md5: 0dfe70a3412b5a73917a2c6c74a72fb3.dir
+      size: 31228725
+      nfiles: 606
+    - path: models/saved/generator_best.pth
+      hash: md5
+      md5: 3de547253ccfbd3a664d865bd7858b5f
+      size: 217624694
+    - path: src/models/evaluate.py
+      hash: md5
+      md5: 62984bbb85030d9e4562561f0c77d330
+      size: 4758
+    outs:
+    - path: models/saved/generator.onnx
+      hash: md5
+      md5: 3980f0ea741de6794a5f95e301fbd6e6
+      size: 217672141

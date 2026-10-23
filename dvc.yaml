@@ -20,10 +20,11 @@ stages:
       - configs/params.yaml
       - data/raw/facades
     params:
-      - training.epochs
-      - training.batch_size
-      - training.lr_g
-      - training.lambda_l1
+      - configs/params.yaml:
+          - training.epochs
+          - training.batch_size
+          - training.lr_g
+          - training.lambda_l1
     outs:
       - models/saved/generator_best.pth:
           cache: true
