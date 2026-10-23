@@ -94,6 +94,30 @@ class FloorplanPipeline:
             except Exception as e:
                 print(f"[FLOORPLAN ENGINE] Warning loading multitask weights: {e}")
 
+        # 3. Load Fallback Routing Model (Blend a=0.3 / Challenger) for zero-detection recovery
+        self.fallback_model = None
+        fallback_candidates = [
+            PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
+            PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_restyled_challenger.pth"
+        ]
+        for fb_cand in fallback_candidates:
+            if fb_cand.exists():
+                try:
+                    ckpt_fb = torch.load(str(fb_cand), map_location=self.device, weights_only=False)
+                    self.fallback_model = MultiTaskFloorplanUNet(
+                        encoder_name="resnet34",
+                        num_struct_classes=5,
+                        num_room_classes=12
+                    ).to(self.device)
+                    sd_fb = ckpt_fb.get("model_state_dict", ckpt_fb)
+                    self.fallback_model.load_state_dict(sd_fb)
+                    self.fallback_model.eval()
+                    self.fallback_model_name = fb_cand.stem
+                    print(f"[FLOORPLAN ENGINE] Loaded Fallback Router model from {fb_cand.name}")
+                    break
+                except Exception as e:
+                    print(f"[FLOORPLAN ENGINE] Warning loading fallback model: {e}")
+
         self.model = self.baseline_model or self.multitask_model
         self.is_multitask = self.multitask_model is not None
 
@@ -247,6 +271,45 @@ class FloorplanPipeline:
             room_mask=room_pred,
             scale_override_m_per_px=scale_override
         )
+
+        model_routed = "champion_v1_1"
+        fallback_triggered = False
+
+        # Fallback Routing: if primary model produces 0 rooms or collapsed detection (< 3 rooms & small area)
+        primary_rooms = layout.get("rooms", [])
+        primary_area = layout.get("metadata", {}).get("total_surface_m2", 0.0)
+
+        if (len(primary_rooms) == 0 or (len(primary_rooms) < 3 and primary_area < 25.0)) and self.fallback_model is not None:
+            with torch.no_grad():
+                fb_out = self.fallback_model(tensor)
+                fb_prob_s = F.softmax(fb_out["struct"], dim=1)
+                fb_prob_r = F.softmax(fb_out["room"], dim=1)
+                fb_struct = torch.argmax(fb_prob_s, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+                fb_room = torch.argmax(fb_prob_r, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+
+                fb_m4 = np.zeros_like(fb_struct)
+                fb_m4[(fb_struct == 1) | (fb_struct == 2)] = 1
+                fb_m4[fb_struct == 3] = 2
+                fb_m4[fb_struct == 4] = 3
+
+                fb_layout = self.vectorizer.vectorize(
+                    mask=fb_m4,
+                    struct_mask=fb_struct,
+                    room_mask=fb_room,
+                    scale_override_m_per_px=scale_override
+                )
+                fb_rooms = fb_layout.get("rooms", [])
+                if len(fb_rooms) > len(primary_rooms):
+                    layout = fb_layout
+                    model_routed = getattr(self, "fallback_model_name", "fallback_adapted")
+                    fallback_triggered = True
+
+        if "metadata" not in layout:
+            layout["metadata"] = {}
+        layout["metadata"]["routing"] = {
+            "model_used": model_routed,
+            "fallback_triggered": fallback_triggered
+        }
 
         # 3. Facade Bridge: synthesize textures for exterior walls
         facade_meta = self.bridge.process_layout_facades(

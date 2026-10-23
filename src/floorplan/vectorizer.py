@@ -83,7 +83,7 @@ class FloorplanVectorizer:
         snap_angle_deg_tolerance: float = 12.0,
         default_door_width_m: float = 0.85,
         wall_height_m: float = 2.80,
-        min_area_habitable_m2: float = 1.5,
+        min_area_habitable_m2: float = 2.5,
         min_area_service_m2: float = 0.8
     ):
         self.min_wall_area = min_wall_area
