@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RotateCcw, Box, Eye, Layers, Sun } from 'lucide-react';
 
-export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFloors = 1 }) {
+export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFloors = 1, isSplit = false }) {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
@@ -260,15 +260,15 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
   return (
     <div className="flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden select-none">
       {/* 3D Viewport Toolbar */}
-      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-10 text-[#1d1d1f] overflow-x-auto select-none">
-        <div className="flex items-center space-x-2.5 shrink-0 mr-3">
+      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f] select-none">
+        <div className="flex items-center space-x-2.5 shrink-0">
           <Box className="w-3.5 h-3.5 text-[#f0500f] shrink-0" />
           <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] whitespace-nowrap">
-            3D MODEL
+            3D PERSPECTIVE MODEL
           </span>
-          <span className="hidden xl:inline text-[#1d1d1f]/20">|</span>
-          <span className="hidden xl:inline-flex items-center px-2 py-0.5 rounded-full border border-[#1d1d1f]/15 bg-white/60 font-mono text-[9px] text-[#1d1d1f]/70 uppercase tracking-wider whitespace-nowrap">
-            {facadeTextureUrl ? 'cGAN Neural Facade' : 'Watertight BIM'}
+          <span className="text-[#1d1d1f]/20">|</span>
+          <span className="font-mono text-[9.5px] text-[#1d1d1f]/70 uppercase tracking-wider whitespace-nowrap">
+            {facadeTextureUrl ? 'cGAN Neural Facade' : isSplit ? 'Watertight BIM' : 'Watertight BIM Geometry & Extrusions'}
           </span>
         </div>
 
@@ -276,7 +276,7 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
         <div className="flex items-center bg-white/80 border border-[#1d1d1f]/20 rounded-full p-1 space-x-1 shadow-sm shrink-0 font-stencil text-[10px] uppercase tracking-wider">
           <button
             onClick={() => setWireframe(!wireframe)}
-            className={`h-7 px-2.5 sm:px-3 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+            className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap shrink-0 ${
               wireframe
                 ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                 : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
@@ -286,7 +286,7 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
           </button>
           <button
             onClick={() => setShowFloors(!showFloors)}
-            className={`h-7 px-2.5 sm:px-3 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+            className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap shrink-0 ${
               showFloors
                 ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                 : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
@@ -296,9 +296,9 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
           </button>
           <button
             onClick={viewPreset === 'top' ? setCameraPerspective : setCameraTopDown}
-            className="h-7 px-2.5 sm:px-3 rounded-full border border-[#1d1d1f]/25 bg-white/80 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all whitespace-nowrap shrink-0"
+            className="h-7 px-3.5 rounded-full border border-[#1d1d1f]/25 bg-white/80 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all whitespace-nowrap shrink-0"
           >
-            {viewPreset === 'top' ? 'PERSPECTIVE' : 'TOP-DOWN'}
+            {viewPreset === 'top' ? 'PERSPECTIVE VIEW' : 'TOP-DOWN VIEW'}
           </button>
         </div>
       </div>

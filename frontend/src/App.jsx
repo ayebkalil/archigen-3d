@@ -314,12 +314,14 @@ export default function App() {
                   isCalibrating={isCalibrating}
                   setIsCalibrating={setIsCalibrating}
                   onUpdateLayout={setLayout}
+                  isSplit={true}
                 />
                 <Viewer3D
                   layout={layout}
                   frontWallId={frontWallId}
                   facadeTextureUrl={facadeTextureUrl}
                   numFloors={numFloors}
+                  isSplit={true}
                 />
               </>
             )}
@@ -335,6 +337,7 @@ export default function App() {
                 isCalibrating={isCalibrating}
                 setIsCalibrating={setIsCalibrating}
                 onUpdateLayout={setLayout}
+                isSplit={false}
               />
             )}
 
@@ -345,6 +348,7 @@ export default function App() {
                 frontWallId={frontWallId}
                 facadeTextureUrl={facadeTextureUrl}
                 numFloors={numFloors}
+                isSplit={false}
               />
             )}
           </div>

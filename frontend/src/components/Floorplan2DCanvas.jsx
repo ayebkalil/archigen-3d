@@ -13,7 +13,9 @@ import {
   PlusCircle,
   Trash2,
   Tag,
-  Layers
+  Layers,
+  GripVertical,
+  HelpCircle
 } from 'lucide-react';
 
 const ROOM_COLORS = {
@@ -59,6 +61,7 @@ export default function Floorplan2DCanvas({
   isCalibrating,
   setIsCalibrating,
   onUpdateLayout,
+  isSplit = false,
 }) {
   const [showRooms, setShowRooms] = useState(true);
   const [showWalls, setShowWalls] = useState(true);
@@ -69,6 +72,43 @@ export default function Floorplan2DCanvas({
   const [activeTool, setActiveTool] = useState('select');
   const [selectedRoomForRelabel, setSelectedRoomForRelabel] = useState(null);
   const [editFeedback, setEditFeedback] = useState(null);
+  const [showNotif, setShowNotif] = useState(true);
+
+  // Movable Floating Layer Dock state (for split view)
+  const [dockPos, setDockPos] = useState({ x: 20, y: 18 });
+  const [isDraggingDock, setIsDraggingDock] = useState(false);
+  const dragStartRef = React.useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
+
+  const handleStartDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingDock(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      posX: dockPos.x,
+      posY: dockPos.y,
+    };
+  };
+
+  React.useEffect(() => {
+    if (!isDraggingDock) return;
+    const onMove = (e) => {
+      const dx = e.clientX - dragStartRef.current.mouseX;
+      const dy = dragStartRef.current.mouseY - e.clientY;
+      setDockPos({
+        x: Math.max(8, Math.min(window.innerWidth - 250, dragStartRef.current.posX + dx)),
+        y: Math.max(8, Math.min(window.innerHeight - 150, dragStartRef.current.posY + dy)),
+      });
+    };
+    const onUp = () => setIsDraggingDock(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDraggingDock]);
 
   // 2-Point Calibration State
   const [calibPointA, setCalibPointA] = useState(null);
@@ -235,13 +275,13 @@ export default function Floorplan2DCanvas({
           <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] whitespace-nowrap">
             2D BLUEPRINT
           </span>
-          <span className="hidden xl:inline text-[#1d1d1f]/20">|</span>
-          <span className="hidden xl:inline-flex items-center px-2 py-0.5 rounded-full border border-[#1d1d1f]/15 bg-white/60 font-mono text-[9px] text-[#1d1d1f]/70 uppercase tracking-wider whitespace-nowrap">
-            {walls.length}W · {rooms.length}R · {doors.length}D
+          <span className="text-[#1d1d1f]/20">|</span>
+          <span className="font-mono text-[9.5px] text-[#1d1d1f]/70 uppercase tracking-wider whitespace-nowrap">
+            {walls.length}W · {rooms.length}R · {doors.length}D {!isSplit && `· ${windows.length}WIN`}
           </span>
         </div>
 
-        {/* Center/Right: CAD Interactive Edit Tools */}
+        {/* Center: CAD Interactive Edit Tools */}
         <div className="flex items-center bg-white/80 border border-[#1d1d1f]/20 rounded-full p-1 space-x-1 shadow-sm shrink-0">
           <button
             onClick={() => { setActiveTool('select'); if (setIsCalibrating) setIsCalibrating(false); }}
@@ -313,20 +353,13 @@ export default function Floorplan2DCanvas({
             <span>SCALE</span>
           </button>
         </div>
-      </div>
 
-      {/* Main Canvas Area */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
-        {/* Floating Layer Visibility Dock */}
-        <div className="absolute bottom-4 left-4 z-20 flex items-center bg-[#f7f4ed]/95 backdrop-blur-md border border-[#1d1d1f]/20 rounded-full px-3 py-1.5 shadow-lg select-none">
-          <div className="flex items-center space-x-1.5 text-[#1d1d1f]/60 font-mono text-[9px] uppercase tracking-wider pr-2.5 border-r border-[#1d1d1f]/15 mr-1.5 shrink-0">
-            <Layers className="w-3.5 h-3.5 text-[#f0500f]" />
-            <span className="font-semibold hidden sm:inline">LAYERS</span>
-          </div>
-          <div className="flex items-center space-x-1 font-stencil text-[9.5px] uppercase tracking-wider">
+        {/* Right: In 2D-only full view (!isSplit), keep layer toggles in the top bar! */}
+        {!isSplit && (
+          <div className="flex items-center space-x-1 font-stencil text-[10px] uppercase tracking-wider shrink-0">
             <button
               onClick={() => setShowRooms(!showRooms)}
-              className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+              className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap ${
                 showRooms
                   ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                   : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
@@ -336,7 +369,7 @@ export default function Floorplan2DCanvas({
             </button>
             <button
               onClick={() => setShowWalls(!showWalls)}
-              className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+              className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap ${
                 showWalls
                   ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                   : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
@@ -346,7 +379,7 @@ export default function Floorplan2DCanvas({
             </button>
             <button
               onClick={() => setShowOpenings(!showOpenings)}
-              className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+              className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap ${
                 showOpenings
                   ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                   : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
@@ -355,7 +388,59 @@ export default function Floorplan2DCanvas({
               DOORS
             </button>
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* Main Canvas Area */}
+      <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
+        {/* Movable Floating Layer Visibility Dock (Only in 2D+3D Split Mode) */}
+        {isSplit && (
+          <div
+            style={{ left: `${dockPos.x}px`, bottom: `${dockPos.y}px` }}
+            className="absolute z-20 flex items-center bg-[#f7f4ed]/95 backdrop-blur-md border border-[#1d1d1f]/20 rounded-full px-2.5 py-1.5 shadow-xl select-none"
+          >
+            <div
+              onMouseDown={handleStartDrag}
+              className="flex items-center space-x-1 text-[#1d1d1f]/40 font-mono text-[9px] uppercase tracking-wider pr-2 border-r border-[#1d1d1f]/15 mr-1.5 cursor-grab active:cursor-grabbing hover:text-[#1d1d1f] shrink-0"
+              title="Click and drag to move layer dock anywhere"
+            >
+              <GripVertical className="w-3.5 h-3.5 text-[#f0500f]" />
+              <span className="font-semibold hidden sm:inline">LAYERS</span>
+            </div>
+            <div className="flex items-center space-x-1 font-stencil text-[9.5px] uppercase tracking-wider">
+              <button
+                onClick={() => setShowRooms(!showRooms)}
+                className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+                  showRooms
+                    ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+                    : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
+                }`}
+              >
+                ROOMS
+              </button>
+              <button
+                onClick={() => setShowWalls(!showWalls)}
+                className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+                  showWalls
+                    ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+                    : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
+                }`}
+              >
+                WALLS
+              </button>
+              <button
+                onClick={() => setShowOpenings(!showOpenings)}
+                className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+                  showOpenings
+                    ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+                    : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
+                }`}
+              >
+                DOORS
+              </button>
+            </div>
+          </div>
+        )}
         {/* Real-time Feedback Banner */}
         {editFeedback && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-[#1d1d1f] text-[#efebe2] font-mono text-[10.5px] uppercase tracking-wider rounded-full shadow-xl z-30 flex items-center space-x-1.5">
@@ -724,19 +809,42 @@ export default function Floorplan2DCanvas({
           </div>
         )}
 
-        {/* Helper Box */}
-        <div className="absolute bottom-4 left-6 bg-[#f7f4ed]/90 backdrop-blur-md border border-[#1d1d1f]/20 rounded-xl p-3.5 text-xs text-[#1d1d1f] shadow-lg max-w-sm pointer-events-none font-sans">
-          <div className="flex items-center space-x-1.5 font-mono uppercase tracking-wider text-[10px] font-semibold text-[#1d1d1f] mb-1">
-            <Info className="w-3.5 h-3.5 text-[#b8452a]" />
-            <span>Interactive Drafting Desk</span>
+        {/* Helper Box / Drafting Tip */}
+        {showNotif ? (
+          <div
+            className={`absolute z-10 bg-[#f7f4ed]/95 backdrop-blur-md border border-[#1d1d1f]/20 rounded-xl p-3 text-xs text-[#1d1d1f] shadow-lg max-w-sm font-sans transition-all ${
+              isSplit ? 'bottom-16 left-5' : 'bottom-4 left-6'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center space-x-1.5 font-mono uppercase tracking-wider text-[10px] font-semibold text-[#1d1d1f]">
+                <Info className="w-3.5 h-3.5 text-[#f0500f]" />
+                <span>INTERACTIVE DRAFTING DESK</span>
+              </div>
+              <button
+                onClick={() => setShowNotif(false)}
+                className="text-[#1d1d1f]/40 hover:text-[#1d1d1f] text-sm leading-none font-bold px-1 ml-2 cursor-pointer"
+                title="Dismiss tip"
+              >
+                ×
+              </button>
+            </div>
+            <p className="font-mono text-[9.5px] text-[#1d1d1f]/70 leading-relaxed">
+              {activeTool === 'select' && "Click any exterior terracotta wall to designate it as the front wall for facade synthesis."}
+              {activeTool === 'add_door' && "Click anywhere on the plan to insert a door. The Three.js 3D model re-extrudes instantly."}
+              {activeTool === 'delete' && "Click any door, window, or wall to delete it from the architectural model."}
+              {activeTool === 'relabel' && "Click any room polygon or badge to change its space classification."}
+            </p>
           </div>
-          <p className="font-mono text-[10px] text-[#1d1d1f]/70 leading-relaxed">
-            {activeTool === 'select' && "Click any exterior terracotta wall to designate it as the front wall for facade synthesis."}
-            {activeTool === 'add_door' && "Click anywhere on the plan to insert a door. The Three.js 3D model re-extrudes instantly."}
-            {activeTool === 'delete' && "Click any door, window, or wall to delete it from the architectural model."}
-            {activeTool === 'relabel' && "Click any room polygon or badge to change its space classification."}
-          </p>
-        </div>
+        ) : (
+          <button
+            onClick={() => setShowNotif(true)}
+            className="absolute bottom-4 right-4 z-10 p-2 rounded-full bg-[#f7f4ed]/95 border border-[#1d1d1f]/20 shadow-md hover:bg-white text-[#1d1d1f]/70 hover:text-[#f0500f] transition-all cursor-pointer"
+            title="Show drafting tips"
+          >
+            <HelpCircle className="w-4 h-4 text-[#f0500f]" />
+          </button>
+        )}
       </div>
     </div>
   );
