@@ -66,6 +66,16 @@
      * **MAE Pièces :** **5.25 pièces**.
    * **Constat Majeur :** L'étanchéité extérieure (75% coques valides) ne garantit pas l'exploitabilité intérieure ; le décalage de distribution (domain shift) sur les plans CAD teintés ou croquis historiques constitue la limitation première du modèle.
 
+3. **Branche Expérimentale (`experiment/floorplan-style-adaptation`) :**
+   * **Adaptation de Domaine Procédurale :** Moteur de restylage SVG en 6 styles architecturaux (`cad_blueprint`, `hatched_walls`, `annotated_dimensions`, etc.) préservant au bit près les masques vérité terrain.
+   * **Banc de Développement ($N=20$ plans réels variés) :** Exploitabilité portée de **55.0% à 85.0%** (plans inutilisables réduits de 30% à 10%, +70 pièces récupérées).
+   * **Validation Hors-Piste One-Shot ($N=12$ plans scellés de soutenance) :**
+     * Coques étanches valides : **75.0% $\to$ 100.0%** (12/12 coques fermées).
+     * Plans avec 0 pièce détectée : **3/12 (25%) $\to$ 0/12 (0%)** (récupération de `fresh_01`, `fresh_03`, `fresh_12`).
+     * Erreur absolue pièces (MAE) : **5.25 $\to$ 4.42 pièces**.
+     * Erreur absolue portes (MAE) : **8.08 $\to$ 6.92 portes**.
+   * **Studio d'Édition Interactive CAD :** Outils de retouche directe 2D/3D (Select, + Door, Delete, Relabel, Scale) intégrés au canevas React avec synchronisation temps réel Three.js.
+
 ---
 
 ## ⏱️ Métriques de Performance & Latence Réelle
