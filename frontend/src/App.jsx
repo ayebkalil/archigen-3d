@@ -140,7 +140,7 @@ export default function App() {
       setLayout(parsedLayout);
 
       if (data.rooms.length === 0) {
-        setErrorMsg('Domain Shift Warning: 0 rooms detected. Watertight room partitioning could not be resolved on this plan (typical for CAD blueprints with heavy dimension annotations or dense colored backgrounds).');
+        setErrorMsg('No rooms detected. This plan style may not be supported (e.g. dense CAD dimension text, low-contrast raster, or non-standard drafting symbols).');
       }
 
       // Find Front Wall & its Facade Texture

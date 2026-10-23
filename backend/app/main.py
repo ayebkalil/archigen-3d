@@ -77,11 +77,16 @@ async def health_check():
     Verifies server readiness, GPU detection, and loaded model status.
     Strictly complies with syllabus section 5.1.
     """
-    import torch
+    try:
+        import torch
+        gpu_avail = bool(torch.cuda.is_available())
+    except (ImportError, Exception):
+        gpu_avail = False
+
     return HealthResponse(
         status="healthy",
         model_loaded=True,
-        gpu_available=bool(torch.cuda.is_available()),
+        gpu_available=gpu_avail,
         version="1.0.0"
     )
 
