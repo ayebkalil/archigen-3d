@@ -111,7 +111,8 @@ def main():
     models_info = [
         ("Baseline (100ep)", "models/saved/generator_best.pth", "transpose"),
         ("Enhanced (150ep)", "models/saved/generator_enhanced_best.pth", "nearest"),
-        ("Perceptual (100ep)", "models/saved/generator_perceptual_best.pth", "nearest")
+        ("Perceptual Champion v1.0 (Prod)", "models/saved/generator_perceptual_best.pth", "nearest"),
+        ("Perceptual (EMA + Schedule)", "models/saved/generator_perceptual_ema_best.pth", "nearest")
     ]
 
     inception_extractor = InceptionFeatureExtractor().to(device)
@@ -191,14 +192,14 @@ def main():
     with open(out_file, "w") as f:
         json.dump(results, f, indent=2)
 
-    print("\n" + "=" * 85)
+    print("\n" + "=" * 95)
     print("AUTHORITATIVE FACADE EVALUATION SUMMARY (N=106 CMP Facades Test Images)")
-    print("=" * 85)
-    print(f"{'Model':<22} | {'L1 Loss':<8} | {'SSIM':<8} | {'PSNR (dB)':<9} | {'LPIPS':<8} | {'KID (x10^3)':<16}")
-    print("-" * 85)
+    print("=" * 95)
+    print(f"{'Model':<30} | {'L1 Loss':<8} | {'SSIM':<8} | {'PSNR (dB)':<9} | {'LPIPS':<8} | {'KID (x10^3)':<16}")
+    print("-" * 95)
     for label, d in results.items():
-        print(f"{label:<22} | {d['l1_loss']:<8.4f} | {d['ssim']:<8.4f} | {d['psnr_db']:<9.2f} | {d['lpips']:<8.4f} | {d['kid_x1000']:6.3f} ± {d['kid_std_x1000']:5.3f}")
-    print("=" * 85)
+        print(f"{label:<30} | {d['l1_loss']:<8.4f} | {d['ssim']:<8.4f} | {d['psnr_db']:<9.2f} | {d['lpips']:<8.4f} | {d['kid_x1000']:6.3f} ± {d['kid_std_x1000']:5.3f}")
+    print("=" * 95)
     print(f"Authoritative metrics saved to: {out_file}\n")
 
 if __name__ == "__main__":

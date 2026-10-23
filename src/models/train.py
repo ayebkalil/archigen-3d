@@ -17,6 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import copy
 import yaml
 import torch
 import torch.nn as nn
@@ -30,6 +31,21 @@ from src.models.architecture import UNetGenerator, PatchGANDiscriminator, weight
 from src.models.losses import FeatureMatchingLoss, PerceptualLoss
 from src.utils.seed import seed_everything
 from src.utils.metrics import compute_ssim, compute_psnr, compute_lpips
+
+class ModelEMA:
+    """Exponential Moving Average for Generator weights to stabilize cGAN convergence."""
+    def __init__(self, model: nn.Module, decay: float = 0.999):
+        self.ema_model = copy.deepcopy(model).eval()
+        for p in self.ema_model.parameters():
+            p.requires_grad_(False)
+        self.decay = decay
+
+    @torch.no_grad()
+    def update(self, model: nn.Module):
+        for ema_p, model_p in zip(self.ema_model.parameters(), model.parameters()):
+            ema_p.data.mul_(self.decay).add_(model_p.data, alpha=1.0 - self.decay)
+        for ema_b, model_b in zip(self.ema_model.buffers(), model.buffers()):
+            ema_b.copy_(model_b)
 
 def load_config(config_path: str = "configs/params.yaml") -> dict:
     with open(config_path, "r") as f:
@@ -101,7 +117,7 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
     lambda_fm = config["training"].get("lambda_fm", 10.0)
     lambda_perc = config["training"].get("lambda_perc", 10.0)
 
-    # 4. Optimizers
+    # 4. Optimizers & LR Decay Schedulers
     optimizer_G = torch.optim.Adam(
         generator.parameters(),
         lr=config["training"]["lr_g"],
@@ -113,11 +129,25 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
         betas=(config["training"]["beta1"], config["training"]["beta2"])
     )
 
+    epochs = epochs_override if epochs_override is not None else config["training"]["epochs"]
+    decay_start = config["training"].get("lr_decay_start_epoch", epochs // 2)
+
+    def lr_lambda(ep):
+        if ep < decay_start:
+            return 1.0
+        return max(0.0, 1.0 - (ep - decay_start) / float(epochs - decay_start + 1))
+
+    scheduler_G = torch.optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=lr_lambda)
+    scheduler_D = torch.optim.lr_scheduler.LambdaLR(optimizer_D, lr_lambda=lr_lambda)
+
+    use_ema = config["training"].get("use_ema", True)
+    ema_decay = config["training"].get("ema_decay", 0.999)
+    generator_ema = ModelEMA(generator, decay=ema_decay) if use_ema else None
+
     # 5. MLflow Tracking Setup
     mlflow.set_tracking_uri(config["mlflow"]["tracking_uri"])
     mlflow.set_experiment(config["project"]["experiment_name"])
 
-    epochs = epochs_override if epochs_override is not None else config["training"]["epochs"]
     run_name = config["project"].get("run_name", "pix2pix_perceptual_sharpness_100ep")
 
     with mlflow.start_run(run_name=run_name) as run:
@@ -129,6 +159,9 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
             "batch_size": batch_size,
             "lr_g": config["training"]["lr_g"],
             "lr_d": config["training"]["lr_d"],
+            "lr_decay_start_epoch": decay_start,
+            "use_ema": use_ema,
+            "ema_decay": ema_decay if use_ema else None,
             "lambda_l1": lambda_l1,
             "lambda_fm": lambda_fm,
             "lambda_perc": lambda_perc,
@@ -143,6 +176,7 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
         })
 
         best_val_lpips = 999.0
+        best_val_lpips_ema = 999.0
 
 
         for epoch in range(1, epochs + 1):
@@ -186,6 +220,8 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
 
                 loss_G.backward()
                 optimizer_G.step()
+                if generator_ema is not None:
+                    generator_ema.update(generator)
 
                 # ---------------------
                 #  Train Discriminator
@@ -210,12 +246,17 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
             avg_loss_d = epoch_loss_d / num_batches
             avg_loss_pixel = epoch_loss_pixel / num_batches
 
+            # Step Learning Rate Schedulers (Linear decay)
+            scheduler_G.step()
+            scheduler_D.step()
+
             # Validation step with SSIM, PSNR, and LPIPS
             generator.eval()
             val_l1 = 0.0
             val_ssim = 0.0
             val_psnr = 0.0
             val_lpips = 0.0
+            val_lpips_ema = 0.0
 
             with torch.no_grad():
                 for val_batch in val_loader:
@@ -228,23 +269,34 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
                     val_psnr += compute_psnr(v_fake_b, v_real_b)
                     val_lpips += compute_lpips(v_fake_b, v_real_b, net="squeeze")
 
+                    if generator_ema is not None:
+                        v_fake_ema = generator_ema.ema_model(v_real_a)
+                        val_lpips_ema += compute_lpips(v_fake_ema, v_real_b, net="squeeze")
+
             avg_val_l1 = val_l1 / len(val_loader)
             avg_val_ssim = val_ssim / len(val_loader)
             avg_val_psnr = val_psnr / len(val_loader)
             avg_val_lpips = val_lpips / len(val_loader)
+            avg_val_lpips_ema = (val_lpips_ema / len(val_loader)) if generator_ema is not None else 0.0
 
-            print(f"[EPOCH {epoch:03d}/{epochs}] Loss_G: {avg_loss_g:.2f} | Loss_D: {avg_loss_d:.4f} | LPIPS: {avg_val_lpips:.4f} | SSIM: {avg_val_ssim:.4f} | PSNR: {avg_val_psnr:.2f} dB | Val_L1: {avg_val_l1:.4f}")
+            cur_lr = scheduler_G.get_last_lr()[0]
+            ema_str = f" | EMA LPIPS: {avg_val_lpips_ema:.4f}" if generator_ema is not None else ""
+            print(f"[EPOCH {epoch:03d}/{epochs}] LR: {cur_lr:.6f} | Loss_G: {avg_loss_g:.2f} | Loss_D: {avg_loss_d:.4f} | LPIPS: {avg_val_lpips:.4f}{ema_str} | SSIM: {avg_val_ssim:.4f} | PSNR: {avg_val_psnr:.2f} dB | Val_L1: {avg_val_l1:.4f}")
 
             # Log metrics to MLflow
-            mlflow.log_metrics({
+            metrics_dict = {
                 "loss_G": avg_loss_g,
                 "loss_D": avg_loss_d,
                 "loss_pixel_train": avg_loss_pixel,
                 "val_l1": avg_val_l1,
                 "val_ssim": avg_val_ssim,
                 "val_psnr": avg_val_psnr,
-                "val_lpips": avg_val_lpips
-            }, step=epoch)
+                "val_lpips": avg_val_lpips,
+                "lr_g": cur_lr
+            }
+            if generator_ema is not None:
+                metrics_dict["val_lpips_ema"] = avg_val_lpips_ema
+            mlflow.log_metrics(metrics_dict, step=epoch)
 
             # Save visual comparison sample every save_sample_freq epochs
             if epoch % config["training"]["save_sample_freq"] == 0 or epoch == 1 or epoch == epochs:
@@ -274,6 +326,13 @@ def train(config_path: str = "configs/params.yaml", epochs_override: int = None)
                 best_ckpt_path = models_dir / "generator_perceptual_best.pth"
                 torch.save(generator.state_dict(), best_ckpt_path)
                 print(f"  -> [CHECKPOINT] New best LPIPS model saved (LPIPS: {best_val_lpips:.4f}, SSIM: {avg_val_ssim:.4f})")
+
+            # Checkpoint best EMA model
+            if generator_ema is not None and avg_val_lpips_ema < best_val_lpips_ema:
+                best_val_lpips_ema = avg_val_lpips_ema
+                best_ema_path = models_dir / "generator_perceptual_ema_best.pth"
+                torch.save(generator_ema.ema_model.state_dict(), best_ema_path)
+                print(f"  -> [CHECKPOINT] New best EMA model saved (LPIPS: {best_val_lpips_ema:.4f})")
 
 
         # 6. Save final model to MLflow Model Registry

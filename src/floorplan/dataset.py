@@ -55,6 +55,7 @@ class CubiCasaDataset(Dataset):
         root_dir: str = "data/CubiCasa5k/cubicasa5k/cubicasa5k",
         split: str = "train",
         img_size: int = 512,
+        crop_size: Optional[int] = None,
         augment: bool = True,
         cache_dir: Optional[str] = "data/CubiCasa5k/cached_512"
     ):
@@ -62,8 +63,12 @@ class CubiCasaDataset(Dataset):
         self.split = split
         self.split_file = self.root_dir / f"{split}.txt"
         self.img_size = img_size
+        self.crop_size = crop_size
         self.augment = augment and (split == "train")
-        self.cache_dir = Path(cache_dir) / split if cache_dir else None
+        if img_size != 512 and cache_dir == "data/CubiCasa5k/cached_512":
+            self.cache_dir = None
+        else:
+            self.cache_dir = Path(cache_dir) / split if cache_dir else None
 
         if not self.split_file.exists():
             raise FileNotFoundError(f"Split file not found: {self.split_file}")
@@ -194,7 +199,29 @@ class CubiCasaDataset(Dataset):
                 room_mask = np.rot90(room_mask, rot_k)
                 mask_4class = np.rot90(mask_4class, rot_k)
 
-        # 6. Compute exact ground-truth physical scale (meters per pixel in 512x512 canvas)
+        # 6. Random/Center Crop (e.g. 512 crop from 1024 rasterized canvas)
+        if self.crop_size and self.crop_size < self.img_size:
+            cs = self.crop_size
+            if self.augment:
+                fg_y, fg_x = np.where(struct_mask > 0)
+                if len(fg_y) > 0 and np.random.rand() > 0.25:
+                    c_idx = np.random.randint(0, len(fg_y))
+                    cy, cx = fg_y[c_idx], fg_x[c_idx]
+                    top = max(0, min(self.img_size - cs, cy - cs // 2 + np.random.randint(-40, 40)))
+                    left = max(0, min(self.img_size - cs, cx - cs // 2 + np.random.randint(-40, 40)))
+                else:
+                    top = np.random.randint(0, self.img_size - cs + 1)
+                    left = np.random.randint(0, self.img_size - cs + 1)
+            else:
+                top = (self.img_size - cs) // 2
+                left = (self.img_size - cs) // 2
+
+            canvas_img = canvas_img.crop((left, top, left + cs, top + cs))
+            struct_mask = struct_mask[top:top+cs, left:left+cs]
+            room_mask = room_mask[top:top+cs, left:left+cs]
+            mask_4class = mask_4class[top:top+cs, left:left+cs]
+
+        # 7. Compute exact ground-truth physical scale (meters per pixel in 512x512 canvas)
         img_path = self.root_dir / sample_rel_path / "F1_scaled.png"
         try:
             with Image.open(img_path) as orig_img:

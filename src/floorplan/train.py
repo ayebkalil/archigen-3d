@@ -31,24 +31,27 @@ def train_floorplan_multitask(
     batch_size: int = 4,
     lr: float = 3e-4,
     img_size: int = 512,
+    crop_size: Optional[int] = None,
     max_train_samples: Optional[int] = None,
     max_val_samples: Optional[int] = None,
     device_str: Optional[str] = None,
-    resume: Optional[str] = None
+    resume: Optional[str] = None,
+    ckpt_name: Optional[str] = None
 ):
     seed_everything(42)
     device = torch.device(device_str or ("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"[FLOORPLAN TRAIN] Training MultiTask UNet++ ({encoder_name}) on device: {device}")
-    print(f"[CONFIG] Resolution: {img_size}x{img_size} | Batch Size: {batch_size} | Epochs: {epochs}")
+    res_str = f"{img_size}x{img_size} (Crop: {crop_size}x{crop_size})" if crop_size else f"{img_size}x{img_size}"
+    print(f"[CONFIG] Resolution: {res_str} | Batch Size: {batch_size} | Epochs: {epochs}")
 
     # Output directory
     models_dir = Path("models/saved/floorplan_unetpp")
     models_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Dataset & Loaders
-    train_dataset = CubiCasaDataset(split="train", img_size=img_size, augment=True)
-    val_dataset = CubiCasaDataset(split="val", img_size=img_size, augment=False)
-    test_dataset = CubiCasaDataset(split="test", img_size=img_size, augment=False)
+    train_dataset = CubiCasaDataset(split="train", img_size=img_size, crop_size=crop_size, augment=True)
+    val_dataset = CubiCasaDataset(split="val", img_size=img_size, crop_size=crop_size, augment=False)
+    test_dataset = CubiCasaDataset(split="test", img_size=img_size, crop_size=crop_size, augment=False)
 
     if max_train_samples and max_train_samples < len(train_dataset):
         train_dataset = Subset(train_dataset, list(range(max_train_samples)))
@@ -104,11 +107,12 @@ def train_floorplan_multitask(
 
     start_epoch = 1
     best_score = 0.0
-    best_ckpt_path = models_dir / f"multitask_{encoder_name}_best.pth"
+    default_name = f"multitask_{encoder_name}_1024crop_challenger.pth" if crop_size else f"multitask_{encoder_name}_best.pth"
+    best_ckpt_path = models_dir / (ckpt_name or default_name)
 
     if resume and Path(resume).exists():
         print(f"[RESUME] Loading checkpoint from {resume}...")
-        ckpt = torch.load(resume, map_location=device)
+        ckpt = torch.load(resume, map_location=device, weights_only=False)
         model.load_state_dict(ckpt["model_state_dict"])
         if "optimizer_state_dict" in ckpt:
             try:
@@ -220,7 +224,7 @@ def train_floorplan_multitask(
 
         # 6. Final Evaluation on Test Split using Best Checkpoint
         print(f"\n[EVALUATION] Loading best checkpoint from {best_ckpt_path} for Test Split...")
-        best_data = torch.load(best_ckpt_path, map_location=device)
+        best_data = torch.load(best_ckpt_path, map_location=device, weights_only=False)
         model.load_state_dict(best_data["model_state_dict"])
         test_metrics = evaluate_loader(model, test_loader, device, multitask_loss)
 
@@ -412,11 +416,13 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=20, help="Number of training epochs")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size (default 4 for 4GB RTX 3050)")
     parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate")
-    parser.add_argument("--img_size", type=int, default=512, help="Image resolution (512 or 768)")
+    parser.add_argument("--img_size", type=int, default=512, help="Image resolution (512 or 1024)")
+    parser.add_argument("--crop_size", type=int, default=None, help="Crop resolution if using higher resolution (e.g. 512 for 1024)")
     parser.add_argument("--encoder", type=str, default="resnet34", help="Backbone encoder")
     parser.add_argument("--max_train_samples", type=int, default=None, help="Limit train samples for fast benchmark")
     parser.add_argument("--max_val_samples", type=int, default=None, help="Limit val samples")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume training from")
+    parser.add_argument("--ckpt_name", type=str, default=None, help="Custom output checkpoint filename")
     args = parser.parse_args()
 
     train_floorplan_multitask(
@@ -425,7 +431,9 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         lr=args.lr,
         img_size=args.img_size,
+        crop_size=args.crop_size,
         max_train_samples=args.max_train_samples,
         max_val_samples=args.max_val_samples,
-        resume=args.resume
+        resume=args.resume,
+        ckpt_name=args.ckpt_name
     )

@@ -120,6 +120,30 @@
       "size_bytes": 104547098,
       "size_mb": 99.7,
       "last_modified": "2026-10-22T21:18:26"
+    },
+    "models\\\\saved\\\\generator_perceptual_ema_best.pth": {
+      "sha256": "4d4ec134344564cd7af6c79864f204ff72129dff036c4788b740cf80a7a662bc",
+      "size_bytes": 156600817,
+      "size_mb": 149.35,
+      "last_modified": "2026-10-23T07:58:35.206336"
+    },
+    "models\\\\saved\\\\generator_perceptual_ema.onnx": {
+      "sha256": "46d95ec2b937af63ef36e0f8c7d1255105e8546d0c7dab42919ae8e6d2fc25ab",
+      "size_bytes": 156648236,
+      "size_mb": 149.39,
+      "last_modified": "2026-10-23T08:33:46.718987"
     }
+  },
+  "champion_facade": {
+    "pytorch": "models/saved/generator_perceptual_ema_best.pth",
+    "onnx": "models/saved/generator_perceptual_ema.onnx",
+    "sha256_pytorch": "4d4ec134344564cd7af6c79864f204ff72129dff036c4788b740cf80a7a662bc",
+    "sha256_onnx": "46d95ec2b937af63ef36e0f8c7d1255105e8546d0c7dab42919ae8e6d2fc25ab",
+    "kid_x1000": 63.552,
+    "lpips": 0.3096,
+    "ssim": 0.2893,
+    "psnr_db": 12.97,
+    "l1_loss": 0.3403,
+    "status": "PROMOTED_CHAMPION_EMA_SCHEDULE"
   }
 }

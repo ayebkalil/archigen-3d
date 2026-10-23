@@ -182,9 +182,18 @@ class FloorplanVectorizer:
         if env_cnts:
             cv2.drawContours(filled_envelope, env_cnts, -1, 1, -1)
 
-        footprint_contours, _ = cv2.findContours(filled_envelope, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Spur pruning: strip high-frequency perimeter whiskers, fences, and thin spurs (< 3px)
+        kernel_spur = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        pruned_envelope = cv2.morphologyEx(filled_envelope, cv2.MORPH_OPEN, kernel_spur)
+        if pruned_envelope.sum() >= 0.75 * max(filled_envelope.sum(), 1):
+            clean_envelope = pruned_envelope
+        else:
+            clean_envelope = filled_envelope
+
+        footprint_contours, _ = cv2.findContours(clean_envelope, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         shell_valid = False
         was_shell_repaired = False
+        shell_failure_code = None
         building_perimeter_m = 0.0
 
         if len(footprint_contours) > 0:
@@ -199,7 +208,7 @@ class FloorplanVectorizer:
                             shell_valid = True
                             building_perimeter_m = round(float(shell_poly.length), 2)
                         else:
-                            rep_shell_poly, rep_ok, _ = repair_polygon_to_single_polygon(raw_shell_poly)
+                            rep_shell_poly, rep_ok, delta_area = repair_polygon_to_single_polygon(raw_shell_poly)
                             if rep_ok and rep_shell_poly.is_valid:
                                 shell_poly = rep_shell_poly
                                 shell_valid = True
@@ -209,8 +218,13 @@ class FloorplanVectorizer:
                                 shell_poly = raw_shell_poly
                                 shell_valid = False
                                 building_perimeter_m = round(float(raw_shell_poly.length), 2)
+                                if delta_area > 10.0:
+                                    shell_failure_code = "REPAIR_REJECTED_AREA_DISTORTION"
+                                else:
+                                    shell_failure_code = "INVALID_GEOMETRY"
                     except Exception:
                         shell_valid = False
+                        shell_failure_code = "INVALID_GEOMETRY"
                         building_perimeter_m = 0.0
 
         # 4. Wall Contour extraction and Rectilinear Polygon simplification
@@ -287,19 +301,20 @@ class FloorplanVectorizer:
 
             wall_id += 1
 
-        # 5. Doors & Windows extraction and wall projection
+        # 5. Doors & Windows extraction with wall gating, dimensional filtering, and fragment clustering
         def extract_openings(bin_mask: np.ndarray, opening_type: str):
-            openings = []
+            raw_candidates = []
             cnts, _ = cv2.findContours(bin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            op_idx = 0
             for c in cnts:
                 if cv2.contourArea(c) < 10:
                     continue
                 M = cv2.moments(c)
                 if M["m00"] == 0:
                     continue
-                cx = (M["m10"] / M["m00"]) * scale_m_per_px
-                cy = (M["m01"] / M["m00"]) * scale_m_per_px
+                center_px_x = M["m10"] / M["m00"]
+                center_px_y = M["m01"] / M["m00"]
+                cx = center_px_x * scale_m_per_px
+                cy = center_px_y * scale_m_per_px
                 center_pt = Point(cx, cy)
 
                 rect = cv2.minAreaRect(c)
@@ -314,24 +329,82 @@ class FloorplanVectorizer:
                         min_dist = dist
                         best_wall_id = seg["wall_id"]
 
+                # Gate 1: Wall proximity filter (must be within 0.85m of a wall)
+                if min_dist > 0.85:
+                    continue
+
+                # Gate 2: Dimension filter (reject fragments < 0.50m or oversized gaps > 2.50m for doors)
+                if opening_type == "door":
+                    if dim_m < 0.50 or dim_m > 2.50:
+                        continue
+                    clamped_width = round(max(0.65, min(dim_m, 2.20)), 2)
+                    height_m = 2.1
+                else:
+                    if dim_m < 0.40 or dim_m > 3.50:
+                        continue
+                    clamped_width = round(max(0.50, min(dim_m, 3.00)), 2)
+                    height_m = 1.4
+
+                raw_candidates.append({
+                    "position_px": [round(center_px_x, 1), round(center_px_y, 1)],
+                    "position_meters": [round(cx, 3), round(cy, 3)],
+                    "width_m": clamped_width,
+                    "height_m": height_m,
+                    "associated_wall": best_wall_id,
+                    "distance_to_wall_m": round(min_dist, 3)
+                })
+
+            # Gate 3: Spatial clustering of contiguous/overlapping opening fragments
+            clusters = []
+            used = set()
+            for i, op1 in enumerate(raw_candidates):
+                if i in used:
+                    continue
+                p1 = Point(op1["position_meters"])
+                w1 = op1["associated_wall"]
+                cluster = [op1]
+                used.add(i)
+                for j, op2 in enumerate(raw_candidates):
+                    if j in used:
+                        continue
+                    p2 = Point(op2["position_meters"])
+                    w2 = op2["associated_wall"]
+                    dist = p1.distance(p2)
+                    # Merge if on the same wall within 0.65m, or close within 0.50m
+                    if (w1 is not None and w1 == w2 and dist <= 0.65) or (dist <= 0.50):
+                        cluster.append(op2)
+                        used.add(j)
+                clusters.append(cluster)
+
+            openings = []
+            for op_idx, cl in enumerate(clusters):
+                avg_px_x = sum(item["position_px"][0] for item in cl) / len(cl)
+                avg_px_y = sum(item["position_px"][1] for item in cl) / len(cl)
+                avg_x = sum(item["position_meters"][0] for item in cl) / len(cl)
+                avg_y = sum(item["position_meters"][1] for item in cl) / len(cl)
+                avg_w = sum(item["width_m"] for item in cl) / len(cl)
+                best_wall = cl[0]["associated_wall"]
+                min_dw = min(item["distance_to_wall_m"] for item in cl)
+
                 op_data = {
                     "id": f"{opening_type}_{op_idx}",
                     "type": opening_type,
-                    "position_meters": [round(cx, 3), round(cy, 3)],
-                    "width_m": round(max(dim_m, 0.6), 2),
+                    "position_px": [round(avg_px_x, 1), round(avg_px_y, 1)],
+                    "position_meters": [round(avg_x, 3), round(avg_y, 3)],
+                    "width_m": round(avg_w, 2),
                     "height_m": 2.1 if opening_type == "door" else 1.4,
-                    "associated_wall": best_wall_id,
-                    "distance_to_wall_m": round(min_dist, 3)
+                    "associated_wall": best_wall,
+                    "distance_to_wall_m": round(min_dw, 3)
                 }
                 openings.append(op_data)
 
                 # Attach to wall openings list
-                if best_wall_id is not None and min_dist < 1.0:
+                if best_wall is not None and min_dw < 1.0:
                     for w_item in walls:
-                        if w_item["id"] == best_wall_id:
+                        if w_item["id"] == best_wall:
                             w_item["openings"].append(op_data)
                             break
-                op_idx += 1
+
             return openings
 
         doors = extract_openings(door_binary, "door")
@@ -518,18 +591,27 @@ class FloorplanVectorizer:
         envelope_segments = sum(len(w.get("polygon_meters", [])) for w in walls)
         has_enough_walls = (len(walls) >= 4) or (envelope_segments >= 4 and len(walls) >= 1)
 
+        warnings = []
         if len(rooms) == 0:
             shell_status = "NO_ROOMS_DETECTED"
             strict_shell_valid = False
+            warnings.append("NO_ROOMS_DETECTED")
         elif not has_enough_walls:
             shell_status = "INCOMPLETE_ENVELOPE"
             strict_shell_valid = False
+            warnings.append("INCOMPLETE_ENVELOPE")
         elif not shell_valid:
-            shell_status = "INVALID_GEOMETRY"
+            shell_status = shell_failure_code if shell_failure_code else "INVALID_GEOMETRY"
             strict_shell_valid = False
+            warnings.append(shell_status)
         else:
             shell_status = "VALID"
             strict_shell_valid = True
+
+        if was_shell_repaired:
+            warnings.append("SHELL_REPAIRED_TOPOLOGY")
+        if len(doors) > max(4, int(2.5 * len(rooms))):
+            warnings.append("DOOR_COUNT_IMPLAUSIBLE")
 
         return {
             "metadata": {
@@ -540,6 +622,7 @@ class FloorplanVectorizer:
                 "is_building_shell_valid": strict_shell_valid,
                 "shell_status": shell_status,
                 "was_shell_repaired": was_shell_repaired,
+                "warnings": warnings,
                 "total_surface_m2": round(total_interior_area_m2, 2),
                 "num_walls": len(walls),
                 "num_exterior_walls": sum(1 for w in walls if w.get("is_exterior", False)),

@@ -114,8 +114,8 @@ class PyTorchFacadeInference:
 class FacadeBridge:
     def __init__(
         self,
-        onnx_model_path: str = "models/saved/generator_perceptual.onnx",
-        pytorch_model_path: str = "models/saved/generator_perceptual_best.pth",
+        onnx_model_path: str = "models/saved/generator_perceptual_ema.onnx",
+        pytorch_model_path: str = "models/saved/generator_perceptual_ema_best.pth",
         prefer_cuda: bool = True,
         enhance_textures: bool = True
     ):
@@ -246,11 +246,11 @@ class FacadeBridge:
         draw.rectangle([wall_x0, wall_y0, wall_x1, wall_y0 + cornice_h], fill=CMP_PALETTE["cornice"])
         draw.rectangle([wall_x0, wall_y1 - base_h, wall_x1, wall_y1], fill=CMP_PALETTE["base"])
 
-        # Corner pilasters (architectural column framing on facade edges)
+        # Corner pilasters (architectural column framing on facade edges using CMP molding class)
         pillar_w = max(int(round(0.28 * scale_px_per_m)), 3)
         if draw_w > (pillar_w * 5):
-            safe_rect(wall_x0, wall_y0 + cornice_h, wall_x0 + pillar_w, wall_y1 - base_h, CMP_PALETTE["pillar"])
-            safe_rect(wall_x1 - pillar_w, wall_y0 + cornice_h, wall_x1, wall_y1 - base_h, CMP_PALETTE["pillar"])
+            safe_rect(wall_x0, wall_y0 + cornice_h, wall_x0 + pillar_w, wall_y1 - base_h, CMP_PALETTE["molding"])
+            safe_rect(wall_x1 - pillar_w, wall_y0 + cornice_h, wall_x1, wall_y1 - base_h, CMP_PALETTE["molding"])
 
         # 4. Openings layout (Doors and Windows)
         # Parse attached openings from wall metadata

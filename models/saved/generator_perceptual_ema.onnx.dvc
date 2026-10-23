@@ -1,0 +1,5 @@
+outs:
+- md5: 1426492875d3f13147c7a65df7670312
+  size: 156648236
+  hash: md5
+  path: generator_perceptual_ema.onnx

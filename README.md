@@ -41,8 +41,8 @@
    * **Architecture :** Générateur UNet-256 (upsampling Nearest+Conv sans damier), Discriminateur PatchGAN $70 \times 70$ stabilisé par Spectral Normalization.
    * **Fonction de coût :** Perte hybride LSGAN + LPIPS (SqueezeNet) + Feature Matching + $\mathcal{L}_1$.
    * **Résultats vérifiés (Split Test CMP Facades) :**
-     * **KID :** $\mathbf{60.40 \times 10^{-3}}$ (meilleur score du benchmark vs 149.89 Baseline)
-     * **LPIPS :** **0.324** (gain de 49.3% en similarité perceptuelle)
+     * **KID :** $\mathbf{67.65 \times 10^{-3} \pm 5.95 \times 10^{-3}}$ (meilleur score du benchmark vs $150.36 \times 10^{-3}$ Baseline, sorties brutes sans filtre)
+     * **LPIPS :** **0.3169** (gain de 50.0% en similarité perceptuelle vs 0.6327 Baseline)
      * **Export ONNX Runtime :** Parité numérique stricte confirmée ($\Delta_{\max} = 6.31 \times 10^{-6}$).
 
 ---

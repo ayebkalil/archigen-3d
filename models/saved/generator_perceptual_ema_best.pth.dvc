@@ -1,0 +1,5 @@
+outs:
+- md5: e827802338e7a41d43f5b7778f16c347
+  size: 156600817
+  hash: md5
+  path: generator_perceptual_ema_best.pth

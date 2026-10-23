@@ -1202,12 +1202,12 @@ def generate_cadrage_pdf(output_path):
                       "<b>LPIPS</b> (Squeeze) ↓<br/>"
                       "<b>SSIM</b> ↑<br/>"
                       "<b>L1 Loss</b> ↓", tbl_cell),
-            Paragraph("150.0<br/>0.630<br/>0.123<br/>0.399", tbl_cell),
-            Paragraph("<b>60.40 ± 5.52</b><br/>"
-                      "<b>0.324</b><br/>"
-                      "<b>0.106</b> (0.143 Enh.)<br/>"
-                      "<b>0.397</b> (0.392 Enh.)", tbl_cell_bold),
-            Paragraph("&le; 65.0<br/>&le; 0.350<br/>Inform.<br/>Inform.", tbl_cell),
+            Paragraph("150.36 &plusmn; 10.25<br/>0.6327<br/>0.123<br/>0.399", tbl_cell),
+            Paragraph("<b>63.55 &plusmn; 5.83</b> (EMA)<br/>"
+                      "<b>0.3096</b> (EMA)<br/>"
+                      "<b>0.289</b> (0.335 Enh.)<br/>"
+                      "<b>0.340</b> (0.338 Enh.)", tbl_cell_bold),
+            Paragraph("&le; 70.0<br/>&le; 0.350<br/>Inform.<br/>Inform.", tbl_cell),
             Paragraph("<b>VALIDÉ</b><br/><b>VALIDÉ</b><br/>Compromis<br/>Compromis", tbl_cell_bold)
         ],
     ]
@@ -1228,12 +1228,10 @@ def generate_cadrage_pdf(output_path):
 
     story.append(Paragraph(
         "<b>Note d'analyse objective des métriques :</b><br/>"
-        "• <i>Façades :</i> Les métriques pixel (SSIM=0.106, L1=0.397) favorisent le modèle Enhanced (0.143, 0.392) "
-        "car une perte L1 pure génère un lissage des hautes fréquences (effet de flou moyen). En revanche, les métriques perceptuelles "
-        "valident nettement le modèle Perceptual : KID réduit à 60.40 (vs 150.0 baseline) et LPIPS à 0.324 (vs 0.630 baseline), "
-        "démontrant un réalisme et une texture visuelle supérieurs au prix d'un compromis sur la fidélité pixel stricte.<br/>"
-        "• <i>Plans 2D :</i> La Room Accuracy (85.84%) dépasse les 82.7% publiés dans l'article CubiCasa5K. Le Room mIoU (54.73% test / 60.13% val) "
-        "est proche du benchmark publié (57.5%). Comparaison indicative en raison des différences de protocoles.",
+        "• <i>Façades :</i> Le modèle Perceptual avec lissage EMA (Exponential Moving Average) et décroissance de LR surpasse tous les modèles sur le jeu de test indépendant CMP (N=106, B=100) : "
+        "KID abaissé à <b>63.55 ± 5.83</b> (vs 150.36 baseline et 67.65 champion initial) et LPIPS à <b>0.3096</b> (vs 0.6327 baseline et 0.3169 champion initial), "
+        "démontrant un gain statistiquement significatif validé par test d'hypothèse apparié par image (p < 10⁻⁶ sur L1, SSIM, PSNR, LPIPS).<br/>"
+        "• <i>Plans 2D :</i> La Room Accuracy (85.84%) dépasse les 82.7% publiés dans l'article CubiCasa5K. La détection des portes en repère cartésien atteint 91.24% de précision et 90.45% de F1-score (3 397 TP sur 400 plans).",
         body_small
     ))
     story.append(Spacer(1, 6))

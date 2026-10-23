@@ -19,7 +19,7 @@
     "kid_x1000": 109.857,
     "kid_std_x1000": 9.238
   },
-  "Perceptual (100ep)": {
+  "Perceptual Champion v1.0 (Prod)": {
     "checkpoint": "models/saved/generator_perceptual_best.pth",
     "upsample_mode": "nearest",
     "l1_loss": 0.3526,
@@ -28,5 +28,15 @@
     "lpips": 0.3169,
     "kid_x1000": 67.649,
     "kid_std_x1000": 5.946
+  },
+  "Perceptual (EMA + Schedule)": {
+    "checkpoint": "models/saved/generator_perceptual_ema_best.pth",
+    "upsample_mode": "nearest",
+    "l1_loss": 0.3403,
+    "ssim": 0.2893,
+    "psnr_db": 12.97,
+    "lpips": 0.3096,
+    "kid_x1000": 63.552,
+    "kid_std_x1000": 5.826
   }
 }
