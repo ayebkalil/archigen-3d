@@ -3,8 +3,9 @@
   --fg: #1d1d1f;
   --fg-dim: rgba(29, 29, 31, 0.62);
   --line: rgba(29, 29, 31, 0.45);
-  --accent: #b8452a;
-  --display: 'Instrument Serif', 'Times New Roman', serif;
+  --accent: #f0500f;
+  --accent-hover: #d8450a;
+  --display: 'Saira Stencil One', 'Instrument Serif', sans-serif;
   --label: 'Geist Mono', ui-monospace, monospace;
   --body: 'Geist', system-ui, sans-serif;
   --shadow: 0 0 10px rgba(239, 235, 226, 0.9), 0 0 2px rgba(239, 235, 226, 0.9);

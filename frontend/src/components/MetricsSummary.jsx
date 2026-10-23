@@ -40,9 +40,9 @@ export default function MetricsSummary({ layout, frontWallId }) {
         {/* Total Area */}
         <div className="px-4 py-2 border-r border-[#1d1d1f] flex flex-col justify-between min-w-[130px]">
           <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            Total Living Area
+            TOTAL LIVING AREA
           </span>
-          <p className="font-serif text-2xl text-[#1d1d1f] mt-0.5 leading-none">
+          <p className="font-stencil text-xl text-[#1d1d1f] mt-0.5 leading-none">
             {totalArea} <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase">m²</span>
           </p>
         </div>
@@ -50,19 +50,19 @@ export default function MetricsSummary({ layout, frontWallId }) {
         {/* Room Count */}
         <div className="px-4 py-2 border-r border-[#1d1d1f] flex flex-col justify-between min-w-[110px]">
           <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            Rooms Partitioned
+            ROOMS PARTITIONED
           </span>
-          <p className="font-serif text-2xl text-[#1d1d1f] mt-0.5 leading-none">
-            {rooms.length} <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase">spaces</span>
+          <p className="font-stencil text-xl text-[#1d1d1f] mt-0.5 leading-none">
+            {rooms.length} <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase">SPACES</span>
           </p>
         </div>
 
         {/* Exterior Shell */}
         <div className="px-4 py-2 border-r border-[#1d1d1f] flex flex-col justify-between min-w-[130px]">
           <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            Building Envelope
+            BUILDING ENVELOPE
           </span>
-          <p className="font-serif text-2xl text-[#1d1d1f] mt-0.5 leading-none">
+          <p className="font-stencil text-xl text-[#1d1d1f] mt-0.5 leading-none">
             {metadata.building_perimeter_m || 0} <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase">m</span>
           </p>
         </div>
@@ -70,21 +70,21 @@ export default function MetricsSummary({ layout, frontWallId }) {
         {/* Architectural Plausibility Status */}
         <div className="px-4 py-2 flex flex-col justify-between min-w-[160px] bg-[#efebe2]/50">
           <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            Plausibility Gate
+            PLAUSIBILITY GATE
           </span>
           <div className="flex items-center space-x-1.5 mt-0.5">
             {warningsCount === 0 ? (
               <>
                 <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
-                <span className="font-mono text-[10.5px] font-semibold text-emerald-800 uppercase tracking-wider">
-                  BIM Validated
+                <span className="font-stencil text-xs text-emerald-800 uppercase tracking-wider">
+                  BIM VALIDATED
                 </span>
               </>
             ) : (
               <>
-                <AlertTriangle className="w-3.5 h-3.5 text-[#b8452a]" />
-                <span className="font-mono text-[10px] font-semibold text-[#b8452a] uppercase tracking-wider">
-                  {warningsCount} Area {warningsCount === 1 ? 'Notice' : 'Notices'}
+                <AlertTriangle className="w-3.5 h-3.5 text-[#f0500f]" />
+                <span className="font-stencil text-xs text-[#f0500f] uppercase tracking-wider">
+                  {warningsCount} AREA {warningsCount === 1 ? 'NOTICE' : 'NOTICES'}
                 </span>
               </>
             )}
@@ -95,8 +95,8 @@ export default function MetricsSummary({ layout, frontWallId }) {
       {/* 2. Room Breakdown Chips (Drafting Badges) */}
       <div className="flex-1 flex flex-col justify-center space-y-1.5 min-w-[280px]">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-[9.5px] uppercase tracking-wider text-[#1d1d1f]/70 font-semibold">
-            Extracted Spatial Registry ({rooms.length})
+          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">
+            EXTRACTED SPATIAL REGISTRY ({rooms.length})
           </span>
           {frontWallId && (
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#b8452a]">

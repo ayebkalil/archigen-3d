@@ -260,43 +260,43 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
   return (
     <div className="flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden select-none">
       {/* 3D Viewport Toolbar */}
-      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]">
+      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f]">
         <div className="flex items-center space-x-2">
-          <Box className="w-3.5 h-3.5 text-[#b8452a]" />
-          <span className="font-semibold text-[#1d1d1f]">3D Model</span>
+          <Box className="w-3.5 h-3.5 text-[#f0500f]" />
+          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">3D MODEL</span>
           <span className="text-[#1d1d1f]/30">|</span>
-          <span className="text-[#1d1d1f]/60 font-mono text-[10px]">
-            {facadeTextureUrl ? 'cGAN Neural Facade' : 'BIM Geometry'}
+          <span className="text-[#1d1d1f]/60 font-mono text-[10px] uppercase tracking-wider">
+            {facadeTextureUrl ? 'cGAN Neural Facade' : 'Watertight BIM Geometry'}
           </span>
         </div>
 
         {/* View Controls */}
-        <div className="flex items-center space-x-1.5 font-mono text-[9.5px]">
+        <div className="flex items-center space-x-1.5 font-stencil text-[10.5px] uppercase tracking-wider">
           <button
             onClick={() => setWireframe(!wireframe)}
             className={`px-3 py-1 rounded-full border transition-all ${
               wireframe
-                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                 : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
             }`}
           >
-            Wireframe
+            WIREFRAME
           </button>
           <button
             onClick={() => setShowFloors(!showFloors)}
             className={`px-3 py-1 rounded-full border transition-all ${
               showFloors
-                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                 : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
             }`}
           >
-            Floors
+            FLOORS
           </button>
           <button
             onClick={viewPreset === 'top' ? setCameraPerspective : setCameraTopDown}
-            className="px-3 py-1 rounded-full border border-[#1d1d1f]/25 bg-white/80 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all font-semibold"
+            className="px-3 py-1 rounded-full border border-[#1d1d1f]/25 bg-white/80 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all"
           >
-            {viewPreset === 'top' ? 'Perspective View' : 'Top-Down View'}
+            {viewPreset === 'top' ? 'PERSPECTIVE' : 'TOP-DOWN'}
           </button>
         </div>
       </div>

@@ -40,12 +40,12 @@ export default function ControlPanel({
       {/* 1. Upload Blueprint */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="font-mono text-[10.5px] font-semibold text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
-            <Upload className="w-3.5 h-3.5 text-[#b8452a]" />
-            <span>1. Architectural Drawing</span>
+          <label className="font-stencil text-xs text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
+            <Upload className="w-3.5 h-3.5 text-[#f0500f]" />
+            <span>01 // ARCHITECTURAL DRAWING</span>
           </label>
           <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-[#1d1d1f]/20 text-[#1d1d1f]/60">
-            2D Raster
+            2D RASTER
           </span>
         </div>
 
@@ -59,15 +59,15 @@ export default function ControlPanel({
 
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="mt-1 border-2 border-dashed border-[#1d1d1f]/30 hover:border-[#b8452a] bg-[#efebe2]/60 hover:bg-[#efebe2] rounded-xl p-4 text-center cursor-pointer transition-all group shadow-sm"
+          className="mt-1 border-2 border-dashed border-[#1d1d1f]/30 hover:border-[#f0500f] bg-[#efebe2]/60 hover:bg-[#efebe2] rounded-xl p-4 text-center cursor-pointer transition-all group shadow-sm"
         >
-          <div className="w-10 h-10 mx-auto rounded-full bg-white/80 border border-[#1d1d1f]/20 group-hover:border-[#b8452a] group-hover:bg-[#b8452a]/10 flex items-center justify-center transition-colors">
-            <Upload className="w-4 h-4 text-[#1d1d1f]/70 group-hover:text-[#b8452a] transition-colors" />
+          <div className="w-10 h-10 mx-auto rounded-full bg-white/80 border border-[#1d1d1f]/20 group-hover:border-[#f0500f] group-hover:bg-[#f0500f]/10 flex items-center justify-center transition-colors">
+            <Upload className="w-4 h-4 text-[#1d1d1f]/70 group-hover:text-[#f0500f] transition-colors" />
           </div>
-          <p className="mt-2 font-mono text-[11px] font-medium text-[#1d1d1f] uppercase tracking-wide">
-            Upload Plan (PNG or JPG)
+          <p className="mt-2 font-stencil text-xs text-[#1d1d1f] uppercase tracking-wider">
+            UPLOAD PLAN (PNG OR JPG)
           </p>
-          <p className="font-mono text-[9.5px] text-[#1d1d1f]/60 mt-0.5">
+          <p className="font-mono text-[9px] text-[#1d1d1f]/60 mt-0.5">
             Architectural sketch, scan, or CAD blueprint
           </p>
         </div>
@@ -75,16 +75,16 @@ export default function ControlPanel({
 
       {/* 2. Scale & Geometry Parameters */}
       <div className="space-y-4">
-        <label className="font-mono text-[10.5px] font-semibold text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
-          <Sliders className="w-3.5 h-3.5 text-[#b8452a]" />
-          <span>2. Dimensions & Calibration</span>
+        <label className="font-stencil text-xs text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
+          <Sliders className="w-3.5 h-3.5 text-[#f0500f]" />
+          <span>02 // SPATIAL CALIBRATION</span>
         </label>
 
         {/* Scale Slider & 2-Point Calibration */}
         <div className="bg-[#efebe2]/80 rounded-xl p-3.5 border border-[#1d1d1f]/15 shadow-sm">
           <div className="flex justify-between items-center text-xs mb-1.5">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]/70">Scale Ratio:</span>
-            <span className="font-mono text-[11px] text-[#b8452a] font-semibold">{scale} m/px</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-[#1d1d1f]/70">Scale Ratio:</span>
+            <span className="font-stencil text-xs text-[#f0500f] tracking-wide">{scale} M/PX</span>
           </div>
           <input
             type="range"
@@ -93,7 +93,7 @@ export default function ControlPanel({
             step="0.001"
             value={scale}
             onChange={(e) => setScale(parseFloat(e.target.value))}
-            className="w-full h-1.5 bg-[#1d1d1f]/15 rounded-lg appearance-none cursor-pointer accent-[#b8452a]"
+            className="w-full h-1.5 bg-[#1d1d1f]/15 rounded-lg appearance-none cursor-pointer accent-[#f0500f]"
           />
           <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-[#1d1d1f]/10">
             <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
@@ -101,14 +101,14 @@ export default function ControlPanel({
             </span>
             <button
               onClick={() => setIsCalibrating && setIsCalibrating(!isCalibrating)}
-              className={`font-mono text-[9.5px] uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all flex items-center space-x-1 ${
+              className={`font-stencil text-[10px] uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all flex items-center space-x-1 ${
                 isCalibrating
-                  ? 'bg-[#b8452a] border-[#b8452a] text-white font-semibold'
+                  ? 'bg-[#f0500f] border-[#f0500f] text-white'
                   : 'bg-white/80 border-[#1d1d1f]/30 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2]'
               }`}
             >
               <Ruler className="w-3 h-3" />
-              <span>{isCalibrating ? 'Measuring...' : '2-Pt Calibrate'}</span>
+              <span>{isCalibrating ? 'MEASURING...' : '2-PT CALIBRATE'}</span>
             </button>
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function ControlPanel({
         {/* Floor Count */}
         <div className="bg-[#efebe2]/80 rounded-xl p-3.5 border border-[#1d1d1f]/15 shadow-sm">
           <div className="flex justify-between items-center text-xs mb-2">
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]/70">Building Storeys:</span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-[#1d1d1f]/70">Building Storeys:</span>
             <span className="font-mono text-[11px] font-semibold text-[#1d1d1f]">{numFloors} Floor{numFloors > 1 ? 's' : ''} ({(numFloors * 2.8).toFixed(1)}m)</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -124,13 +124,13 @@ export default function ControlPanel({
               <button
                 key={f}
                 onClick={() => setNumFloors(f)}
-                className={`py-1.5 rounded-lg font-mono text-[10px] uppercase tracking-wider border transition-all ${
+                className={`py-1.5 rounded-lg font-stencil text-[11px] uppercase tracking-wider border transition-all ${
                   numFloors === f
-                    ? 'bg-[#1d1d1f] border-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+                    ? 'bg-[#1d1d1f] border-[#1d1d1f] text-[#efebe2] shadow-sm'
                     : 'bg-white/60 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:bg-white hover:text-[#1d1d1f]'
                 }`}
               >
-                {f} Storey{f > 1 ? 's' : ''}
+                {f} STOREY{f > 1 ? 'S' : ''}
               </button>
             ))}
           </div>
@@ -139,9 +139,9 @@ export default function ControlPanel({
 
       {/* 3. Facade Style Selector */}
       <div className="space-y-2.5">
-        <label className="font-mono text-[10.5px] font-semibold text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
-          <Palette className="w-3.5 h-3.5 text-[#b8452a]" />
-          <span>3. Facade Material & Style</span>
+        <label className="font-stencil text-xs text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
+          <Palette className="w-3.5 h-3.5 text-[#f0500f]" />
+          <span>03 // FACADE SYNTHESIS (cGAN)</span>
         </label>
 
         <div className="space-y-2">
@@ -151,13 +151,13 @@ export default function ControlPanel({
               onClick={() => setSelectedStyle(style.id)}
               className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
                 selectedStyle === style.id
-                  ? 'bg-white border-[#b8452a] shadow-sm'
+                  ? 'bg-white border-[#f0500f] shadow-sm'
                   : 'bg-[#efebe2]/60 border-[#1d1d1f]/15 hover:border-[#1d1d1f]/40 hover:bg-[#efebe2]'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-serif text-sm text-[#1d1d1f] font-normal">{style.label}</span>
-                {selectedStyle === style.id && <Check className="w-3.5 h-3.5 text-[#b8452a]" />}
+                <span className="font-stencil text-xs tracking-wider uppercase text-[#1d1d1f]">{style.label}</span>
+                {selectedStyle === style.id && <Check className="w-3.5 h-3.5 text-[#f0500f]" />}
               </div>
               <p className="font-mono text-[9px] text-[#1d1d1f]/60 mt-0.5">{style.desc}</p>
             </div>
@@ -170,17 +170,17 @@ export default function ControlPanel({
         <button
           onClick={onRunAnalysis}
           disabled={isAnalyzing}
-          className="w-full h-10 px-5 rounded-full bg-[#1d1d1f] hover:bg-black text-[#efebe2] font-mono text-[10.5px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 transition-all shadow-md disabled:opacity-50"
+          className="w-full h-10 px-5 rounded-full bg-[#1d1d1f] hover:bg-black text-[#efebe2] font-stencil text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md disabled:opacity-50"
         >
           {isAnalyzing ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#b8452a]" />
-              <span>Analyzing Blueprint...</span>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#f0500f]" />
+              <span>ANALYZING BLUEPRINT...</span>
             </>
           ) : (
             <>
-              <Building2 className="w-3.5 h-3.5 text-[#b8452a]" />
-              <span>Extract 3D Floorplan →</span>
+              <Building2 className="w-3.5 h-3.5 text-[#f0500f]" />
+              <span>EXTRACT 3D FLOORPLAN →</span>
             </>
           )}
         </button>
@@ -188,17 +188,17 @@ export default function ControlPanel({
         <button
           onClick={onGenerateFacade}
           disabled={!hasLayout || isGeneratingFacade}
-          className="w-full h-10 px-5 rounded-full bg-[#b8452a] hover:bg-[#96351e] text-white font-mono text-[10.5px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#b8452a]/20 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full h-10 px-5 rounded-full bg-[#f0500f] hover:bg-[#d8450a] text-white font-stencil text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#f0500f]/20 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isGeneratingFacade ? (
             <>
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Synthesizing cGAN Texture...</span>
+              <span>SYNTHESIZING cGAN TEXTURE...</span>
             </>
           ) : (
             <>
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Generate Facade Texture →</span>
+              <span>GENERATE FACADE TEXTURE →</span>
             </>
           )}
         </button>

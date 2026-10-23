@@ -230,66 +230,66 @@ export default function Floorplan2DCanvas({
       {/* Top Drafting Toolbar */}
       <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 select-none">
         {/* Left: Title & Elements count */}
-        <div className="flex items-center space-x-2 font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]">
-          <span className="font-semibold text-[#1d1d1f]">2D Plan</span>
+        <div className="flex items-center space-x-2 text-[#1d1d1f]">
+          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">2D BLUEPRINT</span>
           <span className="text-[#1d1d1f]/30">|</span>
-          <span className="text-[#1d1d1f]/60">
-            {walls.length}w · {rooms.length}r · {doors.length}d · {windows.length}win
+          <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase tracking-wider">
+            {walls.length}W · {rooms.length}R · {doors.length}D · {windows.length}WIN
           </span>
         </div>
 
         {/* Center: CAD Interactive Edit Tools */}
-        <div className="flex items-center bg-white/70 border border-[#1d1d1f]/20 rounded-full p-0.5 space-x-0.5 font-mono text-[10px] uppercase tracking-wider">
+        <div className="flex items-center bg-white/70 border border-[#1d1d1f]/20 rounded-full p-0.5 space-x-0.5">
           <button
             onClick={() => { setActiveTool('select'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Inspect / Select Front Wall"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
               activeTool === 'select' && !isCalibrating
-                ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+                ? 'bg-[#1d1d1f] text-[#efebe2] shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <MousePointer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Select</span>
+            <span className="hidden sm:inline">SELECT</span>
           </button>
 
           <button
             onClick={() => { setActiveTool('add_door'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click on canvas or wall to insert a door"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
               activeTool === 'add_door'
-                ? 'bg-[#b8452a] text-white font-semibold shadow-sm'
+                ? 'bg-[#f0500f] text-white shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">+ Door</span>
+            <span className="hidden sm:inline">+ DOOR</span>
           </button>
 
           <button
             onClick={() => { setActiveTool('delete'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click doors, windows, or internal walls to delete them"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
               activeTool === 'delete'
-                ? 'bg-rose-700 text-white font-semibold shadow-sm'
+                ? 'bg-rose-700 text-white shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Delete</span>
+            <span className="hidden sm:inline">DELETE</span>
           </button>
 
           <button
             onClick={() => { setActiveTool('relabel'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click any room polygon or badge to change space type"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
               activeTool === 'relabel'
-                ? 'bg-[#c48d3f] text-white font-semibold shadow-sm'
+                ? 'bg-[#c48d3f] text-white shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <Tag className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Relabel</span>
+            <span className="hidden sm:inline">RELABEL</span>
           </button>
 
           <button
@@ -300,14 +300,14 @@ export default function Floorplan2DCanvas({
               setCalibPointB(null);
             }}
             title="2-Point Real-world Scale Calibration"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
               isCalibrating
-                ? 'bg-[#b8452a] text-white font-semibold animate-pulse'
+                ? 'bg-[#f0500f] text-white animate-pulse'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <Ruler className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Scale</span>
+            <span className="hidden sm:inline">SCALE</span>
           </button>
         </div>
 

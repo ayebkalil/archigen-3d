@@ -9,9 +9,15 @@
   --line: rgba(29, 29, 31, 0.18);
   --accent: #b8452a;
   --accent-hover: #96351e;
-  --display: 'Instrument Serif', Georgia, serif;
+  --display: 'Saira Stencil One', 'Instrument Serif', Georgia, serif;
   --label: 'Geist Mono', ui-monospace, monospace;
   --body: 'Geist', system-ui, sans-serif;
+  --accent-vivid: #f0500f;
+}
+
+.font-stencil {
+  font-family: 'Saira Stencil One', sans-serif;
+  letter-spacing: 0.02em;
 }
 
 body {
@@ -60,22 +66,93 @@ body {
   background: var(--accent);
 }
 
-/* Rolling Parchment Animation */
-@keyframes rollSweep {
+/* --- Majestic Full-Screen Architectural Paper Roll Unroll Animation --- */
+@keyframes rollCylinderTravel {
   0% {
-    transform: translateX(-100%) scaleX(1);
-    opacity: 0.95;
+    left: -140px;
   }
-  50% {
-    transform: translateX(0%) scaleX(1.05);
+  54% {
+    left: calc(100vw - 30px);
+  }
+  100% {
+    left: calc(100vw + 180px);
+  }
+}
+
+@keyframes unrollSheetExpand {
+  0% {
+    width: 0vw;
+  }
+  54% {
+    width: 100vw;
+  }
+  100% {
+    width: 100vw;
+  }
+}
+
+@keyframes unrollOverlayFade {
+  0%, 75% {
     opacity: 1;
   }
   100% {
-    transform: translateX(110%) scaleX(1);
     opacity: 0;
   }
 }
 
-.parchment-unroll {
-  animation: rollSweep 1.1s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+.architectural-roll-cylinder {
+  position: absolute;
+  top: -5vh;
+  bottom: -5vh;
+  width: 110px;
+  pointer-events: none;
+  background: linear-gradient(90deg, #7a705e 0%, #998f7e 6%, #cfc6b5 18%, #fbf9f4 36%, #eee8dc 52%, #cfc6b5 72%, #9a907e 88%, #665d4c 100%);
+  box-shadow: 48px 0 70px rgba(18, 15, 11, 0.55), 18px 0 26px rgba(18, 15, 11, 0.45), 4px 0 6px rgba(18, 15, 11, 0.4), -8px 0 14px rgba(18, 15, 11, 0.2);
+  z-index: 60;
+  animation: rollCylinderTravel 2.4s cubic-bezier(0.25, 1, 0.35, 1) forwards;
+}
+
+.architectural-roll-cylinder::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -3px;
+  width: 5px;
+  background: linear-gradient(90deg, rgba(30, 25, 18, 0) 0, rgba(30, 25, 18, 0.28) 30%, rgba(255, 252, 244, 0.95) 46%, rgba(205, 197, 181, 0.9) 62%, rgba(40, 34, 26, 0.45) 80%, rgba(255, 252, 244, 0.9) 100%);
+}
+
+.architectural-roll-cylinder::after {
+  content: '';
+  position: absolute;
+  inset: 0 -2px 0 auto;
+  width: 3px;
+  background: rgba(30, 25, 18, 0.5);
+}
+
+.roll-paper-layers {
+  position: absolute;
+  inset: 0;
+  opacity: 0.65;
+  background: repeating-linear-gradient(90deg, transparent 0 8px, rgba(40, 34, 26, 0.35) 8px 10px, rgba(255, 252, 244, 0.85) 10px 12px, transparent 12px 28px);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+}
+
+.architectural-unrolled-sheet {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background-color: #efebe2;
+  background-image: 
+    linear-gradient(to right, rgba(29, 29, 31, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(29, 29, 31, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  overflow: hidden;
+  box-shadow: inset -10px 0 30px rgba(29, 29, 31, 0.15);
+  z-index: 50;
+  animation: unrollSheetExpand 2.4s cubic-bezier(0.25, 1, 0.35, 1) forwards;
+}
+
+.architectural-unroll-overlay {
+  animation: unrollOverlayFade 2.4s ease-out forwards;
 }

@@ -7,6 +7,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        stencil: ['"Saira Stencil One"', '"Instrument Serif"', 'sans-serif'],
         serif: ['"Instrument Serif"', 'Georgia', 'serif'],
         mono: ['"Geist Mono"', 'ui-monospace', 'monospace'],
         sans: ['"Geist"', '-apple-system', 'system-ui', 'sans-serif'],
@@ -26,8 +27,9 @@ export default {
         },
         terracotta: {
           DEFAULT: '#b8452a',
+          vivid: '#f0500f',
           hover: '#96351e',
-          glow: 'rgba(184, 69, 42, 0.25)',
+          glow: 'rgba(240, 80, 15, 0.25)',
         },
         brand: {
           50: '#f0f9ff',

@@ -12,15 +12,15 @@ export default function Navbar({ health, latency, activeTab, setActiveTab, onRet
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="font-serif text-2xl tracking-tight text-[#1d1d1f] font-normal leading-none">
-                ArchiGen <span className="italic text-[#b8452a]">3D</span>
+              <h1 className="font-stencil text-xl tracking-wider uppercase text-[#1d1d1f] font-normal leading-none">
+                ARCHIGEN <span className="text-[#f0500f]">3D</span>
               </h1>
               <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-[#1d1d1f]/30 bg-[#efebe2] text-[#1d1d1f]/80">
-                Studio
+                STUDIO
               </span>
             </div>
-            <p className="font-mono text-[10px] text-[#1d1d1f]/60 tracking-wider uppercase mt-0.5">
-              Neural BIM & 3D Reconstruction
+            <p className="font-mono text-[9px] text-[#1d1d1f]/60 tracking-wider uppercase mt-0.5">
+              NEURAL BIM & 3D RECONSTRUCTION
             </p>
           </div>
         </div>
@@ -29,46 +29,46 @@ export default function Navbar({ health, latency, activeTab, setActiveTab, onRet
         {onReturnToShowcase && (
           <button
             onClick={onReturnToShowcase}
-            className="hidden md:inline-flex items-center space-x-1.5 h-8 px-3.5 rounded-full border border-[#1d1d1f]/40 bg-white/40 hover:bg-[#1d1d1f] hover:text-[#efebe2] text-[#1d1d1f] transition-all font-mono text-[10px] uppercase tracking-widest ml-2"
+            className="hidden md:inline-flex items-center space-x-1.5 h-8 px-3.5 rounded-full border border-[#1d1d1f]/40 bg-white/40 hover:bg-[#1d1d1f] hover:text-[#efebe2] text-[#1d1d1f] transition-all font-stencil text-[11px] uppercase tracking-wider ml-2"
             title="Return to the Casa Serra 3D Scroll Walkthrough"
           >
             <ArrowLeft className="w-3 h-3" />
-            <span>Showcase Tour</span>
+            <span>SHOWCASE TOUR</span>
           </button>
         )}
       </div>
 
       {/* Center: View Switcher (Architectural Pills) */}
-      <div className="hidden md:flex items-center p-1 rounded-full border border-[#1d1d1f]/20 bg-white/50 backdrop-blur-sm text-xs font-mono">
+      <div className="hidden md:flex items-center p-1 rounded-full border border-[#1d1d1f]/20 bg-white/50 backdrop-blur-sm text-xs">
         <button
           onClick={() => setActiveTab('split')}
-          className={`h-7 px-3.5 rounded-full uppercase tracking-wider text-[10.5px] transition-all ${
+          className={`h-7 px-3.5 rounded-full uppercase tracking-wider font-stencil text-[11px] transition-all ${
             activeTab === 'split'
-              ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+              ? 'bg-[#1d1d1f] text-[#efebe2] font-normal shadow-sm'
               : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
           }`}
         >
-          Split Desk (2D + 3D)
+          SPLIT (2D + 3D)
         </button>
         <button
           onClick={() => setActiveTab('2d')}
-          className={`h-7 px-3.5 rounded-full uppercase tracking-wider text-[10.5px] transition-all ${
+          className={`h-7 px-3.5 rounded-full uppercase tracking-wider font-stencil text-[11px] transition-all ${
             activeTab === '2d'
-              ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+              ? 'bg-[#1d1d1f] text-[#efebe2] font-normal shadow-sm'
               : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
           }`}
         >
-          2D Blueprint Plan
+          2D BLUEPRINT
         </button>
         <button
           onClick={() => setActiveTab('3d')}
-          className={`h-7 px-3.5 rounded-full uppercase tracking-wider text-[10.5px] transition-all ${
+          className={`h-7 px-3.5 rounded-full uppercase tracking-wider font-stencil text-[11px] transition-all ${
             activeTab === '3d'
-              ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+              ? 'bg-[#1d1d1f] text-[#efebe2] font-normal shadow-sm'
               : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
           }`}
         >
-          3D Perspective Model
+          3D PERSPECTIVE
         </button>
       </div>
 

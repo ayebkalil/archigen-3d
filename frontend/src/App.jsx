@@ -11,6 +11,7 @@ export default function App() {
     return window.location.hash === '#studio' ? 'studio' : 'showcase';
   });
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [transitionTarget, setTransitionTarget] = useState('studio');
   const [activeTab, setActiveTab] = useState('split');
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('/sample_floorplan.png');
@@ -60,13 +61,16 @@ export default function App() {
 
   const triggerTransition = (targetView) => {
     setIsTransitioning(true);
+    setTransitionTarget(targetView);
+    // Smoothly flip underlying view halfway through when paper has fully covered viewport
     setTimeout(() => {
       setCurrentView(targetView);
       window.location.hash = targetView === 'studio' ? '#studio' : '#showcase';
-    }, 450);
+    }, 1250);
+    // Complete full unroll across screen
     setTimeout(() => {
       setIsTransitioning(false);
-    }, 1100);
+    }, 2400);
   };
 
   const loadDefaultSample = async () => {
@@ -195,17 +199,44 @@ export default function App() {
   const renderTransitionOverlay = () => {
     if (!isTransitioning) return null;
     return (
-      <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden select-none">
-        {/* Physical Architectural Parchment Roll Cylinder Sweep */}
-        <div
-          className="absolute top-0 bottom-0 w-[120px] parchment-unroll"
-          style={{
-            background: 'linear-gradient(90deg, #8a816e 0%, #b8af9d 6%, #e8e2d4 20%, #fefcf7 36%, #ede7da 52%, #cfc6b5 74%, #9e9583 90%, #756d5c 100%)',
-            boxShadow: '48px 0 70px rgba(18, 15, 11, 0.55), 16px 0 24px rgba(18, 15, 11, 0.45), 4px 0 6px rgba(18, 15, 11, 0.4), -8px 0 14px rgba(18, 15, 11, 0.2)',
-          }}
-        >
-          {/* Subtle blueprint paper print preview on the roll edge */}
-          <div className="absolute inset-0 opacity-40 mix-blend-multiply bg-[repeating-linear-gradient(45deg,#1d1d1f_0,#1d1d1f_1px,transparent_0,transparent_8px)]" />
+      <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden select-none architectural-unroll-overlay">
+        {/* Full-Screen Architectural Parchment Sheet Unfurling */}
+        <div className="architectural-unrolled-sheet">
+          {/* Centered Blueprint Stencil Manifesto from User Design */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-6">
+            <div className="border border-[#1d1d1f]/25 p-8 sm:p-12 md:p-16 bg-[#efebe2]/95 backdrop-blur-md max-w-3xl w-full shadow-2xl relative overflow-hidden">
+              {/* Drafting Corner Registration Marks */}
+              <div className="absolute top-3 left-4 font-mono text-[9px] text-[#1d1d1f]/40 uppercase tracking-widest">+ PT-00</div>
+              <div className="absolute top-3 right-4 font-mono text-[9px] text-[#1d1d1f]/40 uppercase tracking-widest">+ SEC-01</div>
+              <div className="absolute bottom-3 left-4 font-mono text-[9px] text-[#1d1d1f]/40 uppercase tracking-widest">+ ARCHIGEN</div>
+              <div className="absolute bottom-3 right-4 font-mono text-[9px] text-[#1d1d1f]/40 uppercase tracking-widest">+ 2026</div>
+
+              <p className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.24em] text-[#1d1d1f]/60 mb-4 text-center">
+                ARCHIGEN 3D • DEEP LEARNING ARCHITECTURAL STUDIO
+              </p>
+              
+              <h2 className="font-stencil text-2xl sm:text-3xl md:text-5xl text-[#1d1d1f] tracking-wide uppercase text-center leading-[1.08]">
+                EVERY BUILDING STARTS FLAT.
+              </h2>
+              <h2 className="font-stencil text-2xl sm:text-3xl md:text-5xl text-[#1d1d1f] tracking-wide uppercase text-center leading-[1.08] mt-2">
+                OURS DON'T <span className="text-[#f0500f]">STAY</span> THAT WAY.
+              </h2>
+              
+              <div className="mt-8 flex items-center justify-center gap-4">
+                <span className="w-16 h-[1px] bg-[#1d1d1f]/25"></span>
+                <span className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-[#1d1d1f]/80 font-semibold">
+                  {transitionTarget === 'studio' ? 'UNROLLING AI GENERATOR STUDIO...' : 'UNROLLING SHOWCASE TOUR...'}
+                </span>
+                <span className="w-16 h-[1px] bg-[#1d1d1f]/25"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Physical 3D Roll Cylinder Leading Edge */}
+        <div className="architectural-roll-cylinder">
+          <div className="roll-paper-layers" />
+          <div className="absolute inset-0 opacity-40 mix-blend-multiply bg-[repeating-linear-gradient(45deg,#1d1d1f_0,#1d1d1f_1px,transparent_0,transparent_10px)]" />
         </div>
       </div>
     );
@@ -216,7 +247,7 @@ export default function App() {
       <div className="relative w-screen h-screen overflow-hidden bg-[#efebe2]">
         {renderTransitionOverlay()}
         <iframe
-          src="/showcase/index.html"
+          src="/showcase/index.html?type=stencil"
           title="ArchiGen 3D Showcase Tour"
           className="w-full h-full border-none"
         />
