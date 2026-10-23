@@ -22,8 +22,8 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
     const height = containerRef.current.clientHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x090d16);
-    scene.fog = new THREE.FogExp2(0x090d16, 0.02);
+    scene.background = new THREE.Color(0xefebe2);
+    scene.fog = new THREE.FogExp2(0xefebe2, 0.018);
     sceneRef.current = scene;
 
     // 2. Camera Setup
@@ -38,7 +38,7 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.15;
 
     containerRef.current.innerHTML = '';
     containerRef.current.appendChild(renderer.domElement);
@@ -48,23 +48,23 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 + 0.05; // Prevent dipping below ground
+    controls.maxPolarAngle = Math.PI / 2 + 0.02; // Prevent dipping below ground
     controlsRef.current = controls;
 
-    // 5. Lighting
-    const ambientLight = new THREE.HemisphereLight(0xffffff, 0x1e293b, 0.7);
+    // 5. Lighting (Warm Natural Architectural Studio Light)
+    const ambientLight = new THREE.HemisphereLight(0xfffdf7, 0xd4cebf, 0.95);
     scene.add(ambientLight);
 
-    const sunLight = new THREE.DirectionalLight(0xfff7ed, 1.2);
-    sunLight.position.set(20, 35, 15);
+    const sunLight = new THREE.DirectionalLight(0xfff8eb, 1.35);
+    sunLight.position.set(22, 38, 18);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 2048;
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.bias = -0.0001;
     scene.add(sunLight);
 
-    // 6. Ground Grid
-    const grid = new THREE.GridHelper(50, 50, 0x38bdf8, 0x1e293b);
+    // 6. Architectural Ground Grid
+    const grid = new THREE.GridHelper(50, 50, 0xb8452a, 0xd8d2c4);
     grid.position.y = -0.01;
     scene.add(grid);
 
@@ -258,43 +258,43 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-950 relative overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden select-none">
       {/* 3D Viewport Toolbar */}
-      <div className="h-12 border-b border-slate-800 bg-slate-900/60 px-4 flex items-center justify-between z-10">
-        <div className="flex items-center space-x-2 text-xs text-slate-300">
-          <Box className="w-3.5 h-3.5 text-sky-400" />
-          <span className="font-semibold text-slate-100">3D Extruded Scene</span>
-          <span className="text-slate-500">|</span>
-          <span className="text-slate-400">
-            {facadeTextureUrl ? 'Generated Facade Texture Active' : 'Procedural Material'}
+      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]">
+        <div className="flex items-center space-x-2">
+          <Box className="w-3.5 h-3.5 text-[#b8452a]" />
+          <span className="font-semibold text-[#1d1d1f]">3D Model</span>
+          <span className="text-[#1d1d1f]/30">|</span>
+          <span className="text-[#1d1d1f]/60 font-mono text-[10px]">
+            {facadeTextureUrl ? 'cGAN Neural Facade' : 'BIM Geometry'}
           </span>
         </div>
 
         {/* View Controls */}
-        <div className="flex items-center space-x-2 text-xs">
+        <div className="flex items-center space-x-1.5 font-mono text-[9.5px]">
           <button
             onClick={() => setWireframe(!wireframe)}
-            className={`px-2.5 py-1 rounded border transition-colors ${
+            className={`px-3 py-1 rounded-full border transition-all ${
               wireframe
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
+                : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
             }`}
           >
             Wireframe
           </button>
           <button
             onClick={() => setShowFloors(!showFloors)}
-            className={`px-2.5 py-1 rounded border transition-colors ${
+            className={`px-3 py-1 rounded-full border transition-all ${
               showFloors
-                ? 'bg-sky-500/10 border-sky-500/30 text-sky-300'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
+                : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
             }`}
           >
             Floors
           </button>
           <button
             onClick={viewPreset === 'top' ? setCameraPerspective : setCameraTopDown}
-            className="px-2.5 py-1 rounded border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 transition-colors"
+            className="px-3 py-1 rounded-full border border-[#1d1d1f]/25 bg-white/80 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all font-semibold"
           >
             {viewPreset === 'top' ? 'Perspective View' : 'Top-Down View'}
           </button>
@@ -305,12 +305,12 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
       <div ref={containerRef} className="flex-1 w-full h-full cursor-grab active:cursor-grabbing" />
 
       {/* Floating Instructions */}
-      <div className="absolute bottom-4 right-4 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-lg p-2.5 text-[11px] text-slate-400 shadow-xl pointer-events-none select-none">
+      <div className="absolute bottom-4 right-4 bg-[#f7f4ed]/90 backdrop-blur-md border border-[#1d1d1f]/20 rounded-full px-4 py-2 font-mono text-[9.5px] uppercase tracking-wider text-[#1d1d1f]/70 shadow-lg pointer-events-none select-none">
         <div className="flex items-center space-x-3">
-          <span>🖱️ Left-Click + Drag: Rotate</span>
-          <span>·</span>
-          <span>Right-Click + Drag: Pan</span>
-          <span>·</span>
+          <span>Left-Click: Rotate</span>
+          <span className="opacity-40">·</span>
+          <span>Right-Click: Pan</span>
+          <span className="opacity-40">·</span>
           <span>Scroll: Zoom</span>
         </div>
       </div>

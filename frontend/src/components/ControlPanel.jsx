@@ -1,15 +1,10 @@
 import React, { useRef } from 'react';
-import { Upload, Sparkles, Building, Sliders, Palette, Download, RefreshCw, Check, Ruler } from 'lucide-react';
-
-const SAMPLE_PLANS = [
-  { name: 'Standard Apartment', path: '/samples/plan_sample1.png', scale: 0.03 },
-  { name: 'Villa 3-Bed', path: '/samples/plan_sample2.png', scale: 0.028 },
-];
+import { Upload, Sparkles, Building2, Sliders, Palette, RefreshCw, Check, Ruler, FileText } from 'lucide-react';
 
 const STYLES = [
   { id: 'Modern Minimalist', label: 'Modern Minimalist', desc: 'White stucco, floor-to-ceiling glass' },
   { id: 'Mediterranean Stone', label: 'Mediterranean Stone', desc: 'Warm sandstone, rustic arches' },
-  { id: 'Traditional Brick', label: 'Traditional Brick', desc: 'Exposed clay brick, framed windows' },
+  { id: 'Traditional Brick', label: 'Traditional Brick', desc: 'Exposed clay brick, framed lintels' },
   { id: 'Lush Vegetation', label: 'Lush Vegetation', desc: 'Biophilic facade, vertical greening' },
 ];
 
@@ -41,13 +36,18 @@ export default function ControlPanel({
   };
 
   return (
-    <aside className="w-80 h-full border-r border-slate-800 bg-slate-900/40 p-5 flex flex-col space-y-6 overflow-y-auto select-none">
-      {/* 1. Upload Floorplan */}
+    <aside className="w-80 h-full border-r border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-sm p-5 flex flex-col space-y-6 overflow-y-auto select-none font-sans text-[#1d1d1f]">
+      {/* 1. Upload Blueprint */}
       <div>
-        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-          <Upload className="w-3.5 h-3.5 text-sky-400" />
-          <span>1. Floorplan Blueprint</span>
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="font-mono text-[10.5px] font-semibold text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
+            <Upload className="w-3.5 h-3.5 text-[#b8452a]" />
+            <span>1. Architectural Drawing</span>
+          </label>
+          <span className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded border border-[#1d1d1f]/20 text-[#1d1d1f]/60">
+            2D Raster
+          </span>
+        </div>
 
         <input
           type="file"
@@ -59,32 +59,32 @@ export default function ControlPanel({
 
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="mt-1 border-2 border-dashed border-slate-700 hover:border-sky-500/60 bg-slate-950/60 hover:bg-slate-950 rounded-xl p-4 text-center cursor-pointer transition-all group"
+          className="mt-1 border-2 border-dashed border-[#1d1d1f]/30 hover:border-[#b8452a] bg-[#efebe2]/60 hover:bg-[#efebe2] rounded-xl p-4 text-center cursor-pointer transition-all group shadow-sm"
         >
-          <div className="w-10 h-10 mx-auto rounded-full bg-slate-900 group-hover:bg-sky-500/10 flex items-center justify-center transition-colors">
-            <Upload className="w-5 h-5 text-slate-400 group-hover:text-sky-400 transition-colors" />
+          <div className="w-10 h-10 mx-auto rounded-full bg-white/80 border border-[#1d1d1f]/20 group-hover:border-[#b8452a] group-hover:bg-[#b8452a]/10 flex items-center justify-center transition-colors">
+            <Upload className="w-4 h-4 text-[#1d1d1f]/70 group-hover:text-[#b8452a] transition-colors" />
           </div>
-          <p className="mt-2 text-xs font-medium text-slate-200">
-            Click to upload PNG or JPG
+          <p className="mt-2 font-mono text-[11px] font-medium text-[#1d1d1f] uppercase tracking-wide">
+            Upload Plan (PNG or JPG)
           </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">
-            Architectural blueprint or sketch
+          <p className="font-mono text-[9.5px] text-[#1d1d1f]/60 mt-0.5">
+            Architectural sketch, scan, or CAD blueprint
           </p>
         </div>
       </div>
 
       {/* 2. Scale & Geometry Parameters */}
       <div className="space-y-4">
-        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
-          <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-          <span>2. Dimensions & Floors</span>
+        <label className="font-mono text-[10.5px] font-semibold text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
+          <Sliders className="w-3.5 h-3.5 text-[#b8452a]" />
+          <span>2. Dimensions & Calibration</span>
         </label>
 
-        {/* Scale Slider & 2-Point Calibration Tool */}
-        <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800/80">
+        {/* Scale Slider & 2-Point Calibration */}
+        <div className="bg-[#efebe2]/80 rounded-xl p-3.5 border border-[#1d1d1f]/15 shadow-sm">
           <div className="flex justify-between items-center text-xs mb-1.5">
-            <span className="text-slate-400">Scale Ratio:</span>
-            <span className="font-mono text-sky-400 font-semibold">{scale} m/px</span>
+            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]/70">Scale Ratio:</span>
+            <span className="font-mono text-[11px] text-[#b8452a] font-semibold">{scale} m/px</span>
           </div>
           <input
             type="range"
@@ -93,44 +93,44 @@ export default function ControlPanel({
             step="0.001"
             value={scale}
             onChange={(e) => setScale(parseFloat(e.target.value))}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
+            className="w-full h-1.5 bg-[#1d1d1f]/15 rounded-lg appearance-none cursor-pointer accent-[#b8452a]"
           />
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
-            <span className="text-[10px] text-slate-500">
-              Door ~0.90m
+          <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-[#1d1d1f]/10">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
+              Standard door ~0.90m
             </span>
             <button
               onClick={() => setIsCalibrating && setIsCalibrating(!isCalibrating)}
-              className={`text-[11px] px-2.5 py-1 rounded border font-medium flex items-center space-x-1 transition-colors ${
+              className={`font-mono text-[9.5px] uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all flex items-center space-x-1 ${
                 isCalibrating
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white'
+                  ? 'bg-[#b8452a] border-[#b8452a] text-white font-semibold'
+                  : 'bg-white/80 border-[#1d1d1f]/30 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2]'
               }`}
             >
-              <Ruler className="w-3 h-3 text-amber-400" />
-              <span>{isCalibrating ? 'Measuring...' : '2-Point Calibrate'}</span>
+              <Ruler className="w-3 h-3" />
+              <span>{isCalibrating ? 'Measuring...' : '2-Pt Calibrate'}</span>
             </button>
           </div>
         </div>
 
         {/* Floor Count */}
-        <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800/80">
+        <div className="bg-[#efebe2]/80 rounded-xl p-3.5 border border-[#1d1d1f]/15 shadow-sm">
           <div className="flex justify-between items-center text-xs mb-2">
-            <span className="text-slate-400">Building Floors:</span>
-            <span className="font-semibold text-indigo-400">{numFloors} Storey ({numFloors * 2.8}m)</span>
+            <span className="font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]/70">Building Storeys:</span>
+            <span className="font-mono text-[11px] font-semibold text-[#1d1d1f]">{numFloors} Floor{numFloors > 1 ? 's' : ''} ({(numFloors * 2.8).toFixed(1)}m)</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {[1, 2, 3].map((f) => (
               <button
                 key={f}
                 onClick={() => setNumFloors(f)}
-                className={`py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                className={`py-1.5 rounded-lg font-mono text-[10px] uppercase tracking-wider border transition-all ${
                   numFloors === f
-                    ? 'bg-indigo-600 border-indigo-500 text-white shadow-sm'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-[#1d1d1f] border-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+                    : 'bg-white/60 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:bg-white hover:text-[#1d1d1f]'
                 }`}
               >
-                {f} Floor{f > 1 ? 's' : ''}
+                {f} Storey{f > 1 ? 's' : ''}
               </button>
             ))}
           </div>
@@ -139,9 +139,9 @@ export default function ControlPanel({
 
       {/* 3. Facade Style Selector */}
       <div className="space-y-2.5">
-        <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center space-x-1.5">
-          <Palette className="w-3.5 h-3.5 text-amber-400" />
-          <span>3. Exterior Architectural Style</span>
+        <label className="font-mono text-[10.5px] font-semibold text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
+          <Palette className="w-3.5 h-3.5 text-[#b8452a]" />
+          <span>3. Facade Material & Style</span>
         </label>
 
         <div className="space-y-2">
@@ -151,36 +151,36 @@ export default function ControlPanel({
               onClick={() => setSelectedStyle(style.id)}
               className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
                 selectedStyle === style.id
-                  ? 'bg-amber-500/10 border-amber-500/40 text-amber-200'
-                  : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700'
+                  ? 'bg-white border-[#b8452a] shadow-sm'
+                  : 'bg-[#efebe2]/60 border-[#1d1d1f]/15 hover:border-[#1d1d1f]/40 hover:bg-[#efebe2]'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-200">{style.label}</span>
-                {selectedStyle === style.id && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                <span className="font-serif text-sm text-[#1d1d1f] font-normal">{style.label}</span>
+                {selectedStyle === style.id && <Check className="w-3.5 h-3.5 text-[#b8452a]" />}
               </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">{style.desc}</p>
+              <p className="font-mono text-[9px] text-[#1d1d1f]/60 mt-0.5">{style.desc}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* 4. Action Buttons */}
+      {/* 4. Action Buttons (Pill CTA) */}
       <div className="pt-2 space-y-2.5 mt-auto">
         <button
           onClick={onRunAnalysis}
           disabled={isAnalyzing}
-          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-sky-600/20 flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
+          className="w-full h-10 px-5 rounded-full bg-[#1d1d1f] hover:bg-black text-[#efebe2] font-mono text-[10.5px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 transition-all shadow-md disabled:opacity-50"
         >
           {isAnalyzing ? (
             <>
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Analyzing Architecture...</span>
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#b8452a]" />
+              <span>Analyzing Blueprint...</span>
             </>
           ) : (
             <>
-              <Building className="w-3.5 h-3.5" />
-              <span>Extract 3D Floorplan</span>
+              <Building2 className="w-3.5 h-3.5 text-[#b8452a]" />
+              <span>Extract 3D Floorplan →</span>
             </>
           )}
         </button>
@@ -188,17 +188,17 @@ export default function ControlPanel({
         <button
           onClick={onGenerateFacade}
           disabled={!hasLayout || isGeneratingFacade}
-          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-semibold shadow-lg shadow-amber-600/20 flex items-center justify-center space-x-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full h-10 px-5 rounded-full bg-[#b8452a] hover:bg-[#96351e] text-white font-mono text-[10.5px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#b8452a]/20 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isGeneratingFacade ? (
             <>
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>Synthesizing Facade...</span>
+              <span>Synthesizing cGAN Texture...</span>
             </>
           ) : (
             <>
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Generate Facade Texture</span>
+              <span>Generate Facade Texture →</span>
             </>
           )}
         </button>

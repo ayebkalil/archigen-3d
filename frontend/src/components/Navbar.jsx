@@ -1,100 +1,97 @@
 import React from 'react';
-import { Box, Layers, Activity, Cpu, Sparkles } from 'lucide-react';
+import { ArrowLeft, Box, Compass, Sparkles, Activity, Cpu } from 'lucide-react';
 
 export default function Navbar({ health, latency, activeTab, setActiveTab, onReturnToShowcase }) {
   return (
-    <header className="h-16 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md px-6 flex items-center justify-between z-30 select-none">
-      <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 via-indigo-600 to-cyan-400 p-[2px] shadow-lg shadow-sky-500/20">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Box className="w-5 h-5 text-sky-400" />
-            </div>
+    <header className="h-16 border-b border-[#1d1d1f]/15 bg-[#efebe2]/95 backdrop-blur-md px-6 flex items-center justify-between z-30 select-none">
+      {/* Left: Brand & Return Navigation */}
+      <div className="flex items-center space-x-5">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-full border border-[#1d1d1f] bg-[#efebe2] flex items-center justify-center shadow-sm">
+            <Compass className="w-5 h-5 text-[#b8452a]" />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                ArchiGen 3D
+              <h1 className="font-serif text-2xl tracking-tight text-[#1d1d1f] font-normal leading-none">
+                ArchiGen <span className="italic text-[#b8452a]">3D</span>
               </h1>
-              <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                AI HomeByMe
+              <span className="font-mono text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-[#1d1d1f]/30 bg-[#efebe2] text-[#1d1d1f]/80">
+                Studio
               </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Deep Learning Floorplan-to-3D & Facade Synthesis
+            <p className="font-mono text-[10px] text-[#1d1d1f]/60 tracking-wider uppercase mt-0.5">
+              Neural BIM & 3D Reconstruction
             </p>
           </div>
         </div>
 
-        {/* Return to Showcase Button */}
+        {/* Return to Showcase Pill Button */}
         {onReturnToShowcase && (
           <button
             onClick={onReturnToShowcase}
-            className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#b8452a]/20 border border-[#b8452a]/40 text-[#f59e0b] hover:bg-[#b8452a]/30 hover:border-[#b8452a]/60 transition-all font-medium text-xs ml-3 shadow-sm"
+            className="hidden md:inline-flex items-center space-x-1.5 h-8 px-3.5 rounded-full border border-[#1d1d1f]/40 bg-white/40 hover:bg-[#1d1d1f] hover:text-[#efebe2] text-[#1d1d1f] transition-all font-mono text-[10px] uppercase tracking-widest ml-2"
             title="Return to the Casa Serra 3D Scroll Walkthrough"
           >
-            <span>← 3D Showcase Tour</span>
+            <ArrowLeft className="w-3 h-3" />
+            <span>Showcase Tour</span>
           </button>
         )}
-
-        {/* View Switcher */}
-        <div className="ml-4 hidden md:flex items-center p-1 rounded-lg bg-slate-950 border border-slate-800 text-xs font-medium">
-          <button
-            onClick={() => setActiveTab('split')}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              activeTab === 'split'
-                ? 'bg-sky-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Split View (2D + 3D)
-          </button>
-          <button
-            onClick={() => setActiveTab('2d')}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              activeTab === '2d'
-                ? 'bg-sky-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            2D Floorplan Analysis
-          </button>
-          <button
-            onClick={() => setActiveTab('3d')}
-            className={`px-3 py-1.5 rounded-md transition-all ${
-              activeTab === '3d'
-                ? 'bg-sky-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            3D Textured Interactive Scene
-          </button>
-        </div>
       </div>
 
-      {/* Status Badges */}
-      <div className="flex items-center space-x-3 text-xs">
-        <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
-          <Activity className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Backend:</span>
-          <span className="font-semibold text-emerald-400">
-            {health?.status === 'healthy' ? 'Online' : 'Checking...'}
+      {/* Center: View Switcher (Architectural Pills) */}
+      <div className="hidden md:flex items-center p-1 rounded-full border border-[#1d1d1f]/20 bg-white/50 backdrop-blur-sm text-xs font-mono">
+        <button
+          onClick={() => setActiveTab('split')}
+          className={`h-7 px-3.5 rounded-full uppercase tracking-wider text-[10.5px] transition-all ${
+            activeTab === 'split'
+              ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+              : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
+          }`}
+        >
+          Split Desk (2D + 3D)
+        </button>
+        <button
+          onClick={() => setActiveTab('2d')}
+          className={`h-7 px-3.5 rounded-full uppercase tracking-wider text-[10.5px] transition-all ${
+            activeTab === '2d'
+              ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+              : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
+          }`}
+        >
+          2D Blueprint Plan
+        </button>
+        <button
+          onClick={() => setActiveTab('3d')}
+          className={`h-7 px-3.5 rounded-full uppercase tracking-wider text-[10.5px] transition-all ${
+            activeTab === '3d'
+              ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+              : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
+          }`}
+        >
+          3D Perspective Model
+        </button>
+      </div>
+
+      {/* Right: Technical Telemetry (Titleblock Badges) */}
+      <div className="flex items-center space-x-2 font-mono text-[10.5px] tracking-wider uppercase">
+        <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-[#1d1d1f]/20 bg-white/50 text-[#1d1d1f]/80">
+          <Activity className="w-3 h-3 text-emerald-600" />
+          <span className="opacity-60 text-[9px]">Pipeline</span>
+          <span className="font-semibold text-emerald-700">
+            {health?.status === 'healthy' ? 'Active' : 'Checking'}
           </span>
         </div>
 
-        <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
-          <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-          <span>GPU:</span>
-          <span className="font-semibold text-indigo-400">
-            RTX 3050 (CUDA)
-          </span>
+        <div className="hidden lg:flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-[#1d1d1f]/20 bg-white/50 text-[#1d1d1f]/80">
+          <Cpu className="w-3 h-3 text-[#b8452a]" />
+          <span className="opacity-60 text-[9px]">Device</span>
+          <span className="font-semibold text-[#1d1d1f]">CUDA RTX 3050</span>
         </div>
 
         {latency !== null && (
-          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Inference:</span>
-            <span className="font-semibold text-amber-400">{latency} ms</span>
+          <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full border border-[#b8452a]/40 bg-[#b8452a]/10 text-[#b8452a]">
+            <Sparkles className="w-3 h-3" />
+            <span className="font-semibold">{latency} ms</span>
           </div>
         )}
       </div>

@@ -10,6 +10,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState(() => {
     return window.location.hash === '#studio' ? 'studio' : 'showcase';
   });
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [activeTab, setActiveTab] = useState('split');
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('/sample_floorplan.png');
@@ -39,16 +40,14 @@ export default function App() {
 
     // Listen for cross-frame messages from the Casa Serra Hero Showcase
     const handleHash = () => {
-      if (window.location.hash === '#studio') {
-        setCurrentView('studio');
-      } else if (window.location.hash === '#showcase' || !window.location.hash) {
-        setCurrentView('showcase');
+      const nextView = window.location.hash === '#studio' ? 'studio' : 'showcase';
+      if (nextView !== currentView) {
+        triggerTransition(nextView);
       }
     };
     const handleMsg = (e) => {
       if (e.data && e.data.type === 'LAUNCH_STUDIO') {
-        window.location.hash = '#studio';
-        setCurrentView('studio');
+        triggerTransition('studio');
       }
     };
     window.addEventListener('hashchange', handleHash);
@@ -57,7 +56,18 @@ export default function App() {
       window.removeEventListener('hashchange', handleHash);
       window.removeEventListener('message', handleMsg);
     };
-  }, []);
+  }, [currentView]);
+
+  const triggerTransition = (targetView) => {
+    setIsTransitioning(true);
+    setTimeout(() => {
+      setCurrentView(targetView);
+      window.location.hash = targetView === 'studio' ? '#studio' : '#showcase';
+    }, 450);
+    setTimeout(() => {
+      setIsTransitioning(false);
+    }, 1100);
+  };
 
   const loadDefaultSample = async () => {
     try {
@@ -182,9 +192,29 @@ export default function App() {
     }
   };
 
+  const renderTransitionOverlay = () => {
+    if (!isTransitioning) return null;
+    return (
+      <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden select-none">
+        {/* Physical Architectural Parchment Roll Cylinder Sweep */}
+        <div
+          className="absolute top-0 bottom-0 w-[120px] parchment-unroll"
+          style={{
+            background: 'linear-gradient(90deg, #8a816e 0%, #b8af9d 6%, #e8e2d4 20%, #fefcf7 36%, #ede7da 52%, #cfc6b5 74%, #9e9583 90%, #756d5c 100%)',
+            boxShadow: '48px 0 70px rgba(18, 15, 11, 0.55), 16px 0 24px rgba(18, 15, 11, 0.45), 4px 0 6px rgba(18, 15, 11, 0.4), -8px 0 14px rgba(18, 15, 11, 0.2)',
+          }}
+        >
+          {/* Subtle blueprint paper print preview on the roll edge */}
+          <div className="absolute inset-0 opacity-40 mix-blend-multiply bg-[repeating-linear-gradient(45deg,#1d1d1f_0,#1d1d1f_1px,transparent_0,transparent_8px)]" />
+        </div>
+      </div>
+    );
+  };
+
   if (currentView === 'showcase') {
     return (
       <div className="relative w-screen h-screen overflow-hidden bg-[#efebe2]">
+        {renderTransitionOverlay()}
         <iframe
           src="/showcase/index.html"
           title="ArchiGen 3D Showcase Tour"
@@ -195,17 +225,16 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#efebe2] text-[#1d1d1f] font-sans selection:bg-[#b8452a]/20 selection:text-[#b8452a]">
+      {renderTransitionOverlay()}
+
       {/* 1. Header */}
       <Navbar
         health={health}
         latency={latency}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onReturnToShowcase={() => {
-          window.location.hash = '#showcase';
-          setCurrentView('showcase');
-        }}
+        onReturnToShowcase={() => triggerTransition('showcase')}
       />
 
       {/* 2. Main Work Area */}
@@ -231,12 +260,12 @@ export default function App() {
         />
 
         {/* Center Viewport Area */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950">
+        <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#efebe2] drafting-grid">
           {errorMsg && (
-            <div className="bg-rose-500/10 border-b border-rose-500/20 px-6 py-2 text-xs text-rose-300 flex justify-between items-center">
-              <span>{errorMsg}</span>
-              <button onClick={() => setErrorMsg(null)} className="underline">
-                Dismiss
+            <div className="bg-[#b8452a]/10 border-b border-[#b8452a]/30 px-6 py-2.5 font-mono text-xs text-[#b8452a] flex justify-between items-center z-20">
+              <span className="font-medium tracking-wide">Notice: {errorMsg}</span>
+              <button onClick={() => setErrorMsg(null)} className="underline uppercase tracking-wider text-[10px] ml-4 font-semibold hover:text-[#96351e]">
+                Dismiss ×
               </button>
             </div>
           )}

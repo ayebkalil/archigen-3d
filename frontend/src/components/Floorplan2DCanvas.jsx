@@ -16,17 +16,17 @@ import {
 } from 'lucide-react';
 
 const ROOM_COLORS = {
-  'Living Room': { fill: 'rgba(56, 189, 248, 0.25)', stroke: '#38bdf8' },
-  'Living Room / Common': { fill: 'rgba(56, 189, 248, 0.25)', stroke: '#38bdf8' },
-  'Bedroom': { fill: 'rgba(168, 85, 247, 0.25)', stroke: '#a855f7' },
-  'Kitchen': { fill: 'rgba(251, 146, 60, 0.25)', stroke: '#fb923c' },
-  'Bathroom': { fill: 'rgba(45, 212, 191, 0.25)', stroke: '#2dd4bf' },
-  'Bathroom / Storage': { fill: 'rgba(45, 212, 191, 0.25)', stroke: '#2dd4bf' },
-  'Entry': { fill: 'rgba(234, 179, 8, 0.25)', stroke: '#eab308' },
-  'Outdoor / Balcony': { fill: 'rgba(74, 222, 128, 0.25)', stroke: '#4ade80' },
-  'Storage / Closet': { fill: 'rgba(148, 163, 184, 0.25)', stroke: '#94a3b8' },
-  'Office': { fill: 'rgba(244, 114, 182, 0.25)', stroke: '#f472b6' },
-  'Default': { fill: 'rgba(99, 102, 241, 0.2)', stroke: '#6366f1' },
+  'Living Room': { fill: 'rgba(28, 78, 128, 0.20)', stroke: '#1c4e80' },
+  'Living Room / Common': { fill: 'rgba(28, 78, 128, 0.20)', stroke: '#1c4e80' },
+  'Bedroom': { fill: 'rgba(184, 69, 42, 0.18)', stroke: '#b8452a' },
+  'Kitchen': { fill: 'rgba(196, 141, 63, 0.20)', stroke: '#c48d3f' },
+  'Bathroom': { fill: 'rgba(42, 122, 110, 0.20)', stroke: '#2a7a6e' },
+  'Bathroom / Storage': { fill: 'rgba(42, 122, 110, 0.20)', stroke: '#2a7a6e' },
+  'Entry': { fill: 'rgba(110, 90, 70, 0.18)', stroke: '#6e5a46' },
+  'Outdoor / Balcony': { fill: 'rgba(60, 110, 60, 0.18)', stroke: '#3c6e3c' },
+  'Storage / Closet': { fill: 'rgba(90, 90, 100, 0.18)', stroke: '#5a5a64' },
+  'Office': { fill: 'rgba(140, 75, 120, 0.18)', stroke: '#8c4b78' },
+  'Default': { fill: 'rgba(60, 70, 90, 0.18)', stroke: '#3c465a' },
 };
 
 const ARCHITECTURAL_ROOM_TYPES = [
@@ -226,27 +226,27 @@ export default function Floorplan2DCanvas({
   else if (activeTool === 'relabel') canvasCursor = 'cursor-pointer';
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-950 relative overflow-hidden border-r border-slate-800">
-      {/* Top Toolbar */}
-      <div className="h-12 border-b border-slate-800 bg-slate-900/60 px-4 flex items-center justify-between z-10">
+    <div className="flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden border-r border-[#1d1d1f]/15 drafting-grid">
+      {/* Top Drafting Toolbar */}
+      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 select-none">
         {/* Left: Title & Elements count */}
-        <div className="flex items-center space-x-2 text-xs text-slate-300">
-          <span className="font-semibold text-slate-100">2D Plan</span>
-          <span className="text-slate-500">|</span>
-          <span className="text-slate-400">
+        <div className="flex items-center space-x-2 font-mono text-[10.5px] uppercase tracking-wider text-[#1d1d1f]">
+          <span className="font-semibold text-[#1d1d1f]">2D Plan</span>
+          <span className="text-[#1d1d1f]/30">|</span>
+          <span className="text-[#1d1d1f]/60">
             {walls.length}w · {rooms.length}r · {doors.length}d · {windows.length}win
           </span>
         </div>
 
         {/* Center: CAD Interactive Edit Tools */}
-        <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 space-x-0.5">
+        <div className="flex items-center bg-white/70 border border-[#1d1d1f]/20 rounded-full p-0.5 space-x-0.5 font-mono text-[10px] uppercase tracking-wider">
           <button
             onClick={() => { setActiveTool('select'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Inspect / Select Front Wall"
-            className={`px-2.5 py-1 rounded text-xs flex items-center space-x-1.5 transition-colors ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
               activeTool === 'select' && !isCalibrating
-                ? 'bg-sky-500 text-slate-950 font-semibold shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold shadow-sm'
+                : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <MousePointer className="w-3.5 h-3.5" />
@@ -256,10 +256,10 @@ export default function Floorplan2DCanvas({
           <button
             onClick={() => { setActiveTool('add_door'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click on canvas or wall to insert a door"
-            className={`px-2.5 py-1 rounded text-xs flex items-center space-x-1.5 transition-colors ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
               activeTool === 'add_door'
-                ? 'bg-emerald-500 text-slate-950 font-semibold shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#b8452a] text-white font-semibold shadow-sm'
+                : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <PlusCircle className="w-3.5 h-3.5" />
@@ -269,10 +269,10 @@ export default function Floorplan2DCanvas({
           <button
             onClick={() => { setActiveTool('delete'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click doors, windows, or internal walls to delete them"
-            className={`px-2.5 py-1 rounded text-xs flex items-center space-x-1.5 transition-colors ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
               activeTool === 'delete'
-                ? 'bg-rose-500 text-white font-semibold shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-rose-700 text-white font-semibold shadow-sm'
+                : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -282,10 +282,10 @@ export default function Floorplan2DCanvas({
           <button
             onClick={() => { setActiveTool('relabel'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click any room polygon or badge to change space type"
-            className={`px-2.5 py-1 rounded text-xs flex items-center space-x-1.5 transition-colors ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
               activeTool === 'relabel'
-                ? 'bg-purple-500 text-white font-semibold shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#c48d3f] text-white font-semibold shadow-sm'
+                : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <Tag className="w-3.5 h-3.5" />
@@ -300,10 +300,10 @@ export default function Floorplan2DCanvas({
               setCalibPointB(null);
             }}
             title="2-Point Real-world Scale Calibration"
-            className={`px-2.5 py-1 rounded text-xs flex items-center space-x-1.5 transition-colors ${
+            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all ${
               isCalibrating
-                ? 'bg-amber-500 text-slate-950 font-semibold animate-pulse'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-[#b8452a] text-white font-semibold animate-pulse'
+                : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
             <Ruler className="w-3.5 h-3.5" />
@@ -312,33 +312,33 @@ export default function Floorplan2DCanvas({
         </div>
 
         {/* Right: Visibility Toggles */}
-        <div className="flex items-center space-x-1 text-xs">
+        <div className="flex items-center space-x-1 font-mono text-[9.5px] uppercase tracking-wider">
           <button
             onClick={() => setShowRooms(!showRooms)}
-            className={`px-2 py-1 rounded border text-[11px] transition-colors ${
+            className={`px-2.5 py-0.5 rounded-full border transition-all ${
               showRooms
-                ? 'bg-sky-500/10 border-sky-500/30 text-sky-300'
-                : 'bg-slate-900 border-slate-800 text-slate-500'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
+                : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
             }`}
           >
             Rooms
           </button>
           <button
             onClick={() => setShowWalls(!showWalls)}
-            className={`px-2 py-1 rounded border text-[11px] transition-colors ${
+            className={`px-2.5 py-0.5 rounded-full border transition-all ${
               showWalls
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                : 'bg-slate-900 border-slate-800 text-slate-500'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
+                : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
             }`}
           >
             Walls
           </button>
           <button
             onClick={() => setShowOpenings(!showOpenings)}
-            className={`px-2 py-1 rounded border text-[11px] transition-colors ${
+            className={`px-2.5 py-0.5 rounded-full border transition-all ${
               showOpenings
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-slate-900 border-slate-800 text-slate-500'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
+                : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
             }`}
           >
             Doors
@@ -350,16 +350,16 @@ export default function Floorplan2DCanvas({
       <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
         {/* Real-time Feedback Banner */}
         {editFeedback && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-emerald-500/90 text-slate-950 font-semibold text-xs rounded-full shadow-2xl z-30 flex items-center space-x-1.5 animate-bounce">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-[#1d1d1f] text-[#efebe2] font-mono text-[10.5px] uppercase tracking-wider rounded-full shadow-xl z-30 flex items-center space-x-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
             <span>{editFeedback}</span>
           </div>
         )}
 
         <div
           onClick={handleCanvasClick}
-          className={`relative rounded-xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-900 ${canvasCursor} ${
-            isCalibrating ? 'ring-2 ring-amber-500/50' : activeTool !== 'select' ? 'ring-1 ring-sky-500/30' : ''
+          className={`relative rounded-xl overflow-hidden shadow-xl border border-[#1d1d1f]/25 bg-white ${canvasCursor} ${
+            isCalibrating ? 'ring-2 ring-[#b8452a]' : activeTool !== 'select' ? 'ring-1 ring-[#1d1d1f]/40' : ''
           }`}
           style={{ width: `${canvasSize[0]}px`, height: `${canvasSize[1]}px` }}
         >
@@ -416,17 +416,18 @@ export default function Floorplan2DCanvas({
                           width="100"
                           height="28"
                           rx="4"
-                          fill="rgba(15, 23, 42, 0.85)"
-                          stroke={activeTool === 'relabel' ? '#c084fc' : style.stroke}
-                          strokeWidth="1"
+                          fill="rgba(247, 244, 237, 0.95)"
+                          stroke={activeTool === 'relabel' ? '#b8452a' : style.stroke}
+                          strokeWidth="1.2"
                         />
                         <text
                           x="0"
                           y="-2"
                           textAnchor="middle"
-                          fill="#f8fafc"
+                          fill="#1d1d1f"
                           fontSize="9"
                           fontWeight="600"
+                          fontFamily="'Geist', sans-serif"
                         >
                           {room.room_type}
                         </text>
@@ -434,9 +435,10 @@ export default function Floorplan2DCanvas({
                           x="0"
                           y="9"
                           textAnchor="middle"
-                          fill="#38bdf8"
-                          fontSize="8"
+                          fill="#b8452a"
+                          fontSize="8.5"
                           fontWeight="bold"
+                          fontFamily="'Geist Mono', monospace"
                         >
                           {room.surface_m2} m²
                         </text>
@@ -455,16 +457,16 @@ export default function Floorplan2DCanvas({
                 const pts = wall.polygon_px || [];
                 const pointsStr = pts.map((p) => `${p[0]},${p[1]}`).join(' ');
 
-                let strokeColor = '#64748b'; // Interior default
-                let fillColor = 'rgba(100, 116, 139, 0.3)';
+                let strokeColor = '#1d1d1f'; // Interior drafting ink
+                let fillColor = 'rgba(29, 29, 31, 0.20)';
 
                 if (isExterior) {
-                  strokeColor = '#38bdf8'; // Exterior cyan
-                  fillColor = 'rgba(56, 189, 248, 0.35)';
+                  strokeColor = '#b8452a'; // Exterior terracotta
+                  fillColor = 'rgba(184, 69, 42, 0.35)';
                 }
                 if (isSelected) {
-                  strokeColor = '#f59e0b'; // Front wall amber
-                  fillColor = 'rgba(245, 158, 11, 0.5)';
+                  strokeColor = '#c48d3f'; // Front wall architectural amber
+                  fillColor = 'rgba(196, 141, 63, 0.50)';
                 }
 
                 if (activeTool === 'delete') {
@@ -627,19 +629,20 @@ export default function Floorplan2DCanvas({
         )}
 
         {/* Floating Calibration Controls Card */}
+        {/* 2-Point Calibration Tool Box */}
         {isCalibrating && (
-          <div className="absolute top-4 right-6 bg-slate-900/95 backdrop-blur-md border border-amber-500/40 rounded-xl p-4 text-xs text-slate-200 shadow-2xl w-80 z-30">
-            <div className="flex items-center justify-between font-semibold text-slate-100 mb-2">
+          <div className="absolute top-4 right-6 bg-[#f7f4ed]/95 backdrop-blur-md border border-[#b8452a]/40 rounded-xl p-4 text-xs text-[#1d1d1f] shadow-xl w-80 z-30 font-sans">
+            <div className="flex items-center justify-between font-semibold text-[#1d1d1f] mb-2 font-mono uppercase tracking-wider text-[11px]">
               <div className="flex items-center space-x-1.5">
-                <Ruler className="w-4 h-4 text-amber-400" />
-                <span className="text-amber-300">2-Point Scale Calibration</span>
+                <Ruler className="w-4 h-4 text-[#b8452a]" />
+                <span className="text-[#b8452a]">2-Point Scale Calibration</span>
               </div>
-              <button onClick={handleCancelCalibration} className="text-slate-400 hover:text-white">
+              <button onClick={handleCancelCalibration} className="text-[#1d1d1f]/50 hover:text-[#1d1d1f]">
                 <X className="w-4 h-4" />
               </button>
             </div>
             
-            <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+            <p className="text-[11px] text-[#1d1d1f]/70 mb-3 leading-relaxed">
               {!calibPointA
                 ? "Click Point 1 on the canvas (e.g. one side of a doorway or exterior wall)."
                 : !calibPointB
@@ -648,9 +651,9 @@ export default function Floorplan2DCanvas({
             </p>
 
             {calibPointA && calibPointB && (
-              <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div className="space-y-3 pt-2 border-t border-[#1d1d1f]/15 font-mono">
                 <div>
-                  <label className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                  <label className="text-[9.5px] uppercase font-semibold text-[#1d1d1f]/70 block mb-1">
                     Known Distance in Real World (Meters)
                   </label>
                   <div className="flex items-center space-x-2">
@@ -661,49 +664,49 @@ export default function Floorplan2DCanvas({
                       max="30"
                       value={knownDistanceM}
                       onChange={(e) => setKnownDistanceM(e.target.value)}
-                      className="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-slate-100 font-mono text-sm w-28 focus:border-amber-400 focus:outline-none"
+                      className="bg-white border border-[#1d1d1f]/30 rounded px-2.5 py-1 text-[#1d1d1f] font-mono text-sm w-28 focus:border-[#b8452a] focus:outline-none"
                     />
-                    <span className="text-slate-400 text-xs">meters</span>
+                    <span className="text-[#1d1d1f]/60 text-xs">meters</span>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => setKnownDistanceM('0.90')}
-                    className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-white hover:bg-[#1d1d1f] hover:text-[#efebe2] text-[#1d1d1f] border border-[#1d1d1f]/20"
                   >
                     Door (0.9m)
                   </button>
                   <button
                     onClick={() => setKnownDistanceM('1.80')}
-                    className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-white hover:bg-[#1d1d1f] hover:text-[#efebe2] text-[#1d1d1f] border border-[#1d1d1f]/20"
                   >
                     Double Door (1.8m)
                   </button>
                   <button
                     onClick={() => setKnownDistanceM('3.50')}
-                    className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-white hover:bg-[#1d1d1f] hover:text-[#efebe2] text-[#1d1d1f] border border-[#1d1d1f]/20"
                   >
                     Wall (3.5m)
                   </button>
                 </div>
 
-                <div className="bg-slate-950 p-2.5 rounded border border-slate-800 flex justify-between items-center text-xs">
-                  <span className="text-slate-400">Calibrated Ratio:</span>
-                  <span className="font-mono font-bold text-amber-400">{calculatedScale} m/px</span>
+                <div className="bg-[#efebe2] p-2.5 rounded border border-[#1d1d1f]/15 flex justify-between items-center text-xs">
+                  <span className="text-[#1d1d1f]/70 uppercase text-[10px]">Calibrated Ratio:</span>
+                  <span className="font-mono font-bold text-[#b8452a]">{calculatedScale} m/px</span>
                 </div>
 
                 <div className="flex space-x-2 pt-1">
                   <button
                     onClick={handleApplyCalibration}
-                    className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold py-1.5 px-3 rounded text-xs flex items-center justify-center space-x-1.5 transition-colors"
+                    className="flex-1 bg-[#b8452a] hover:bg-[#96351e] text-white font-mono uppercase tracking-wider text-[10px] font-semibold py-1.5 px-3 rounded-full flex items-center justify-center space-x-1.5 transition-all shadow-sm"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Apply Calibration</span>
                   </button>
                   <button
                     onClick={() => { setCalibPointA(null); setCalibPointB(null); }}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded text-xs transition-colors"
+                    className="bg-white hover:bg-[#1d1d1f]/10 text-[#1d1d1f] border border-[#1d1d1f]/20 font-mono uppercase tracking-wider text-[10px] px-3 py-1.5 rounded-full transition-all"
                   >
                     Reset
                   </button>
@@ -714,14 +717,14 @@ export default function Floorplan2DCanvas({
         )}
 
         {/* Helper Box */}
-        <div className="absolute bottom-4 left-6 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg p-3 text-xs text-slate-300 shadow-xl max-w-sm pointer-events-none">
-          <div className="flex items-center space-x-1.5 font-semibold text-slate-100 mb-1">
-            <Info className="w-3.5 h-3.5 text-sky-400" />
-            <span>Interactive Floorplan Studio</span>
+        <div className="absolute bottom-4 left-6 bg-[#f7f4ed]/90 backdrop-blur-md border border-[#1d1d1f]/20 rounded-xl p-3.5 text-xs text-[#1d1d1f] shadow-lg max-w-sm pointer-events-none font-sans">
+          <div className="flex items-center space-x-1.5 font-mono uppercase tracking-wider text-[10px] font-semibold text-[#1d1d1f] mb-1">
+            <Info className="w-3.5 h-3.5 text-[#b8452a]" />
+            <span>Interactive Drafting Desk</span>
           </div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            {activeTool === 'select' && "Click any exterior cyan wall to designate it as the front wall for facade synthesis."}
-            {activeTool === 'add_door' && "Click anywhere on the plan to insert a door. The 3D scene re-extrudes instantly."}
+          <p className="font-mono text-[10px] text-[#1d1d1f]/70 leading-relaxed">
+            {activeTool === 'select' && "Click any exterior terracotta wall to designate it as the front wall for facade synthesis."}
+            {activeTool === 'add_door' && "Click anywhere on the plan to insert a door. The Three.js 3D model re-extrudes instantly."}
             {activeTool === 'delete' && "Click any door, window, or wall to delete it from the architectural model."}
             {activeTool === 'relabel' && "Click any room polygon or badge to change its space classification."}
           </p>
