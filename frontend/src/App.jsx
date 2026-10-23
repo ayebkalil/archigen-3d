@@ -253,6 +253,7 @@ export default function App() {
                   onCalibrateScale={handleCalibrateScale}
                   isCalibrating={isCalibrating}
                   setIsCalibrating={setIsCalibrating}
+                  onUpdateLayout={setLayout}
                 />
                 <Viewer3D
                   layout={layout}
@@ -273,6 +274,7 @@ export default function App() {
                 onCalibrateScale={handleCalibrateScale}
                 isCalibrating={isCalibrating}
                 setIsCalibrating={setIsCalibrating}
+                onUpdateLayout={setLayout}
               />
             )}
 

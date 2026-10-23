@@ -20,7 +20,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from backend.app.floorplan_engine import FloorplanPipeline
 
-def run_blind_evaluation():
+def run_blind_evaluation(model_weights_path: str = None, run_name: str = "frozen_v1_1"):
     manifest_path = PROJECT_ROOT / "data" / "real_external_plans" / "fresh_defense_eval" / "fresh_defense_manifest.json"
     if not manifest_path.exists():
         raise FileNotFoundError(f"Manifest not found: {manifest_path}")
@@ -28,13 +28,27 @@ def run_blind_evaluation():
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    out_dir = PROJECT_ROOT / "outputs" / "fresh_defense_results"
+    if run_name == "frozen_v1_1":
+        out_dir = PROJECT_ROOT / "outputs" / "fresh_defense_results"
+    else:
+        out_dir = PROJECT_ROOT / "outputs" / f"fresh_defense_results_{run_name}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     pipeline = FloorplanPipeline.get_instance()
+    if model_weights_path:
+        import torch
+        print(f"[BLIND EVAL] Loading custom challenger weights from {model_weights_path}...")
+        ckpt = torch.load(model_weights_path, map_location=pipeline.device, weights_only=False)
+        state_dict = ckpt["model_state_dict"] if isinstance(ckpt, dict) and "model_state_dict" in ckpt else ckpt
+        if hasattr(pipeline, "multitask_model") and pipeline.multitask_model is not None:
+            pipeline.multitask_model.load_state_dict(state_dict)
+            pipeline.multitask_model.eval()
+        else:
+            pipeline.model.load_state_dict(state_dict)
+            pipeline.model.eval()
 
     print("=" * 105)
-    print(f"[BLIND EVALUATION] Testing Frozen Model on {len(manifest)} Locked Plans (SHA256 Verified)")
+    print(f"[BLIND EVALUATION] Testing Model ({run_name}) on {len(manifest)} Locked Plans (SHA256 Verified)")
     print(f"Device: {pipeline.device}")
     print("=" * 105)
 
@@ -207,4 +221,10 @@ def run_blind_evaluation():
     print("=" * 105)
 
 if __name__ == "__main__":
-    run_blind_evaluation()
+    import argparse
+    parser = argparse.ArgumentParser(description="Evaluate floorplan model on 12 locked defense plans.")
+    parser.add_argument("--weights", type=str, default=None, help="Path to custom model weights")
+    parser.add_argument("--run-name", type=str, default="frozen_v1_1", help="Evaluation run name")
+    args = parser.parse_args()
+
+    run_blind_evaluation(model_weights_path=args.weights, run_name=args.run_name)

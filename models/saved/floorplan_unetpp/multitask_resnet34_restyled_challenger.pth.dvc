@@ -1,0 +1,5 @@
+outs:
+- md5: 0440a30cf4048d04973853f42c5ba6d8
+  size: 313159956
+  hash: md5
+  path: multitask_resnet34_restyled_challenger.pth
