@@ -66,11 +66,11 @@ export default function App() {
     setTimeout(() => {
       setCurrentView(targetView);
       window.location.hash = targetView === 'studio' ? '#studio' : '#showcase';
-    }, 1250);
-    // Complete full unroll across screen
+    }, 2200);
+    // Complete deliberate, majestic unroll across full screen
     setTimeout(() => {
       setIsTransitioning(false);
-    }, 2400);
+    }, 3800);
   };
 
   const loadDefaultSample = async () => {

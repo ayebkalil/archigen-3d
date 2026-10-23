@@ -71,11 +71,11 @@ body {
   0% {
     left: -140px;
   }
-  54% {
-    left: calc(100vw - 30px);
+  58% {
+    left: calc(100vw - 20px);
   }
   100% {
-    left: calc(100vw + 180px);
+    left: calc(100vw + 220px);
   }
 }
 
@@ -83,7 +83,7 @@ body {
   0% {
     width: 0vw;
   }
-  54% {
+  58% {
     width: 100vw;
   }
   100% {
@@ -92,11 +92,20 @@ body {
 }
 
 @keyframes unrollOverlayFade {
-  0%, 75% {
+  0%, 72% {
     opacity: 1;
   }
   100% {
     opacity: 0;
+  }
+}
+
+@keyframes rollTurnLayers {
+  0% {
+    background-position: 0px 0;
+  }
+  100% {
+    background-position: -800px 0;
   }
 }
 
@@ -109,7 +118,7 @@ body {
   background: linear-gradient(90deg, #7a705e 0%, #998f7e 6%, #cfc6b5 18%, #fbf9f4 36%, #eee8dc 52%, #cfc6b5 72%, #9a907e 88%, #665d4c 100%);
   box-shadow: 48px 0 70px rgba(18, 15, 11, 0.55), 18px 0 26px rgba(18, 15, 11, 0.45), 4px 0 6px rgba(18, 15, 11, 0.4), -8px 0 14px rgba(18, 15, 11, 0.2);
   z-index: 60;
-  animation: rollCylinderTravel 2.4s cubic-bezier(0.25, 1, 0.35, 1) forwards;
+  animation: rollCylinderTravel 3.8s cubic-bezier(0.38, 0.05, 0.22, 1) forwards;
 }
 
 .architectural-roll-cylinder::before {
@@ -133,8 +142,10 @@ body {
   inset: 0;
   opacity: 0.65;
   background: repeating-linear-gradient(90deg, transparent 0 8px, rgba(40, 34, 26, 0.35) 8px 10px, rgba(255, 252, 244, 0.85) 10px 12px, transparent 12px 28px);
+  background-size: 28px 100%;
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
   mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  animation: rollTurnLayers 3.8s linear infinite;
 }
 
 .architectural-unrolled-sheet {
@@ -150,9 +161,9 @@ body {
   overflow: hidden;
   box-shadow: inset -10px 0 30px rgba(29, 29, 31, 0.15);
   z-index: 50;
-  animation: unrollSheetExpand 2.4s cubic-bezier(0.25, 1, 0.35, 1) forwards;
+  animation: unrollSheetExpand 3.8s cubic-bezier(0.38, 0.05, 0.22, 1) forwards;
 }
 
 .architectural-unroll-overlay {
-  animation: unrollOverlayFade 2.4s ease-out forwards;
+  animation: unrollOverlayFade 3.8s ease-out forwards;
 }
