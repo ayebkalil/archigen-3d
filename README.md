@@ -57,7 +57,7 @@
    * **IoU Empreinte Bâtie Pleine :** **82.16%** (coque extérieure étanche fermée).
 
 2. **Évaluation à l'Aveugle sur 12 Plans Externes Verrouillés ($N=12$, SHA256 scellés) :**
-   * **Triage d'Exploitabilité Réaliste (Accord Inter-Annotateurs : 94.4%, $\kappa = 0.926$) :**
+   * **Triage d'Exploitabilité Réaliste (Diagnostic Visuel de l'Équipe) :**
      * **Directement Exploitable :** **1 / 12 plans (8.3%)** (`fresh_04`, Ladowski : 6/6 pièces, 7/8 portes).
      * **Partiellement Exploitable / Retouches Requises :** **4 / 12 plans (33.3%)** (`fresh_05`, `fresh_06`, `fresh_07`, `fresh_09`).
      * **Inexploitable / Échec Complet :** **7 / 12 plans (58.3%)** (`fresh_01`, `fresh_02`, `fresh_03`, `fresh_08`, `fresh_10`, `fresh_11`, `fresh_12`).
