@@ -65,8 +65,9 @@ def evaluate_model_pipeline(
                 num_struct_classes=5,
                 num_room_classes=12
             ).to(device)
-            ckpt = torch.load(multitask_weights, map_location=device)
-            multitask_model.load_state_dict(ckpt["model_state_dict"])
+            ckpt = torch.load(multitask_weights, map_location=device, weights_only=False)
+            state_dict = ckpt["model_state_dict"] if isinstance(ckpt, dict) and "model_state_dict" in ckpt else ckpt
+            multitask_model.load_state_dict(state_dict)
             multitask_model.eval()
         else:
             print(f"[WARNING] MultiTask weights not found at {multitask_weights}")
@@ -435,12 +436,20 @@ def run_full_comparative_benchmark(split: str = "test", max_samples: Optional[in
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate floorplan models on CubiCasa5K")
-    parser.add_argument("--model", type=str, default="all", choices=["baseline", "multitask", "hybrid", "all"])
-    parser.add_argument("--split", type=str, default="test", choices=["test", "val", "train"])
+    parser.add_argument("--model", type=str, default="multitask", choices=["baseline", "multitask", "hybrid", "all"])
+    parser.add_argument("--split", type=str, default="val", choices=["test", "val", "train"])
     parser.add_argument("--max_samples", type=int, default=None, help="Limit number of samples for rapid run")
+    parser.add_argument("--weights", type=str, default="models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth", help="Path to multitask model weights")
+    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for evaluation")
     args = parser.parse_args()
 
     if args.model == "all":
         run_full_comparative_benchmark(split=args.split, max_samples=args.max_samples)
     else:
-        evaluate_model_pipeline(model_type=args.model, split=args.split, max_samples=args.max_samples)
+        evaluate_model_pipeline(
+            model_type=args.model,
+            split=args.split,
+            max_samples=args.max_samples,
+            batch_size=args.batch_size,
+            multitask_weights=args.weights
+        )

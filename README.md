@@ -67,13 +67,18 @@
    * **Constat Majeur :** L'étanchéité extérieure (75% coques valides) ne garantit pas l'exploitabilité intérieure ; le décalage de distribution (domain shift) sur les plans CAD teintés ou croquis historiques constitue la limitation première du modèle.
 
 3. **Branche Expérimentale (`experiment/floorplan-style-adaptation`) :**
-   * **Adaptation de Domaine Procédurale :** Moteur de restylage SVG en 6 styles architecturaux (`cad_blueprint`, `hatched_walls`, `annotated_dimensions`, etc.) préservant au bit près les masques vérité terrain.
-   * **Banc de Développement ($N=20$ plans réels variés) :** Exploitabilité portée de **55.0% à 85.0%** (plans inutilisables réduits de 30% à 10%, +70 pièces récupérées).
-   * **Validation Hors-Piste One-Shot ($N=12$ plans scellés de soutenance) :**
+   * **Adaptation de Domaine Procédurale :** Moteur de restylage vectoriel SVG en 6 styles architecturaux (`cad_blueprint`, `hatched_walls`, `annotated_dimensions`, etc.) garantissant zéro fuite d'annotations.
+   * **Banc de Développement ($N=20$ plans réels variés) :** Le filtre heuristique d'exploitabilité géométrique (`rooms >= 3 and area >= 25 m2`) passe de **55.0% à 85.0%** (plans vides réduits de 30% à 10%). On observe cependant une tendance au sur-partitionnement des cloisons intérieures (+70 pièces détectées au total).
+   * **Contrôle de Régression In-Distribution (CubiCasa Val, $N=400$) :**
+     * **Wall Merged IoU :** **73.90% vs 73.90%** (parité parfaite).
+     * **Door IoU :** **60.88% vs 61.13%** (baisse minime de 0.25%).
+     * **Window IoU :** **73.70% vs 74.72%** (baisse de 1.02%).
+     * **Room Semantic mIoU :** **56.94% vs 62.39%** (-5.45% de régression sémantique, motivant le maintien de v1.1 en production).
+   * **Diagnostic Hors-Piste sur les 12 Plans de Soutenance ($N=12$) :**
      * Coques étanches valides : **75.0% $\to$ 100.0%** (12/12 coques fermées).
-     * Plans avec 0 pièce détectée : **3/12 (25%) $\to$ 0/12 (0%)** (récupération de `fresh_01`, `fresh_03`, `fresh_12`).
-     * Erreur absolue pièces (MAE) : **5.25 $\to$ 4.42 pièces**.
-     * Erreur absolue portes (MAE) : **8.08 $\to$ 6.92 portes**.
+     * Plans en échec total (0 pièce) : **3/12 $\to$ 0/12** (récupération de `fresh_01`, `fresh_03`, `fresh_12`).
+     * Erreur absolue pièces : **5.25 $\to$ 4.42 pièces** ; Portes : **8.08 $\to$ 6.92 portes** (variations modestes dans la marge de bruit statistique).
+     * *Note méthodologique :* Les 12 plans ne constituent plus un test aveugle pur car les styles ont été conçus en réponse directe aux modes d'échec observés sur ceux-ci.
    * **Studio d'Édition Interactive CAD :** Outils de retouche directe 2D/3D (Select, + Door, Delete, Relabel, Scale) intégrés au canevas React avec synchronisation temps réel Three.js.
 
 ---
@@ -81,11 +86,12 @@
 ## ⏱️ Métriques de Performance & Latence Réelle
 
 Mesuré sur station locale (GPU NVIDIA GeForce RTX 3050 Laptop 4 Go VRAM, CPU AMD Ryzen 5, 16 Go RAM) :
-* **Inférence Tensorielle UNet++ (GPU) :** **~45 ms**
-* **Vectorisation Polygonale Rectilinéaire (CPU) :** **~180 ms**
-* **Synthèse de Façade cGAN ONNX Runtime (GPU) :** **~24.7 ms** (mode `front_only=True`)
-* **Extrusion 3D & Exportation OBJ/MTL (CPU) :** **~0.8 ms**
-* **Latence Médiane Totale Bout en Bout :** **156.6 ms (P95 : 217.7 ms)** — conforme au budget temps réel (< 400 ms).
+* **1. Prétraitement d'Image (Letterbox 512×512 & Tenseurs) :** **73.3 ms**
+* **2. Inférence Tensorielle UNet++ (GPU CUDA) :** **64.9 ms**
+* **3. Vectorisation Polygonale Rectilinéaire (CPU) :** **76.6 ms**
+* **4. Synthèse de Façade cGAN PyTorch (GPU CUDA, mode `front_only=True`) :** **30.4 ms**
+* **5. Génération Scène 3D Three.js & Métadonnées (CPU) :** **1.3 ms**
+* **Latence Totale Bout-en-Bout (Moyenne mesurée) :** **246.5 ms** (P95 : 282.7 ms) — conforme au budget interactif (< 400 ms).
 
 ---
 
