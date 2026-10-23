@@ -1,0 +1,106 @@
+[
+  {
+    "id": "modern_01",
+    "filename": "modern_01_2bhk_bungalow.jpg",
+    "title": "File:2 bhk Bungalow floor plan.jpg",
+    "style": "Modern CAD Bungalow",
+    "description": "Modern 2-BHK residential bungalow architectural floor plan with kitchen, living room, bedrooms, bathrooms.",
+    "license": "CC BY-SA 4.0",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/61/2_bhk_Bungalow_floor_plan.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      2160,
+      2576
+    ]
+  },
+  {
+    "id": "modern_02",
+    "filename": "modern_02_cad_house_plan.jpg",
+    "title": "File:CAD of House Plan from Design to Build.jpg",
+    "style": "Contemporary CAD Blueprint",
+    "description": "High-resolution architectural CAD layout of modern residential single-family home.",
+    "license": "CC BY-SA 4.0",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/8/80/CAD_of_House_Plan_from_Design_to_Build.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      3765,
+      2523
+    ]
+  },
+  {
+    "id": "modern_03",
+    "filename": "modern_03_floor_plan_1395sqft.jpg",
+    "title": "File:Floor plan 1395 Sq.ft.jpg",
+    "style": "Modern Real Estate Listing",
+    "description": "1395 Sq Ft contemporary residential listing floor plan with dining, lounge, bedrooms.",
+    "license": "CC BY-SA 4.0",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/f4/Floor_plan_1395_Sq.ft.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      1300,
+      929
+    ]
+  },
+  {
+    "id": "modern_04",
+    "filename": "modern_04_30by35_residential.jpg",
+    "title": "File:30BY35 home plan by ER. AYUSH TOMAR 9997233546.jpg",
+    "style": "Compact Urban Residence",
+    "description": "30x35 modern compact urban residential home layout.",
+    "license": "CC0",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/a/a6/30BY35_home_plan_by_ER._AYUSH_TOMAR_9997233546.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      1600,
+      1280
+    ]
+  },
+  {
+    "id": "modern_05",
+    "filename": "modern_05_savar_dohs_residence.jpg",
+    "title": "File:House Plan of savar DOHS.jpg",
+    "style": "Suburban Duplex",
+    "description": "Modern suburban duplex residence floor plan layout.",
+    "license": "CC BY-SA 4.0",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/f/f0/House_Plan_of_savar_DOHS.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      870,
+      648
+    ]
+  },
+  {
+    "id": "modern_06",
+    "filename": "modern_06_caroline_court_apartment.png",
+    "title": "File:Caroline Court Apartments Vancouver floor plan.png",
+    "style": "Urban Apartment Listing",
+    "description": "Multi-room urban apartment listing floor plan with hallway, kitchen, living room.",
+    "license": "Public domain",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/1/15/Caroline_Court_Apartments_Vancouver_floor_plan.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      416,
+      661
+    ]
+  },
+  {
+    "id": "modern_07",
+    "filename": "modern_07_swedish_open_plan_apartment.jpg",
+    "title": "File:Swedish-apartment-design-with-open-floor-plan-1-554x368.jpg",
+    "style": "Scandinavian Open Concept",
+    "description": "Contemporary Scandinavian open floor plan apartment layout.",
+    "license": "CC BY 2.0",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Swedish-apartment-design-with-open-floor-plan-1-554x368.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      554,
+      368
+    ]
+  },
+  {
+    "id": "modern_08",
+    "filename": "modern_08_simon_house_plan.jpg",
+    "title": "File:Simon House Plan..JPG",
+    "style": "Modern Single Family",
+    "description": "Modern residential family house architectural floor plan.",
+    "license": "Public domain",
+    "source_url": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Simon_House_Plan..JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "resolution": [
+      1288,
+      1892
+    ]
+  }
+]

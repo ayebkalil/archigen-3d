@@ -10,12 +10,60 @@ from typing import Dict, List, Any, Tuple
 import numpy as np
 import cv2
 from shapely.geometry import Polygon, LineString, Point
+from shapely.validation import make_valid
 
 ROOM_NAMES = {
     0: "Background", 1: "Living Room", 2: "Bedroom", 3: "Kitchen",
     4: "Bathroom", 5: "Entry / Hall", 6: "Balcony / Terrace",
     7: "Storage", 8: "Closet", 9: "Garage", 10: "Office", 11: "Other"
 }
+
+def repair_polygon_to_single_polygon(poly: Polygon, max_area_change_pct: float = 10.0) -> Tuple[Polygon, bool, float]:
+    """
+    Repairs self-intersecting or invalid polygons using Shapely's make_valid.
+    Extracts the dominant single Polygon if a MultiPolygon or GeometryCollection is produced.
+    Ensures that the area does not collapse or explode (must remain within max_area_change_pct of original area).
+    
+    Returns:
+        (clean_polygon, was_repaired, area_change_pct)
+    """
+    if poly is None or poly.is_empty:
+        return poly, False, 0.0
+
+    if poly.is_valid:
+        return poly, False, 0.0
+
+    orig_area = poly.area
+    try:
+        repaired = make_valid(poly)
+        if repaired.is_empty:
+            return poly, False, 0.0
+
+        if repaired.geom_type == "Polygon":
+            clean_poly = repaired
+        elif repaired.geom_type in ["MultiPolygon", "GeometryCollection"]:
+            polys = [g for g in repaired.geoms if g.geom_type == "Polygon" and not g.is_empty]
+            if not polys:
+                return poly, False, 0.0
+            clean_poly = max(polys, key=lambda p: p.area)
+        else:
+            return poly, False, 0.0
+
+        if not clean_poly.is_valid:
+            return poly, False, 0.0
+
+        if orig_area > 1e-4:
+            delta_area = abs(clean_poly.area - orig_area) / orig_area * 100.0
+            if delta_area <= max_area_change_pct:
+                return clean_poly, True, delta_area
+            else:
+                # Area changed too drastically (> max_area_change_pct collapse/expansion); treat as failed repair
+                return poly, False, delta_area
+        else:
+            # Original geometry had cancelled winding area (e.g. figure-8)
+            return clean_poly, True, 0.0
+    except Exception:
+        return poly, False, 0.0
 
 class FloorplanVectorizer:
 
@@ -136,6 +184,7 @@ class FloorplanVectorizer:
 
         footprint_contours, _ = cv2.findContours(filled_envelope, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         shell_valid = False
+        was_shell_repaired = False
         building_perimeter_m = 0.0
 
         if len(footprint_contours) > 0:
@@ -144,9 +193,22 @@ class FloorplanVectorizer:
                 ext_poly_approx = cv2.approxPolyDP(largest_ext, 2.0, True).reshape(-1, 2)
                 if len(ext_poly_approx) >= 3:
                     try:
-                        shell_poly = Polygon(ext_poly_approx * scale_m_per_px)
-                        shell_valid = bool(shell_poly.is_valid)
-                        building_perimeter_m = round(float(shell_poly.length), 2)
+                        raw_shell_poly = Polygon(ext_poly_approx * scale_m_per_px)
+                        if raw_shell_poly.is_valid:
+                            shell_poly = raw_shell_poly
+                            shell_valid = True
+                            building_perimeter_m = round(float(shell_poly.length), 2)
+                        else:
+                            rep_shell_poly, rep_ok, _ = repair_polygon_to_single_polygon(raw_shell_poly)
+                            if rep_ok and rep_shell_poly.is_valid:
+                                shell_poly = rep_shell_poly
+                                shell_valid = True
+                                was_shell_repaired = True
+                                building_perimeter_m = round(float(shell_poly.length), 2)
+                            else:
+                                shell_poly = raw_shell_poly
+                                shell_valid = False
+                                building_perimeter_m = round(float(raw_shell_poly.length), 2)
                     except Exception:
                         shell_valid = False
                         building_perimeter_m = 0.0
@@ -279,6 +341,7 @@ class FloorplanVectorizer:
         rooms = []
         room_idx = 0
         total_interior_area_m2 = 0.0
+        num_rooms_repaired = 0
 
         if room_mask is not None and np.max(room_mask) > 0:
             # Hybrid Room Partitioning:
@@ -355,6 +418,19 @@ class FloorplanVectorizer:
                     continue
                 r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
 
+                # Validate and repair room polygon with Shapely make_valid
+                r_repaired = False
+                try:
+                    r_raw_poly = Polygon(r_poly_m)
+                    if not r_raw_poly.is_valid:
+                        rep_r_poly, r_ok, _ = repair_polygon_to_single_polygon(r_raw_poly)
+                        if r_ok and rep_r_poly.is_valid:
+                            r_poly_m = [[round(pt[0], 3), round(pt[1], 3)] for pt in rep_r_poly.exterior.coords[:-1]]
+                            r_repaired = True
+                            num_rooms_repaired += 1
+                except Exception:
+                    pass
+
                 M = cv2.moments(largest_c)
                 cx = (M["m10"] / max(M["m00"], 1e-4)) * scale_m_per_px
                 cy = (M["m01"] / max(M["m00"], 1e-4)) * scale_m_per_px
@@ -366,7 +442,8 @@ class FloorplanVectorizer:
                     "room_type": ROOM_NAMES.get(c_id, "Other Room"),
                     "surface_m2": area_m2,
                     "centroid_meters": [round(cx, 3), round(cy, 3)],
-                    "polygon_meters": r_poly_m
+                    "polygon_meters": r_poly_m,
+                    "was_repaired": r_repaired
                 })
                 room_idx += 1
         elif room_mask is not None:
@@ -391,12 +468,26 @@ class FloorplanVectorizer:
                     r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
                     r_type = "Living Room / Common" if area_m2 > 25 else "Bedroom" if area_m2 > 12 else "Bathroom / Storage"
 
+                    # Validate and repair room polygon with Shapely make_valid
+                    r_repaired = False
+                    try:
+                        r_raw_poly = Polygon(r_poly_m)
+                        if not r_raw_poly.is_valid:
+                            rep_r_poly, r_ok, _ = repair_polygon_to_single_polygon(r_raw_poly)
+                            if r_ok and rep_r_poly.is_valid:
+                                r_poly_m = [[round(pt[0], 3), round(pt[1], 3)] for pt in rep_r_poly.exterior.coords[:-1]]
+                                r_repaired = True
+                                num_rooms_repaired += 1
+                    except Exception:
+                        pass
+
                     rooms.append({
                         "id": f"room_{room_idx}",
                         "room_type": r_type,
                         "surface_m2": area_m2,
                         "centroid_meters": [round(centroids[lbl][0] * scale_m_per_px, 3), round(centroids[lbl][1] * scale_m_per_px, 3)],
-                        "polygon_meters": r_poly_m
+                        "polygon_meters": r_poly_m,
+                        "was_repaired": r_repaired
                     })
                     room_idx += 1
 
@@ -448,11 +539,13 @@ class FloorplanVectorizer:
                 "building_perimeter_m": building_perimeter_m,
                 "is_building_shell_valid": strict_shell_valid,
                 "shell_status": shell_status,
+                "was_shell_repaired": was_shell_repaired,
                 "total_surface_m2": round(total_interior_area_m2, 2),
                 "num_walls": len(walls),
                 "num_exterior_walls": sum(1 for w in walls if w.get("is_exterior", False)),
                 "num_envelope_segments": envelope_segments,
                 "num_rooms": len(rooms),
+                "num_rooms_repaired": num_rooms_repaired,
                 "num_doors": len(doors),
                 "num_windows": len(windows)
             },

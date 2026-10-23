@@ -32,7 +32,9 @@ CMP_PALETTE = {
     "sill": (255, 80, 0),          # Window Sill
     "balcony": (192, 255, 54),     # Balcony / Ledge
     "base": (0, 0, 222),           # Foundation / Bottom Base Molding
-    "molding": (0, 0, 222)         # Architectural Horizontal Trim
+    "molding": (0, 0, 222),        # Architectural Horizontal Trim
+    "pillar": (0, 128, 0),         # Pilasters / Vertical Columns
+    "deco": (255, 255, 0)          # Window Lintels / Decorative Headers
 }
 
 def enhance_facade_details(
@@ -225,6 +227,12 @@ class FacadeBridge:
         canvas = Image.new("RGB", (target_size, target_size), CMP_PALETTE["background"])
         draw = ImageDraw.Draw(canvas)
 
+        def safe_rect(bx0, by0, bx1, by1, f_color):
+            rx0, rx1 = int(round(min(bx0, bx1))), int(round(max(bx0, bx1)))
+            ry0, ry1 = int(round(min(by0, by1))), int(round(max(by0, by1)))
+            if rx1 > rx0 and ry1 > ry0:
+                draw.rectangle([rx0, ry0, rx1, ry1], fill=f_color)
+
         # 2. Draw Main Wall (Facade)
         wall_x0 = offset_x
         wall_y0 = offset_y
@@ -232,11 +240,17 @@ class FacadeBridge:
         wall_y1 = offset_y + draw_h
         draw.rectangle([wall_x0, wall_y0, wall_x1, wall_y1], fill=CMP_PALETTE["facade"])
 
-        # 3. Architectural Trim: Cornice at top, Base at bottom
+        # 3. Architectural Trim: Cornice at top, Base at bottom, Corner Pilasters
         cornice_h = max(int(round(0.25 * scale_px_per_m)), 4)
         base_h = max(int(round(0.30 * scale_px_per_m)), 5)
         draw.rectangle([wall_x0, wall_y0, wall_x1, wall_y0 + cornice_h], fill=CMP_PALETTE["cornice"])
         draw.rectangle([wall_x0, wall_y1 - base_h, wall_x1, wall_y1], fill=CMP_PALETTE["base"])
+
+        # Corner pilasters (architectural column framing on facade edges)
+        pillar_w = max(int(round(0.28 * scale_px_per_m)), 3)
+        if draw_w > (pillar_w * 5):
+            safe_rect(wall_x0, wall_y0 + cornice_h, wall_x0 + pillar_w, wall_y1 - base_h, CMP_PALETTE["pillar"])
+            safe_rect(wall_x1 - pillar_w, wall_y0 + cornice_h, wall_x1, wall_y1 - base_h, CMP_PALETTE["pillar"])
 
         # 4. Openings layout (Doors and Windows)
         # Parse attached openings from wall metadata
@@ -284,12 +298,6 @@ class FacadeBridge:
         door_w_px = max(int(round(door_w_m * scale_px_per_m)), 12)
         door_h_px = max(int(round(door_h_m * scale_px_per_m)), 20)
 
-        def safe_rect(bx0, by0, bx1, by1, f_color):
-            rx0, rx1 = int(round(min(bx0, bx1))), int(round(max(bx0, bx1)))
-            ry0, ry1 = int(round(min(by0, by1))), int(round(max(by0, by1)))
-            if rx1 > rx0 and ry1 > ry0:
-                draw.rectangle([rx0, ry0, rx1, ry1], fill=f_color)
-
         # 5. Draw Openings Per Floor (Bottom to Top)
         for fl in range(num_floors):
             floor_bottom_y = wall_y1 - int(round(fl * floor_height_m * scale_px_per_m))
@@ -307,6 +315,11 @@ class FacadeBridge:
                 d_x1 = d_cx_px + door_w_px // 2
                 d_y1 = floor_bottom_y - base_h
                 d_y0 = d_y1 - door_h_px
+                # Door surround molding
+                d_trim = max(int(round(0.08 * scale_px_per_m)), 2)
+                safe_rect(d_x0 - d_trim, d_y0 - d_trim, d_x1 + d_trim, d_y0, CMP_PALETTE["molding"])
+                safe_rect(d_x0 - d_trim, d_y0, d_x0, d_y1, CMP_PALETTE["molding"])
+                safe_rect(d_x1, d_y0, d_x1 + d_trim, d_y1, CMP_PALETTE["molding"])
                 safe_rect(d_x0, d_y0, d_x1, d_y1, CMP_PALETTE["door"])
 
             # Windows on this floor
@@ -331,6 +344,15 @@ class FacadeBridge:
                 sill_h_px = max(int(round(0.08 * scale_px_per_m)), 3)
                 sill_margin = 2
                 safe_rect(w_x0 - sill_margin, w_y1, w_x1 + sill_margin, w_y1 + sill_h_px, CMP_PALETTE["sill"])
+
+                # Draw Window Lintel / Header above window
+                lintel_h_px = max(int(round(0.10 * scale_px_per_m)), 2)
+                safe_rect(w_x0 - sill_margin, w_y0 - lintel_h_px, w_x1 + sill_margin, w_y0, CMP_PALETTE["deco"])
+
+                # Upper-floor balcony railing (for multi-story facades)
+                if fl > 0:
+                    balcony_h_px = max(int(round(0.35 * scale_px_per_m)), 5)
+                    safe_rect(w_x0 - 3, w_y1 - balcony_h_px, w_x1 + 3, w_y1 + 1, CMP_PALETTE["balcony"])
 
         return canvas, uv_bounds
 

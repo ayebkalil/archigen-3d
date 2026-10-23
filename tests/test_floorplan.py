@@ -150,3 +150,34 @@ def test_floorplan_pipeline_tta_modes():
     res_8 = pipeline.process_image(raw_bytes, tta_mode="8_fold")
     assert res_8["inference_mode"] in ["8_fold_tta", "single_pass"]
 
+def test_repair_polygon_to_single_polygon():
+    """Verify Shapely make_valid repair on self-intersecting polygons with area preservation."""
+    from shapely.geometry import Polygon
+    from src.floorplan.vectorizer import repair_polygon_to_single_polygon
+
+    # 1. Clean valid polygon
+    clean = Polygon([(0, 0), (4, 0), (4, 4), (0, 4)])
+    poly_clean, was_rep, _ = repair_polygon_to_single_polygon(clean)
+    assert not was_rep
+    assert poly_clean.is_valid
+
+    # 2. Self-intersecting bow-tie (figure-8) polygon
+    # A standard self-crossing polygon: (0,0) -> (4,4) -> (0,4) -> (4,0) -> (0,0)
+    bowtie = Polygon([(0, 0), (4, 4), (0, 4), (4, 0)])
+    assert not bowtie.is_valid
+    poly_rep, was_rep, delta_area = repair_polygon_to_single_polygon(bowtie, max_area_change_pct=100.0)
+    assert was_rep
+    assert poly_rep.is_valid
+    assert poly_rep.geom_type == "Polygon"
+
+    # 3. Collapse rejection: if area distortion exceeds max_area_change_pct, repair is rejected
+    loop_crossing = Polygon([(0, 0), (10, 0), (10, 10), (5, 4), (4, 12), (6, 12), (5, 4), (0, 10)])
+    assert not loop_crossing.is_valid
+    _, was_rep_5, delta_5 = repair_polygon_to_single_polygon(loop_crossing, max_area_change_pct=5.0)
+    assert not was_rep_5
+    assert delta_5 > 5.0
+
+    _, was_rep_20, delta_20 = repair_polygon_to_single_polygon(loop_crossing, max_area_change_pct=20.0)
+    assert was_rep_20
+    assert delta_20 <= 20.0
+
