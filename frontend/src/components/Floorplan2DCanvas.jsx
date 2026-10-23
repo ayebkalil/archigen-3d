@@ -12,7 +12,8 @@ import {
   MousePointer,
   PlusCircle,
   Trash2,
-  Tag
+  Tag,
+  Layers
 } from 'lucide-react';
 
 const ROOM_COLORS = {
@@ -228,68 +229,70 @@ export default function Floorplan2DCanvas({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden border-r border-[#1d1d1f]/15 drafting-grid">
       {/* Top Drafting Toolbar */}
-      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 select-none">
+      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-10 select-none overflow-x-auto">
         {/* Left: Title & Elements count */}
-        <div className="flex items-center space-x-2 text-[#1d1d1f]">
-          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">2D BLUEPRINT</span>
-          <span className="text-[#1d1d1f]/30">|</span>
-          <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase tracking-wider">
-            {walls.length}W · {rooms.length}R · {doors.length}D · {windows.length}WIN
+        <div className="flex items-center space-x-2.5 text-[#1d1d1f] shrink-0 mr-3">
+          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] whitespace-nowrap">
+            2D BLUEPRINT
+          </span>
+          <span className="hidden xl:inline text-[#1d1d1f]/20">|</span>
+          <span className="hidden xl:inline-flex items-center px-2 py-0.5 rounded-full border border-[#1d1d1f]/15 bg-white/60 font-mono text-[9px] text-[#1d1d1f]/70 uppercase tracking-wider whitespace-nowrap">
+            {walls.length}W · {rooms.length}R · {doors.length}D
           </span>
         </div>
 
-        {/* Center: CAD Interactive Edit Tools */}
-        <div className="flex items-center bg-white/70 border border-[#1d1d1f]/20 rounded-full p-0.5 space-x-0.5">
+        {/* Center/Right: CAD Interactive Edit Tools */}
+        <div className="flex items-center bg-white/80 border border-[#1d1d1f]/20 rounded-full p-1 space-x-1 shadow-sm shrink-0">
           <button
             onClick={() => { setActiveTool('select'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Inspect / Select Front Wall"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
+            className={`h-7 px-2.5 sm:px-3 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10px] uppercase tracking-wider whitespace-nowrap shrink-0 ${
               activeTool === 'select' && !isCalibrating
                 ? 'bg-[#1d1d1f] text-[#efebe2] shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
-            <MousePointer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">SELECT</span>
+            <MousePointer className="w-3.5 h-3.5 shrink-0" />
+            <span>SELECT</span>
           </button>
 
           <button
             onClick={() => { setActiveTool('add_door'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click on canvas or wall to insert a door"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
+            className={`h-7 px-2.5 sm:px-3 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10px] uppercase tracking-wider whitespace-nowrap shrink-0 ${
               activeTool === 'add_door'
                 ? 'bg-[#f0500f] text-white shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">+ DOOR</span>
+            <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+            <span>+ DOOR</span>
           </button>
 
           <button
             onClick={() => { setActiveTool('delete'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click doors, windows, or internal walls to delete them"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
+            className={`h-7 px-2.5 sm:px-3 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10px] uppercase tracking-wider whitespace-nowrap shrink-0 ${
               activeTool === 'delete'
                 ? 'bg-rose-700 text-white shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">DELETE</span>
+            <Trash2 className="w-3.5 h-3.5 shrink-0" />
+            <span>DELETE</span>
           </button>
 
           <button
             onClick={() => { setActiveTool('relabel'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click any room polygon or badge to change space type"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
+            className={`h-7 px-2.5 sm:px-3 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10px] uppercase tracking-wider whitespace-nowrap shrink-0 ${
               activeTool === 'relabel'
                 ? 'bg-[#c48d3f] text-white shadow-sm'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
-            <Tag className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">RELABEL</span>
+            <Tag className="w-3.5 h-3.5 shrink-0" />
+            <span>RELABEL</span>
           </button>
 
           <button
@@ -300,54 +303,59 @@ export default function Floorplan2DCanvas({
               setCalibPointB(null);
             }}
             title="2-Point Real-world Scale Calibration"
-            className={`px-3 py-1 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10.5px] uppercase tracking-wider ${
+            className={`h-7 px-2.5 sm:px-3 rounded-full flex items-center space-x-1.5 transition-all font-stencil text-[10px] uppercase tracking-wider whitespace-nowrap shrink-0 ${
               isCalibrating
                 ? 'bg-[#f0500f] text-white animate-pulse'
                 : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
             }`}
           >
-            <Ruler className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">SCALE</span>
-          </button>
-        </div>
-
-        {/* Right: Visibility Toggles */}
-        <div className="flex items-center space-x-1 font-mono text-[9.5px] uppercase tracking-wider">
-          <button
-            onClick={() => setShowRooms(!showRooms)}
-            className={`px-2.5 py-0.5 rounded-full border transition-all ${
-              showRooms
-                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
-                : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-            }`}
-          >
-            Rooms
-          </button>
-          <button
-            onClick={() => setShowWalls(!showWalls)}
-            className={`px-2.5 py-0.5 rounded-full border transition-all ${
-              showWalls
-                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
-                : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-            }`}
-          >
-            Walls
-          </button>
-          <button
-            onClick={() => setShowOpenings(!showOpenings)}
-            className={`px-2.5 py-0.5 rounded-full border transition-all ${
-              showOpenings
-                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f] font-semibold'
-                : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-            }`}
-          >
-            Doors
+            <Ruler className="w-3.5 h-3.5 shrink-0" />
+            <span>SCALE</span>
           </button>
         </div>
       </div>
 
       {/* Main Canvas Area */}
       <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
+        {/* Floating Layer Visibility Dock */}
+        <div className="absolute bottom-4 left-4 z-20 flex items-center bg-[#f7f4ed]/95 backdrop-blur-md border border-[#1d1d1f]/20 rounded-full px-3 py-1.5 shadow-lg select-none">
+          <div className="flex items-center space-x-1.5 text-[#1d1d1f]/60 font-mono text-[9px] uppercase tracking-wider pr-2.5 border-r border-[#1d1d1f]/15 mr-1.5 shrink-0">
+            <Layers className="w-3.5 h-3.5 text-[#f0500f]" />
+            <span className="font-semibold hidden sm:inline">LAYERS</span>
+          </div>
+          <div className="flex items-center space-x-1 font-stencil text-[9.5px] uppercase tracking-wider">
+            <button
+              onClick={() => setShowRooms(!showRooms)}
+              className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+                showRooms
+                  ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+                  : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
+              }`}
+            >
+              ROOMS
+            </button>
+            <button
+              onClick={() => setShowWalls(!showWalls)}
+              className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+                showWalls
+                  ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+                  : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
+              }`}
+            >
+              WALLS
+            </button>
+            <button
+              onClick={() => setShowOpenings(!showOpenings)}
+              className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
+                showOpenings
+                  ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+                  : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
+              }`}
+            >
+              DOORS
+            </button>
+          </div>
+        </div>
         {/* Real-time Feedback Banner */}
         {editFeedback && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-[#1d1d1f] text-[#efebe2] font-mono text-[10.5px] uppercase tracking-wider rounded-full shadow-xl z-30 flex items-center space-x-1.5">

@@ -260,21 +260,23 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
   return (
     <div className="flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden select-none">
       {/* 3D Viewport Toolbar */}
-      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f]">
-        <div className="flex items-center space-x-2">
-          <Box className="w-3.5 h-3.5 text-[#f0500f]" />
-          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">3D MODEL</span>
-          <span className="text-[#1d1d1f]/30">|</span>
-          <span className="text-[#1d1d1f]/60 font-mono text-[10px] uppercase tracking-wider">
-            {facadeTextureUrl ? 'cGAN Neural Facade' : 'Watertight BIM Geometry'}
+      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-10 text-[#1d1d1f] overflow-x-auto select-none">
+        <div className="flex items-center space-x-2.5 shrink-0 mr-3">
+          <Box className="w-3.5 h-3.5 text-[#f0500f] shrink-0" />
+          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] whitespace-nowrap">
+            3D MODEL
+          </span>
+          <span className="hidden xl:inline text-[#1d1d1f]/20">|</span>
+          <span className="hidden xl:inline-flex items-center px-2 py-0.5 rounded-full border border-[#1d1d1f]/15 bg-white/60 font-mono text-[9px] text-[#1d1d1f]/70 uppercase tracking-wider whitespace-nowrap">
+            {facadeTextureUrl ? 'cGAN Neural Facade' : 'Watertight BIM'}
           </span>
         </div>
 
         {/* View Controls */}
-        <div className="flex items-center space-x-1.5 font-stencil text-[10.5px] uppercase tracking-wider">
+        <div className="flex items-center bg-white/80 border border-[#1d1d1f]/20 rounded-full p-1 space-x-1 shadow-sm shrink-0 font-stencil text-[10px] uppercase tracking-wider">
           <button
             onClick={() => setWireframe(!wireframe)}
-            className={`px-3 py-1 rounded-full border transition-all ${
+            className={`h-7 px-2.5 sm:px-3 rounded-full border transition-all whitespace-nowrap shrink-0 ${
               wireframe
                 ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                 : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
@@ -284,7 +286,7 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
           </button>
           <button
             onClick={() => setShowFloors(!showFloors)}
-            className={`px-3 py-1 rounded-full border transition-all ${
+            className={`h-7 px-2.5 sm:px-3 rounded-full border transition-all whitespace-nowrap shrink-0 ${
               showFloors
                 ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
                 : 'bg-white/70 border-[#1d1d1f]/20 text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-white'
@@ -294,7 +296,7 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
           </button>
           <button
             onClick={viewPreset === 'top' ? setCameraPerspective : setCameraTopDown}
-            className="px-3 py-1 rounded-full border border-[#1d1d1f]/25 bg-white/80 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all"
+            className="h-7 px-2.5 sm:px-3 rounded-full border border-[#1d1d1f]/25 bg-white/80 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all whitespace-nowrap shrink-0"
           >
             {viewPreset === 'top' ? 'PERSPECTIVE' : 'TOP-DOWN'}
           </button>
