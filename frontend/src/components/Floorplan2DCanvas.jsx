@@ -371,6 +371,14 @@ export default function Floorplan2DCanvas({
               </g>
             )}
           </svg>
+
+          {/* Unresolved Rooms Domain Warning */}
+          {layout && rooms.length === 0 && (
+            <div className="absolute inset-x-6 top-6 bg-slate-950/95 border border-amber-500/50 rounded-xl p-3 text-center pointer-events-none shadow-2xl backdrop-blur-sm z-20">
+              <p className="text-xs font-semibold text-amber-400">0 Rooms Segmented (Domain Shift: Unresolved Partition)</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">The neural network could not close topological loops around rooms on this drafting format.</p>
+            </div>
+          )}
         </div>
 
         {/* Floating Calibration Controls Card */}

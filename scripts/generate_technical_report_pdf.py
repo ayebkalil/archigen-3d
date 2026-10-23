@@ -334,7 +334,7 @@ def build_technical_report_pdf(output_path: str):
             Paragraph("<b>mIoU PIÈCES (9 CL.)</b><br/><font size=10 color='#0F294A'><b>64.72%</b></font><br/>[62.0, 67.1] (+2.05% TTA)", ParagraphStyle('kp2', fontName='Helvetica', fontSize=7.2, leading=9.5, alignment=1)),
             Paragraph("<b>IoU MURS FUSIONNÉS</b><br/><font size=10 color='#0F294A'><b>74.93%</b></font><br/>[74.0, 75.8] (p < 0.001)", ParagraphStyle('kp3', fontName='Helvetica', fontSize=7.2, leading=9.5, alignment=1)),
             Paragraph("<b>COQUES ÉTANCHES</b><br/><font size=10 color='#0F294A'><b>91.75%</b></font><br/>367 / 400 plans test", ParagraphStyle('kp4', fontName='Helvetica', fontSize=7.2, leading=9.5, alignment=1)),
-            Paragraph("<b>KID FAÇADE (x10³)</b><br/><font size=10 color='#0F294A'><b>67.65 ± 5.9</b></font><br/>LPIPS: 0.3169 (CMP N=106)", ParagraphStyle('kp5', fontName='Helvetica', fontSize=7.2, leading=9.5, alignment=1)),
+            Paragraph("<b>KID FAÇADE (x10³)</b><br/><font size=10 color='#0F294A'><b>63.55 ± 5.8</b></font><br/>LPIPS: 0.3096 (CMP N=106)", ParagraphStyle('kp5', fontName='Helvetica', fontSize=7.2, leading=9.5, alignment=1)),
             Paragraph("<b>LATENCE MÉDIANE</b><br/><font size=10 color='#0F294A'><b>156.6 ms</b></font><br/>P95: 217.7 ms (GPU)", ParagraphStyle('kp6', fontName='Helvetica', fontSize=7.2, leading=9.5, alignment=1)),
         ]
     ]
@@ -631,12 +631,20 @@ def build_technical_report_pdf(output_path: str):
             Paragraph("<b>0.3379</b>", tbl_cell_bold),
         ],
         [
-            Paragraph("<b>Perceptual (100 ep, LPIPS+SN, L1=30) [PRODUCTION]</b>", tbl_cell_left),
-            Paragraph("<b>0.3169</b>", tbl_cell_bold),
-            Paragraph("<b>67.65 ± 5.95</b>", tbl_cell_bold),
+            Paragraph("<b>Perceptual Champion v1.0 (100 ep, LPIPS+SN)</b>", tbl_cell_left),
+            Paragraph("0.3169", tbl_cell),
+            Paragraph("67.65 ± 5.95", tbl_cell),
             Paragraph("0.2792", tbl_cell),
             Paragraph("12.69", tbl_cell),
             Paragraph("0.3526", tbl_cell),
+        ],
+        [
+            Paragraph("<b>Perceptual Promu (100 ep, EMA 0.999 + LR Decay) [PROD]</b>", tbl_cell_left),
+            Paragraph("<b>0.3096</b>", tbl_cell_bold),
+            Paragraph("<b>63.55 ± 5.83</b>", tbl_cell_bold),
+            Paragraph("0.2893", tbl_cell),
+            Paragraph("<b>12.97</b>", tbl_cell_bold),
+            Paragraph("0.3403", tbl_cell),
         ],
     ]
     t41 = Table(t41_data, colWidths=[usable_w * 0.40, usable_w * 0.15, usable_w * 0.15, usable_w * 0.10, usable_w * 0.10, usable_w * 0.10])
@@ -750,8 +758,8 @@ def build_technical_report_pdf(output_path: str):
         "est de <b>Δ_max = 6.31 x 10⁻⁶</b>, garantissant l'exactitude reproductible des inférences en production.<br/>"
         "• <b>Politique de Versioning DVC & Git :</b> Aucun fichier binaire lourd (.pth, .onnx) n'est traqué dans le dépôt Git. Les poids sont "
         "entièrement gérés par DVC avec traçabilité MLflow.<br/>"
-        "• <b>Validation par Tests Automatisés :</b> La suite de tests unitaires et d'intégration compte <b>25 tests Pytest réussis à 100%</b>, "
-        "couvrant le bridge de textures, le vectoriseur géométrique, la non-régression des modèles et les endpoints REST de l'API FastAPI."
+        "• <b>Validation par Tests Automatisés :</b> La suite de tests unitaires et d'intégration compte <b>32 tests Pytest réussis à 100%</b> "
+        "(27 tests sur les modèles, vectoriseur et post-traitement + 5 tests d'API FastAPI)."
     )
     t_mh = Table([[Paragraph(mlops_highlights, body_small)]], colWidths=[usable_w])
     t_mh.setStyle(TableStyle([
@@ -805,20 +813,23 @@ def build_technical_report_pdf(output_path: str):
     story.append(Spacer(1, 6))
 
     # Conclusion & Synthesis
-    story.append(Paragraph("<b>Conclusion & Perspectives d'Avenir</b>", h2))
+    story.append(Paragraph("<b>Conclusion & Perspectives d'Avenir (Bilan Réel & Décalage de Domaine)</b>", h2))
     concl_text = (
         "Le projet <b>ArchiGen 3D</b> démontre avec succès la faisabilité et la rentabilité industrielle d'une chaîne automatisée "
-        "de conversion 2D vers 3D associant Vision par Ordinateur classique, Apprentissage Profond supervisé et Modèles Génératifs. "
-        "L'entraînement du modèle multi-tâches UNet++ (ResNet-34) avec augmentations régularisées permet d'atteindre <b>88.09%</b> "
-        "d'exactitude pixel et <b>64.72%</b> de mIoU sémantique sur 9 classes fiables, tout en maintenant un taux d'étanchéité géométrique "
-        "de <b>91.75%</b> sur 400 plans de test non vus.<br/><br/>"
-        "Côté génération, l'adoption de PatchGAN stabilisé par normalisation spectrale et perte perceptuelle LPIPS produit des façades de haute fidélité "
-        "(KID de <b>67.65 x 10⁻³</b>, LPIPS de <b>0.3169</b>), avec un runtime GPU optimisé à <b>156.6 ms</b> en médiane.<br/><br/>"
-        "<b>Perspectives identifiées :</b> (1) intégration de Graph Neural Networks (GNN) pour contraindre la grammaire topologique "
-        "des pièces indépendamment de la qualité graphique ; (2) intégration de modèles de diffusion latente conditionnés par ControlNet "
-        "pour enrichir le répertoire architectural (façades contemporaines, bardages bois, architectures haussmanniennes)."
+        "de conversion 2D vers 3D associant Vision par Ordinateur, Apprentissage Profond supervisé et Modèles Génératifs. "
+        "Sur les plans conformes à la distribution CubiCasa5K, le modèle multi-tâches UNet++ (ResNet-34) atteint <b>88.09%</b> "
+        "d'exactitude pixel, <b>64.72%</b> de mIoU sémantique, un <b>F1-score de 90.45% sur les portes</b> (à 24 px) et <b>82.16%</b> d'IoU sur l'enveloppe bâtie.<br/><br/>"
+        "<b>Limitation Première Documentée (Domain Shift sur Plans Hors Dataset) :</b> L'évaluation à l'aveugle menée sur 12 plans externes scellés "
+        "(SHA256 verrouillés, zéro ajustement de seuil) montre les limites strictes de généralisation du système hors CubiCasa : "
+        "<b>1 seul plan sur 12 est directement exploitable</b> (Ladowski fresh_04 : 6/6 pièces, 7/8 portes), 4 requièrent de lourdes retouches manuelles, "
+        "et 7 sont inexploitables (fonds bleus CAD, croquis historiques pâles, ombrages 3D). L'erreur moyenne de détection explose à <b>8.08 portes (MAE)</b> "
+        "et <b>5.25 pièces (MAE)</b>, démontrant que la validité géométrique extérieure (75%) ne garantit pas l'exploitabilité intérieure.<br/><br/>"
+        "Côté génération, l'adoption de PatchGAN stabilisé par normalisation spectrale, lissage EMA et perte perceptuelle LPIPS produit des façades de haute fidélité "
+        "(KID de <b>63.55 ± 5.83 x 10⁻³</b>, LPIPS de <b>0.3096</b>), avec un runtime GPU optimisé à <b>156.6 ms</b> en médiane.<br/><br/>"
+        "<b>Perspectives :</b> Normalisation colorimétrique adaptative en amont contre les fonds CAD teintés, "
+        "GNN pour contraindre la grammaire topologique des pièces, et modèles de diffusion latente ControlNet pour les textures architecturales complexes."
     )
-    t_concl = Table([[Paragraph(concl_text, body)]], colWidths=[usable_w])
+    t_concl = Table([[Paragraph(concl_text, body_small)]], colWidths=[usable_w])
     t_concl.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,-1), INFO_BG),
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#93C5FD")),

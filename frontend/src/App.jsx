@@ -62,11 +62,15 @@ export default function App() {
   const loadDefaultSample = async () => {
     try {
       setIsAnalyzing(true);
-      const res = await fetch('/sample_floorplan.png');
+      const urlParams = new URLSearchParams(window.location.search);
+      const sampleParam = urlParams.get('sample');
+      const samplePath = sampleParam === 'fresh_12' ? '/fresh_12.jpg' : '/sample_floorplan.png';
+      const sampleMime = sampleParam === 'fresh_12' ? 'image/jpeg' : 'image/png';
+      const res = await fetch(samplePath);
       const blob = await res.blob();
-      const sampleFile = new File([blob], 'sample_floorplan.png', { type: 'image/png' });
+      const sampleFile = new File([blob], samplePath.replace('/', ''), { type: sampleMime });
       setFile(sampleFile);
-      setImageUrl('/sample_floorplan.png');
+      setImageUrl(samplePath);
       await executeAnalysis(sampleFile, scale, numFloors, null);
     } catch (err) {
       console.error('Failed to load default sample:', err);
@@ -134,6 +138,10 @@ export default function App() {
       };
 
       setLayout(parsedLayout);
+
+      if (data.rooms.length === 0) {
+        setErrorMsg('Domain Shift Warning: 0 rooms detected. Watertight room partitioning could not be resolved on this plan (typical for CAD blueprints with heavy dimension annotations or dense colored backgrounds).');
+      }
 
       // Find Front Wall & its Facade Texture
       const frontWall = data.walls.find((w) => w.is_front) || data.walls.find((w) => w.is_exterior);
