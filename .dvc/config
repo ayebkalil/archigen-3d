@@ -1,4 +1,4 @@
 [core]
     remote = local_storage
 ['remote "local_storage"']
-    url = C:\Users\ayebk\.dvc_remotes\archigen_3d
+    url = ../../dvc_storage
