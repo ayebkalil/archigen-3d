@@ -1,0 +1,254 @@
+[
+  {
+    "id": "fresh_01",
+    "filename": "fresh_01_AI-generated_image_of_a_modern_apar.png",
+    "style": "Modern 2-Bedroom Apartment Listing",
+    "original_title": "File:AI-generated image of a modern apartment floor plan.png",
+    "dimensions": [
+      1672,
+      941
+    ],
+    "license": "CC0 (Public Domain)",
+    "gt_rooms": 5,
+    "gt_doors": 6,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "b856d4062c2780183a3566818007a628629d9d2a56033b2d54c75935de1374bb",
+    "file_size_bytes": 2563070,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "5 interior rooms (Living/Dining, Kitchen, Bed 1, Bed 2, Bath). Balcony excluded. 6 doors (Entry, 2 Beds, Bath, Kitchen, Balcony door)."
+    }
+  },
+  {
+    "id": "fresh_02",
+    "filename": "fresh_02_Residential_Tower_Park_Plazajpg.jpg",
+    "style": "Residential Tower Multi-Unit Typical Floor",
+    "original_title": "File:Residential Tower Park Plaza.jpg",
+    "dimensions": [
+      2136,
+      3216
+    ],
+    "license": "CC BY-SA 3.0",
+    "gt_rooms": 16,
+    "gt_doors": 20,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "958d7d92d5e1ea47952d2b6e748c777bd41f4e10146bbe8bcdafda97766eaa7e",
+    "file_size_bytes": 4582248,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "16 total habitable units/rooms across tower core. Corridors excluded. 20 access doors."
+    }
+  },
+  {
+    "id": "fresh_03",
+    "filename": "fresh_03_Drawing_of_the_Restored_Floor_Plan_.png",
+    "style": "Roman Atrium Residential Villa (House of Pansa)",
+    "original_title": "File:Drawing of the Restored Floor Plan of the House of Pansa.png",
+    "dimensions": [
+      3500,
+      2857
+    ],
+    "license": "Public domain",
+    "gt_rooms": 12,
+    "gt_doors": 14,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "fb064e20f5a273a2ba49548d96d878907a306e2b8e664a4bd4e065ab63583464",
+    "file_size_bytes": 594762,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "Roman Atrium House: 12 enclosed cubicula/tablinum/alae rooms. Central open compluvium/impluvium included as reception hall; unroofed garden excluded. 14 connecting doorways."
+    }
+  },
+  {
+    "id": "fresh_04",
+    "filename": "fresh_04_N_Ladowski_Experimenteller_Entwurf_.jpg",
+    "style": "Modernist Experimental Residential Blueprint (Ladowski)",
+    "original_title": "File:N. Ladowski. Experimenteller Entwurf.jpg",
+    "dimensions": [
+      3334,
+      2384
+    ],
+    "license": "Public domain",
+    "gt_rooms": 6,
+    "gt_doors": 8,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "097810fc05d8e5963a45342f041c7ace5d3829a363bad8c3bbe8a396bcb8b9c0",
+    "file_size_bytes": 1121682,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "6 defined living/working modules. 8 internal connecting doors."
+    }
+  },
+  {
+    "id": "fresh_05",
+    "filename": "fresh_05_Plan_of_the_First_Floor_of_the_Feli.png",
+    "style": "Vallotton House Ground Floor Residence",
+    "original_title": "File:Plan of the First Floor of the Felix Vallotton House.png",
+    "dimensions": [
+      3500,
+      2845
+    ],
+    "license": "Public domain",
+    "gt_rooms": 6,
+    "gt_doors": 8,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "c89eef31fb606bc46f07e3ea87beefc3ace45eb026db208b017c037616f5de39",
+    "file_size_bytes": 1470589,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "6 ground-floor reception, dining, kitchen, study rooms. 8 doorways (including 2 exterior French doors)."
+    }
+  },
+  {
+    "id": "fresh_06",
+    "filename": "fresh_06_Plan_of_the_Second_Floor_of_the_Fel.png",
+    "style": "Vallotton House Upper Floor Bedrooms",
+    "original_title": "File:Plan of the Second Floor of the Felix Vallotton House.png",
+    "dimensions": [
+      3500,
+      2836
+    ],
+    "license": "Public domain",
+    "gt_rooms": 7,
+    "gt_doors": 8,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "8f83e9ed0331d58a7e8d96d725176ee1548c91e0af419d2c2a241401042b2719",
+    "file_size_bytes": 888310,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "7 upper-floor bedrooms and bathrooms. 8 connecting doors from central landing."
+    }
+  },
+  {
+    "id": "fresh_07",
+    "filename": "fresh_07_StateLibQld_1_120300_Architectural_.jpg",
+    "style": "Queenslander Traditional Wooden Cottage",
+    "original_title": "File:StateLibQld 1 120300 Architectural drawing.jpg",
+    "dimensions": [
+      1000,
+      836
+    ],
+    "license": "Public domain",
+    "gt_rooms": 6,
+    "gt_doors": 7,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "1c142df0877cb7e65feccd4f617ba63a32f6f946fc12611787d4ad522aeddc56",
+    "file_size_bytes": 89064,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "Queenslander: 6 interior rooms (Parlor, Dining, Kitchen, 3 Bedrooms). Wrap-around veranda excluded from interior rooms. 7 doorways."
+    }
+  },
+  {
+    "id": "fresh_08",
+    "filename": "fresh_08_Umbria_Plantation_-_Architectural_p.png",
+    "style": "Umbria Plantation Residential Residence",
+    "original_title": "File:Umbria Plantation - Architectural plan.png",
+    "dimensions": [
+      1242,
+      1000
+    ],
+    "license": "Public domain",
+    "gt_rooms": 5,
+    "gt_doors": 8,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "95bb992e380b93586d27904c7946fc4b2992f2422a12b90a01bc70d485404382",
+    "file_size_bytes": 394685,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "Umbria Plantation: 5 main hall/living/bedroom chambers. Open portico excluded. 8 doors."
+    }
+  },
+  {
+    "id": "fresh_09",
+    "filename": "fresh_09_Drawing_Plan_of_the_Ground_Floor_of.jpg",
+    "style": "English Country Residence Ground Floor",
+    "original_title": "File:Drawing, Plan of the Ground Floor of a Country House.jpg",
+    "dimensions": [
+      3000,
+      1806
+    ],
+    "license": "Public domain",
+    "gt_rooms": 6,
+    "gt_doors": 7,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "0e0bfb9b91070f89d76f0af8caba591cdf53e74152da740570067505b1410be4",
+    "file_size_bytes": 3103006,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "English Country: 6 principal ground-floor rooms. 7 internal doors."
+    }
+  },
+  {
+    "id": "fresh_10",
+    "filename": "fresh_10_Spade_House_drawings_2JPG.jpg",
+    "style": "Spade House Ground Floor (C.F.A. Voysey)",
+    "original_title": "File:Spade House drawings (2).JPG",
+    "dimensions": [
+      2540,
+      3488
+    ],
+    "license": "Public domain",
+    "gt_rooms": 8,
+    "gt_doors": 10,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "161e721b13666f5da7d62a3cc89a0d0c31101a91ff3f68054cc2c7c59de68c29",
+    "file_size_bytes": 4418560,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "Spade House GF: 8 main rooms (Hall, Parlor, Dining, Kitchen, Scullery, Larder, Study, Pantry). 10 doors."
+    }
+  },
+  {
+    "id": "fresh_11",
+    "filename": "fresh_11_Spade_House_drawings_2cJPG.jpg",
+    "style": "Spade House Upper Floor (C.F.A. Voysey)",
+    "original_title": "File:Spade House drawings (2c).JPG",
+    "dimensions": [
+      3568,
+      1008
+    ],
+    "license": "Public domain",
+    "gt_rooms": 7,
+    "gt_doors": 8,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "41a1c314e6fb3db9917d4db154ff5e981b54e6bdffc44b659d00f3ea1935ec64",
+    "file_size_bytes": 1744896,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "Spade House UF: 7 bedrooms and dressing rooms. 8 doors from gallery corridor."
+    }
+  },
+  {
+    "id": "fresh_12",
+    "filename": "fresh_12_CAD_of_House_Plan_from_Design_to_Bu.jpg",
+    "style": "Modern CAD 3-BHK Residence Blueprint",
+    "original_title": "File:CAD of House Plan from Design to Build.jpg",
+    "dimensions": [
+      3765,
+      2523
+    ],
+    "license": "CC BY-SA 4.0",
+    "gt_rooms": 8,
+    "gt_doors": 9,
+    "status": "LOCKED_FOR_DEFENSE_EVAL",
+    "sha256": "3c79ef7de56713b632f1c837cf12c6a58cca2997bfbb1f7fe1aec2fd3bb90855",
+    "file_size_bytes": 1686729,
+    "annotation_protocol": {
+      "room_criteria": "Enclosed habitable/functional space with >= 3 bounding walls. Excludes open verandas/gardens.",
+      "door_criteria": "Pedestrian transit opening with swing arc, leaf, or wall portal >= 0.65m.",
+      "specific_rules": "CAD 3-BHK: 8 enclosed rooms (Living, Dining, Kitchen, 3 Beds, 2 Baths). Balconies excluded. 9 doors (Main entrance, 3 beds, 2 baths, kitchen, 2 balcony doors)."
+    }
+  }
+]
