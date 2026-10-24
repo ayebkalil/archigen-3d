@@ -181,3 +181,31 @@ def test_repair_polygon_to_single_polygon():
     assert was_rep_20
     assert delta_20 <= 20.0
 
+def test_fallback_router_trigger_conditions():
+    """Verify that fallback routing fires ONLY on true collapses and never on studios."""
+    def check_collapse(n_rooms, area, shell_valid):
+        return (n_rooms == 0) or (not shell_valid) or (n_rooms == 1 and area < 8.0)
+
+    # 1. Normal multi-room apartment
+    assert not check_collapse(n_rooms=4, area=65.0, shell_valid=True)
+
+    # 2. Legitimate 2-room apartment (Plan 10 & 142 cases)
+    assert not check_collapse(n_rooms=2, area=10.7, shell_valid=True)
+    assert not check_collapse(n_rooms=2, area=24.3, shell_valid=True)
+
+    # 3. Legitimate single-room studio apartment (dev_06 & dev_18 cases)
+    assert not check_collapse(n_rooms=1, area=21.2, shell_valid=True)
+    assert not check_collapse(n_rooms=1, area=16.6, shell_valid=True)
+
+    # 4. Total collapse (0 rooms, Plan 346 & dev_07 cases)
+    assert check_collapse(n_rooms=0, area=0.0, shell_valid=False)
+    assert check_collapse(n_rooms=0, area=0.0, shell_valid=True)
+
+    # 5. Invalid building shell (structural failure)
+    assert check_collapse(n_rooms=3, area=45.0, shell_valid=False)
+
+    # 6. Single-room tiny artifact under 8 m² (Plans 80, 277, 321, 353 cases)
+    assert check_collapse(n_rooms=1, area=4.2, shell_valid=True)
+    assert check_collapse(n_rooms=1, area=5.3, shell_valid=True)
+
+

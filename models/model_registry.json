@@ -132,6 +132,13 @@
       "size_bytes": 156648236,
       "size_mb": 149.39,
       "last_modified": "2026-10-23T08:33:46.718987"
+    },
+    "models\\\\saved\\\\floorplan_unetpp\\\\multitask_resnet34_blend_alpha_0_3.pth": {
+      "sha256": "bba5d827e27e8a099cfbca07ec13cc862d2d6f3094574f16bac17b86c5301dc6",
+      "size_bytes": 104530352,
+      "size_mb": 99.69,
+      "last_modified": "2026-10-23T19:10:00",
+      "role": "fallback_router"
     }
   },
   "champion_facade": {

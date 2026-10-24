@@ -1,0 +1,5 @@
+outs:
+- md5: ce54c25b4e332c5783097151509ff8ba
+  size: 104530352
+  hash: md5
+  path: multitask_resnet34_blend_alpha_0_3.pth
