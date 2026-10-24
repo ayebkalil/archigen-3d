@@ -74,7 +74,7 @@ async def monitor_latency_middleware(request: Request, call_next):
 @app.get("/health", response_model=HealthResponse, tags=["System Health"])
 async def health_check():
     """
-    Verifies server readiness, GPU detection, and loaded model status.
+    Verifies server readiness, GPU detection, loaded model status, and fallback router status.
     Strictly complies with syllabus section 5.1.
     """
     try:
@@ -83,11 +83,23 @@ async def health_check():
     except (ImportError, Exception):
         gpu_avail = False
 
+    fb_loaded = False
+    fb_name = None
+    try:
+        from app.floorplan_engine import FloorplanPipeline
+        pipeline = FloorplanPipeline.get_instance()
+        fb_loaded = pipeline.fallback_model is not None
+        fb_name = getattr(pipeline, "fallback_model_name", None)
+    except Exception:
+        pass
+
     return HealthResponse(
         status="healthy",
         model_loaded=True,
         gpu_available=gpu_avail,
-        version="1.0.0"
+        version="1.0.0",
+        fallback_router_loaded=fb_loaded,
+        fallback_model_name=fb_name
     )
 
 @app.get("/metrics", tags=["Production Monitoring"])
@@ -110,6 +122,16 @@ async def get_model_metadata():
     """
     Returns characteristics of the loaded architectures, training metrics, and target resolutions.
     """
+    fb_loaded = False
+    fb_name = None
+    try:
+        from app.floorplan_engine import FloorplanPipeline
+        pipeline = FloorplanPipeline.get_instance()
+        fb_loaded = pipeline.fallback_model is not None
+        fb_name = getattr(pipeline, "fallback_model_name", None)
+    except Exception:
+        pass
+
     return ModelMetadataResponse(
         project_name="ArchiGen 3D (AI HomeByMe)",
         major_axis="Axe 2 - Generative AI (Pix2Pix / cGAN)",
@@ -117,7 +139,12 @@ async def get_model_metadata():
         framework="PyTorch + ONNX Runtime",
         target_resolution=[256, 256],
         supported_styles=["Modern Minimalist", "Mediterranean Stone", "Traditional Brick", "Lush Vegetation"],
-        metrics={"target_fid": 45.0, "target_lpips": 0.28, "target_miou": 0.78}
+        metrics={"target_fid": 45.0, "target_lpips": 0.28, "target_miou": 0.78},
+        fallback_router={
+            "loaded": fb_loaded,
+            "model_name": fb_name,
+            "trigger_condition": "n_rooms == 0 or not is_shell_valid or (n_rooms == 1 and area < 8.0)"
+        }
     )
 
 @app.post("/predict/floorplan", response_model=FloorPlanAnalysisResponse, tags=["Vision Inference"])

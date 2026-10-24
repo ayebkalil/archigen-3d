@@ -14,22 +14,24 @@ from app.main import app
 client = TestClient(app)
 
 def test_health_endpoint():
-    """Verify that GET /health returns 200 and healthy status."""
+    """Verify that GET /health returns 200, healthy status, and fallback router status."""
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
     assert "version" in data
     assert "model_loaded" in data
+    assert "fallback_router_loaded" in data
 
 def test_model_metadata_endpoint():
-    """Verify that GET /model/metadata returns architecture and metrics."""
+    """Verify that GET /model/metadata returns architecture, metrics, and fallback router metadata."""
     response = client.get("/model/metadata")
     assert response.status_code == 200
     data = response.json()
     assert data["project_name"] == "ArchiGen 3D (AI HomeByMe)"
     assert "supported_styles" in data
     assert len(data["supported_styles"]) > 0
+    assert "fallback_router" in data
 
 def test_predict_floorplan_invalid_file():
     """Verify that uploading a non-image file returns HTTP 400 Bad Request."""
