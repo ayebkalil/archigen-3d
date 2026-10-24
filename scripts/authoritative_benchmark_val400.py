@@ -171,15 +171,19 @@ def benchmark_all_systems():
                 if lay_ch.get("metadata", {}).get("is_building_shell_valid", False):
                     results["Challenger"]["valid_shells"] += 1
 
-                # Routed System
-                # Rule: Champion runs first. Fallback triggered if rooms == 0 OR (rooms < 3 AND area < 25 m2)
+                # Refined Routed System Trigger:
+                # Trigger fallback ONLY on genuine structural collapses:
+                # 0 rooms, invalid shell, or single-room artifact under 8.0 m2
                 area_c = lay_champ.get("metadata", {}).get("total_surface_m2", 0.0)
-                is_trigger = (n_c == 0) or (n_c < 3 and area_c < 25.0)
+                valid_c = lay_champ.get("metadata", {}).get("is_building_shell_valid", False)
+                valid_bl = lay_bl.get("metadata", {}).get("is_building_shell_valid", False)
+
+                is_trigger = (n_c == 0) or (not valid_c) or (n_c == 1 and area_c < 8.0)
 
                 if is_trigger:
                     results["Routed System"]["fallback_triggers"] += 1
-                    # Fallback pass uses Blend alpha=0.3
-                    if n_bl > n_c:
+                    # Adopt fallback if it detected more rooms, or if primary shell was invalid and fallback is valid
+                    if n_bl > n_c or (not valid_c and valid_bl):
                         chosen_lay = lay_bl
                         chosen_pr_r = pr_blend_r[i:i+1]
                         chosen_pr_s = pr_blend_s[i:i+1]
@@ -221,12 +225,19 @@ def benchmark_all_systems():
         s_union = s_cm.sum(dim=1).float() + s_cm.sum(dim=0).float() - s_tp
         s_ious = torch.where(s_union > 0, s_tp / s_union, torch.zeros_like(s_tp)).cpu().numpy() * 100.0
 
+        # Exact denominators
+        miou_10cl = float(np.mean(r_ious[1:11]))
         miou_9cl = float(np.mean([r_ious[c] for c in ACTIVE_9_CLASSES]))
-        miou_11cl = float(np.mean(r_ious[1:]))
+        miou_11cl = float(np.mean(r_ious[1:12]))
+
+        # Wall metrics
+        wall_tp = float(s_cm[1:3, 1:3].sum())
+        wall_union = float(s_cm[1:3, :].sum() + s_cm[:, 1:3].sum() - s_cm[1:3, 1:3].sum())
+        wall_merged = float((wall_tp / wall_union) * 100.0) if wall_union > 0 else 0.0
 
         wall_int = float(s_ious[1])
         wall_ext = float(s_ious[2])
-        wall_comb = float(np.mean(s_ious[1:3]))
+        wall_mean = float((wall_int + wall_ext) / 2.0)
         door_iou = float(s_ious[3])
         win_iou = float(s_ious[4])
 
@@ -236,11 +247,13 @@ def benchmark_all_systems():
         fb_rate = float(results[s]["fallback_triggers"] / 400.0 * 100.0)
 
         summary[s] = {
+            "room_mIoU_10cl": round(miou_10cl, 2),
             "room_mIoU_9cl": round(miou_9cl, 2),
             "room_mIoU_11cl": round(miou_11cl, 2),
+            "wall_merged_iou": round(wall_merged, 2),
+            "wall_mean_iou": round(wall_mean, 2),
             "wall_ext_iou": round(wall_ext, 2),
             "wall_int_iou": round(wall_int, 2),
-            "wall_comb_iou": round(wall_comb, 2),
             "door_iou": round(door_iou, 2),
             "win_iou": round(win_iou, 2),
             "room_count_mae": round(room_mae, 3),
@@ -259,15 +272,17 @@ def benchmark_all_systems():
     print("-" * 115, flush=True)
 
     rows = [
-        ("room_mIoU_9cl", "Room mIoU (9 Active Cl.)", "%"),
-        ("room_mIoU_11cl", "Room mIoU (11 Fg Cl.)", "%"),
-        ("wall_comb_iou", "Wall IoU (Combined)", "%"),
+        ("room_mIoU_10cl", "Room mIoU (10 Habitable Classes)", "%"),
+        ("room_mIoU_9cl", "Room mIoU (9 Active Classes)", "%"),
+        ("room_mIoU_11cl", "Room mIoU (11 All-Fg Classes)", "%"),
+        ("wall_merged_iou", "True Merged Wall IoU", "%"),
+        ("wall_mean_iou", "Mean Ext & Int Wall IoU", "%"),
         ("wall_ext_iou", "Wall Ext. IoU", "%"),
         ("wall_int_iou", "Wall Int. IoU", "%"),
         ("door_iou", "Door IoU", "%"),
         ("win_iou", "Window IoU", "%"),
-        ("room_count_mae", "Room Count MAE", " rms"),
-        ("room_count_bias", "Room Count Signed Bias", " rms"),
+        ("room_count_mae", "Room Count MAE", " rooms"),
+        ("room_count_bias", "Room Count Signed Bias", " rooms"),
         ("shell_valid_pct", "Building Shell Valid", "%"),
         ("fallback_trigger_pct", "Fallback Trigger Rate", "%")
     ]

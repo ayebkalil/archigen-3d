@@ -275,11 +275,16 @@ class FloorplanPipeline:
         model_routed = "champion_v1_1"
         fallback_triggered = False
 
-        # Fallback Routing: if primary model produces 0 rooms or collapsed detection (< 3 rooms & small area)
+        # Fallback Routing: triggered only on genuine structural collapses
+        # (0 detected rooms, invalid building shell, or single-room artifact under 8.0 m2).
+        # This isolates true model failures while preserving legitimate 1-2 room studio apartments.
         primary_rooms = layout.get("rooms", [])
         primary_area = layout.get("metadata", {}).get("total_surface_m2", 0.0)
+        is_shell_valid = layout.get("metadata", {}).get("is_building_shell_valid", False)
 
-        if (len(primary_rooms) == 0 or (len(primary_rooms) < 3 and primary_area < 25.0)) and self.fallback_model is not None:
+        is_collapse = (len(primary_rooms) == 0) or (not is_shell_valid) or (len(primary_rooms) == 1 and primary_area < 8.0)
+
+        if is_collapse and self.fallback_model is not None:
             with torch.no_grad():
                 fb_out = self.fallback_model(tensor)
                 fb_prob_s = F.softmax(fb_out["struct"], dim=1)
@@ -299,7 +304,10 @@ class FloorplanPipeline:
                     scale_override_m_per_px=scale_override
                 )
                 fb_rooms = fb_layout.get("rooms", [])
-                if len(fb_rooms) > len(primary_rooms):
+                fb_shell_valid = fb_layout.get("metadata", {}).get("is_building_shell_valid", False)
+
+                # Adopt fallback if it found more rooms, or if primary shell was invalid and fallback produced a valid shell
+                if len(fb_rooms) > len(primary_rooms) or (not is_shell_valid and fb_shell_valid):
                     layout = fb_layout
                     model_routed = getattr(self, "fallback_model_name", "fallback_adapted")
                     fallback_triggered = True
