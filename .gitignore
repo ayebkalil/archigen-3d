@@ -35,6 +35,7 @@ data/processed/*
 data/CubiCasa5k/
 data/CubiCasa5K/
 data/*_cache/
+data/furniture_raw/
 *.zip
 *.tar.gz
 *.tar
