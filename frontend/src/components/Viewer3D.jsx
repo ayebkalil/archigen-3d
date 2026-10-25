@@ -152,9 +152,11 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
       if (!pts || pts.length < 3) return;
 
       const shape = new THREE.Shape();
-      shape.moveTo(pts[0][0] - centerX, pts[0][1] - centerZ);
+      // Shared unmirrored transform: X_shape = x - cx, Y_shape = -(y - cy)
+      // With rotateX(-Math.PI / 2), this yields X_3d = x - cx, Z_3d = y - cy (det = +1)
+      shape.moveTo(pts[0][0] - centerX, -(pts[0][1] - centerZ));
       for (let i = 1; i < pts.length; i++) {
-        shape.lineTo(pts[i][0] - centerX, pts[i][1] - centerZ);
+        shape.lineTo(pts[i][0] - centerX, -(pts[i][1] - centerZ));
       }
       shape.closePath();
 
@@ -207,9 +209,9 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
         if (!pts || pts.length < 3) return;
 
         const shape = new THREE.Shape();
-        shape.moveTo(pts[0][0] - centerX, pts[0][1] - centerZ);
+        shape.moveTo(pts[0][0] - centerX, -(pts[0][1] - centerZ));
         for (let i = 1; i < pts.length; i++) {
-          shape.lineTo(pts[i][0] - centerX, pts[i][1] - centerZ);
+          shape.lineTo(pts[i][0] - centerX, -(pts[i][1] - centerZ));
         }
         shape.closePath();
 
@@ -243,7 +245,8 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
   // View Presets
   const setCameraTopDown = () => {
     if (!cameraRef.current || !controlsRef.current) return;
-    cameraRef.current.position.set(0, 30, 0.1);
+    cameraRef.current.position.set(0, 30, 0);
+    cameraRef.current.up.set(0, 0, -1);
     controlsRef.current.target.set(0, 0, 0);
     controlsRef.current.update();
     setViewPreset('top');
@@ -252,6 +255,7 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
   const setCameraPerspective = () => {
     if (!cameraRef.current || !controlsRef.current) return;
     cameraRef.current.position.set(15, 20, 25);
+    cameraRef.current.up.set(0, 1, 0);
     controlsRef.current.target.set(0, 2, 0);
     controlsRef.current.update();
     setViewPreset('perspective');

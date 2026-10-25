@@ -124,8 +124,8 @@ class Floorplan3DExtruder:
         material_faces = {"Wall_Interior": [], "Wall_Exterior": [], "Wall_Front_Facade": []}
 
         def add_vertex(x, y, z):
-            # In Blender / Three.js standard coords: X is right, Y is up, Z is depth
-            vertices.append((x, z, -y))
+            # Standard unmirrored coords (det = +1): X is right, Y is up, Z is depth
+            vertices.append((x, z, y))
             return len(vertices)
 
         def add_vt(u, v):

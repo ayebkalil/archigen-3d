@@ -1,8 +1,16 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "ArchiGen 3D Curated CC0 Furniture Catalog (Kenney Kit)",
   "license": "CC0 1.0 Universal",
-  "scaling_method": "strict_uniform (sx = sy = sz, zero mesh distortion)",
+  "scaling_policy": "Strict uniform scaling for 27 items; non-uniform scaling permitted solely for 6 simple box-like cabinet/appliance items.",
+  "box_like_non_uniform_items": [
+    "kitchen_counter",
+    "kitchen_sink_unit",
+    "refrigerator",
+    "sideboard",
+    "tv_unit",
+    "wardrobe"
+  ],
   "coordinate_convention": {
     "origin": "center of base at y=0, (x=0, z=0)",
     "forward": "+Z (faces into room / open side)",
@@ -11,10 +19,10 @@
     "lateral": "+X (right)",
     "unit": "meters"
   },
-  "style_support": {
-    "modern": "sleek minimalist models & contemporary finishes",
-    "scandinavian": "light wood, organic curved forms & textiles",
-    "classic": "formal framed furniture & draped upholstery"
+  "preset_support": {
+    "preset_1": "Contemporary neutral layout (clean lines, functional)",
+    "preset_2": "Organic curved timber layout (soft edges, warm tones)",
+    "preset_3": "Formal framed furniture layout (classic silhouettes)"
   },
   "items": {
     "bed_double": {
@@ -22,7 +30,12 @@
       "name": "Double Bed",
       "category": "bed",
       "glb": "/models/furniture/bed_double.glb",
-      "uniform_scale": 1.67,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.67,
+        1.67,
+        1.67
+      ],
       "dimensions_m": [
         1.597,
         1.879,
@@ -40,9 +53,13 @@
           0.939
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "classic"
+        "preset_1",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -60,7 +77,12 @@
       "name": "Single Bed",
       "category": "bed_single",
       "glb": "/models/furniture/bed_single.glb",
-      "uniform_scale": 1.67,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.67,
+        1.67,
+        1.67
+      ],
       "dimensions_m": [
         0.954,
         1.879,
@@ -78,10 +100,15 @@
           0.939
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -99,7 +126,12 @@
       "name": "Nightstand",
       "category": "nightstand",
       "glb": "/models/furniture/nightstand.glb",
-      "uniform_scale": 1.9,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.9,
+        1.9,
+        1.9
+      ],
       "dimensions_m": [
         0.505,
         0.413,
@@ -117,10 +149,15 @@
           0.206
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "adjacent_anchor",
       "clearance": {
@@ -138,28 +175,38 @@
       "name": "Wardrobe Closet",
       "category": "wardrobe",
       "glb": "/models/furniture/wardrobe.glb",
-      "uniform_scale": 2.45,
+      "scaling_type": "non_uniform_box",
+      "scale_factors": [
+        2.5,
+        2.3529,
+        2.4
+      ],
       "dimensions_m": [
-        0.98,
-        0.613,
-        2.082
+        1.0,
+        0.6,
+        2.0
       ],
       "bounds": {
         "min": [
-          -0.49,
+          -0.5,
           0.0,
-          -0.306
+          -0.3
         ],
         "max": [
-          0.49,
-          2.082,
-          0.306
+          0.5,
+          2.0,
+          0.3
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -174,10 +221,15 @@
     },
     "sofa_3seater": {
       "id": "sofa_3seater",
-      "name": "3-Seater Sofa (Standard)",
+      "name": "3-Seater Sofa (Neutral)",
       "category": "sofa",
       "glb": "/models/furniture/sofa_3seater.glb",
-      "uniform_scale": 2.04,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        2.04,
+        2.04,
+        2.04
+      ],
       "dimensions_m": [
         1.999,
         0.836,
@@ -195,8 +247,11 @@
           0.418
         ]
       },
+      "presets": [
+        "preset_2"
+      ],
       "styles": [
-        "scandinavian"
+        "preset_2"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -211,10 +266,15 @@
     },
     "sofa_modern": {
       "id": "sofa_modern",
-      "name": "Modern Designer Sofa",
+      "name": "Low-Profile Sofa",
       "category": "sofa",
       "glb": "/models/furniture/sofa_modern.glb",
-      "uniform_scale": 1.96,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.96,
+        1.96,
+        1.96
+      ],
       "dimensions_m": [
         2.195,
         0.804,
@@ -232,8 +292,11 @@
           0.402
         ]
       },
+      "presets": [
+        "preset_1"
+      ],
       "styles": [
-        "modern"
+        "preset_1"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -248,29 +311,37 @@
     },
     "sofa_classic": {
       "id": "sofa_classic",
-      "name": "Classic Sectional Sofa",
+      "name": "Standard Framed Sofa",
       "category": "sofa",
       "glb": "/models/furniture/sofa_classic.glb",
-      "uniform_scale": 2.14,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        2.04,
+        2.04,
+        2.04
+      ],
       "dimensions_m": [
-        2.097,
-        1.755,
-        0.984
+        1.999,
+        0.836,
+        0.938
       ],
       "bounds": {
         "min": [
-          -1.049,
+          -1.0,
           0.0,
-          -0.877
+          -0.418
         ],
         "max": [
-          1.049,
-          0.984,
-          0.877
+          1.0,
+          0.938,
+          0.418
         ]
       },
+      "presets": [
+        "preset_3"
+      ],
       "styles": [
-        "classic"
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -285,10 +356,15 @@
     },
     "armchair": {
       "id": "armchair",
-      "name": "Modern Armchair",
+      "name": "Contemporary Armchair",
       "category": "armchair",
       "glb": "/models/furniture/armchair.glb",
-      "uniform_scale": 1.5,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.5,
+        1.5,
+        1.5
+      ],
       "dimensions_m": [
         1.094,
         0.615,
@@ -306,8 +382,11 @@
           0.308
         ]
       },
+      "presets": [
+        "preset_1"
+      ],
       "styles": [
-        "modern"
+        "preset_1"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -322,29 +401,37 @@
     },
     "armchair_classic": {
       "id": "armchair_classic",
-      "name": "Classic Club Armchair",
+      "name": "Club Armchair",
       "category": "armchair",
       "glb": "/models/furniture/armchair_classic.glb",
-      "uniform_scale": 1.8,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.78,
+        1.78,
+        1.78
+      ],
       "dimensions_m": [
-        0.882,
-        0.738,
-        0.828
+        0.872,
+        0.73,
+        0.819
       ],
       "bounds": {
         "min": [
-          -0.441,
+          -0.436,
           0.0,
-          -0.369
+          -0.365
         ],
         "max": [
-          0.441,
-          0.828,
-          0.369
+          0.436,
+          0.819,
+          0.365
         ]
       },
+      "presets": [
+        "preset_3"
+      ],
       "styles": [
-        "classic"
+        "preset_3"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -359,29 +446,37 @@
     },
     "armchair_scandi": {
       "id": "armchair_scandi",
-      "name": "Scandinavian Frame Chair",
+      "name": "Timber Frame Chair",
       "category": "armchair",
       "glb": "/models/furniture/armchair_scandi.glb",
-      "uniform_scale": 2.5,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.78,
+        1.78,
+        1.78
+      ],
       "dimensions_m": [
-        0.5,
-        0.5,
-        1.15
+        0.356,
+        0.356,
+        0.819
       ],
       "bounds": {
         "min": [
-          -0.25,
+          -0.178,
           0.0,
-          -0.25
+          -0.178
         ],
         "max": [
-          0.25,
-          1.15,
-          0.25
+          0.178,
+          0.819,
+          0.178
         ]
       },
+      "presets": [
+        "preset_2"
+      ],
       "styles": [
-        "scandinavian"
+        "preset_2"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -396,10 +491,15 @@
     },
     "coffee_table": {
       "id": "coffee_table",
-      "name": "Wood Coffee Table",
+      "name": "Rectangular Coffee Table",
       "category": "coffee_table",
       "glb": "/models/furniture/coffee_table.glb",
-      "uniform_scale": 1.67,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.67,
+        1.67,
+        1.67
+      ],
       "dimensions_m": [
         1.104,
         0.668,
@@ -417,8 +517,11 @@
           0.334
         ]
       },
+      "presets": [
+        "preset_2"
+      ],
       "styles": [
-        "scandinavian"
+        "preset_2"
       ],
       "placement_rule": "in_front_of_anchor",
       "clearance": {
@@ -433,10 +536,15 @@
     },
     "coffee_table_glass": {
       "id": "coffee_table_glass",
-      "name": "Modern Glass Coffee Table",
+      "name": "Square Coffee Table",
       "category": "coffee_table",
       "glb": "/models/furniture/coffee_table_glass.glb",
-      "uniform_scale": 1.7,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.7,
+        1.7,
+        1.7
+      ],
       "dimensions_m": [
         0.68,
         0.68,
@@ -454,8 +562,11 @@
           0.34
         ]
       },
+      "presets": [
+        "preset_1"
+      ],
       "styles": [
-        "modern"
+        "preset_1"
       ],
       "placement_rule": "in_front_of_anchor",
       "clearance": {
@@ -470,31 +581,41 @@
     },
     "tv_unit": {
       "id": "tv_unit",
-      "name": "Media TV Unit",
+      "name": "Media TV Console",
       "category": "tv_unit",
       "glb": "/models/furniture/tv_unit.glb",
-      "uniform_scale": 2.0,
+      "scaling_type": "non_uniform_box",
+      "scale_factors": [
+        2.0,
+        1.6129,
+        1.8
+      ],
       "dimensions_m": [
         1.6,
-        0.5,
-        0.62
+        0.45,
+        0.5
       ],
       "bounds": {
         "min": [
           -0.8,
           0.0,
-          -0.25
+          -0.225
         ],
         "max": [
           0.8,
-          0.62,
-          0.25
+          0.5,
+          0.225
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -509,10 +630,15 @@
     },
     "rug_living": {
       "id": "rug_living",
-      "name": "Living Area Rug",
+      "name": "Area Floor Rug",
       "category": "rug",
       "glb": "/models/furniture/rug_living.glb",
-      "uniform_scale": 1.6,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.6,
+        1.6,
+        1.6
+      ],
       "dimensions_m": [
         2.512,
         1.472,
@@ -530,10 +656,15 @@
           0.736
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "under_anchor",
       "clearance": {
@@ -548,10 +679,15 @@
     },
     "potted_plant": {
       "id": "potted_plant",
-      "name": "Indoor Plant",
+      "name": "Potted Plant",
       "category": "plant",
       "glb": "/models/furniture/potted_plant.glb",
-      "uniform_scale": 2.2,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        2.2,
+        2.2,
+        2.2
+      ],
       "dimensions_m": [
         0.467,
         0.531,
@@ -569,10 +705,15 @@
           0.266
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "corner",
       "clearance": {
@@ -592,7 +733,12 @@
       "name": "Dining Table (Rectangular)",
       "category": "dining_table",
       "glb": "/models/furniture/dining_table.glb",
-      "uniform_scale": 1.95,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.95,
+        1.95,
+        1.95
+      ],
       "dimensions_m": [
         1.641,
         0.872,
@@ -610,8 +756,11 @@
           0.436
         ]
       },
+      "presets": [
+        "preset_1"
+      ],
       "styles": [
-        "modern"
+        "preset_1"
       ],
       "placement_rule": "center",
       "clearance": {
@@ -626,10 +775,15 @@
     },
     "dining_table_round": {
       "id": "dining_table_round",
-      "name": "Round Dining Table",
+      "name": "Dining Table (Round)",
       "category": "dining_table",
       "glb": "/models/furniture/dining_table_round.glb",
-      "uniform_scale": 1.8,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.8,
+        1.8,
+        1.8
+      ],
       "dimensions_m": [
         1.247,
         1.44,
@@ -647,8 +801,11 @@
           0.72
         ]
       },
+      "presets": [
+        "preset_2"
+      ],
       "styles": [
-        "scandinavian"
+        "preset_2"
       ],
       "placement_rule": "center",
       "clearance": {
@@ -663,10 +820,15 @@
     },
     "dining_table_cloth": {
       "id": "dining_table_cloth",
-      "name": "Classic Dining Table (Cloth)",
+      "name": "Dining Table (Draped)",
       "category": "dining_table",
       "glb": "/models/furniture/dining_table_cloth.glb",
-      "uniform_scale": 1.95,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.95,
+        1.95,
+        1.95
+      ],
       "dimensions_m": [
         1.641,
         0.872,
@@ -684,8 +846,11 @@
           0.436
         ]
       },
+      "presets": [
+        "preset_3"
+      ],
       "styles": [
-        "classic"
+        "preset_3"
       ],
       "placement_rule": "center",
       "clearance": {
@@ -703,26 +868,34 @@
       "name": "Modern Dining Chair",
       "category": "dining_chair",
       "glb": "/models/furniture/dining_chair.glb",
-      "uniform_scale": 2.3,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.8,
+        1.8,
+        1.8
+      ],
       "dimensions_m": [
-        0.46,
-        0.46,
-        1.058
+        0.36,
+        0.36,
+        0.828
       ],
       "bounds": {
         "min": [
-          -0.23,
+          -0.18,
           0.0,
-          -0.23
+          -0.18
         ],
         "max": [
-          0.23,
-          1.058,
-          0.23
+          0.18,
+          0.828,
+          0.18
         ]
       },
+      "presets": [
+        "preset_1"
+      ],
       "styles": [
-        "modern"
+        "preset_1"
       ],
       "placement_rule": "around_anchor",
       "clearance": {
@@ -737,29 +910,37 @@
     },
     "dining_chair_scandi": {
       "id": "dining_chair_scandi",
-      "name": "Scandinavian Dining Chair",
+      "name": "Curved Dining Chair",
       "category": "dining_chair",
       "glb": "/models/furniture/dining_chair_scandi.glb",
-      "uniform_scale": 2.2,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.8,
+        1.8,
+        1.8
+      ],
       "dimensions_m": [
-        0.44,
-        0.44,
-        1.001
+        0.36,
+        0.36,
+        0.819
       ],
       "bounds": {
         "min": [
-          -0.22,
+          -0.18,
           0.0,
-          -0.22
+          -0.18
         ],
         "max": [
-          0.22,
-          1.001,
-          0.22
+          0.18,
+          0.819,
+          0.18
         ]
       },
+      "presets": [
+        "preset_2"
+      ],
       "styles": [
-        "scandinavian"
+        "preset_2"
       ],
       "placement_rule": "around_anchor",
       "clearance": {
@@ -774,29 +955,37 @@
     },
     "dining_chair_classic": {
       "id": "dining_chair_classic",
-      "name": "Classic Dining Chair",
+      "name": "Framed Dining Chair",
       "category": "dining_chair",
       "glb": "/models/furniture/dining_chair_classic.glb",
-      "uniform_scale": 2.2,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.75,
+        1.75,
+        1.75
+      ],
       "dimensions_m": [
-        0.44,
-        0.44,
-        1.034
+        0.35,
+        0.35,
+        0.822
       ],
       "bounds": {
         "min": [
-          -0.22,
+          -0.175,
           0.0,
-          -0.22
+          -0.175
         ],
         "max": [
-          0.22,
-          1.034,
-          0.22
+          0.175,
+          0.822,
+          0.175
         ]
       },
+      "presets": [
+        "preset_3"
+      ],
       "styles": [
-        "classic"
+        "preset_3"
       ],
       "placement_rule": "around_anchor",
       "clearance": {
@@ -811,31 +1000,41 @@
     },
     "sideboard": {
       "id": "sideboard",
-      "name": "Dining Sideboard",
+      "name": "Low Sideboard Credenza",
       "category": "sideboard",
       "glb": "/models/furniture/sideboard.glb",
-      "uniform_scale": 1.85,
+      "scaling_type": "non_uniform_box",
+      "scale_factors": [
+        1.75,
+        2.5806,
+        1.7308
+      ],
       "dimensions_m": [
-        1.48,
-        0.463,
-        1.461
+        1.4,
+        0.45,
+        0.8
       ],
       "bounds": {
         "min": [
-          -0.74,
+          -0.7,
           0.0,
-          -0.231
+          -0.225
         ],
         "max": [
-          0.74,
-          1.461,
-          0.231
+          0.7,
+          0.8,
+          0.225
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -850,10 +1049,15 @@
     },
     "desk": {
       "id": "desk",
-      "name": "Office Desk",
+      "name": "Writing Desk",
       "category": "desk",
       "glb": "/models/furniture/desk.glb",
-      "uniform_scale": 1.85,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.85,
+        1.85,
+        1.85
+      ],
       "dimensions_m": [
         1.359,
         0.726,
@@ -871,9 +1075,13 @@
           0.363
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2"
+      ],
       "styles": [
-        "modern",
-        "scandinavian"
+        "preset_1",
+        "preset_2"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -888,10 +1096,15 @@
     },
     "desk_corner": {
       "id": "desk_corner",
-      "name": "Executive Corner Desk",
+      "name": "Corner Desk",
       "category": "desk",
       "glb": "/models/furniture/desk_corner.glb",
-      "uniform_scale": 1.65,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.65,
+        1.65,
+        1.65
+      ],
       "dimensions_m": [
         1.608,
         1.608,
@@ -909,8 +1122,11 @@
           0.804
         ]
       },
+      "presets": [
+        "preset_3"
+      ],
       "styles": [
-        "classic"
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -928,7 +1144,12 @@
       "name": "Desk Swivel Chair",
       "category": "office_chair",
       "glb": "/models/furniture/office_chair.glb",
-      "uniform_scale": 1.8,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.8,
+        1.8,
+        1.8
+      ],
       "dimensions_m": [
         0.603,
         0.566,
@@ -946,10 +1167,15 @@
           0.283
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -967,7 +1193,12 @@
       "name": "Open Bookcase",
       "category": "bookcase",
       "glb": "/models/furniture/bookcase.glb",
-      "uniform_scale": 2.1,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        2.1,
+        2.1,
+        2.1
+      ],
       "dimensions_m": [
         0.84,
         0.525,
@@ -985,10 +1216,15 @@
           0.263
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1004,10 +1240,15 @@
     },
     "floor_lamp": {
       "id": "floor_lamp",
-      "name": "Floor Reading Lamp",
+      "name": "Floor Lamp",
       "category": "lamp",
       "glb": "/models/furniture/floor_lamp.glb",
-      "uniform_scale": 2.0,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        2.0,
+        2.0,
+        2.0
+      ],
       "dimensions_m": [
         0.304,
         0.351,
@@ -1025,10 +1266,15 @@
           0.176
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "corner",
       "clearance": {
@@ -1044,31 +1290,41 @@
     },
     "kitchen_counter": {
       "id": "kitchen_counter",
-      "name": "Kitchen Base Cabinet",
+      "name": "Kitchen Base Counter",
       "category": "kitchen_counter",
       "glb": "/models/furniture/kitchen_counter.glb",
-      "uniform_scale": 2.0,
+      "scaling_type": "non_uniform_box",
+      "scale_factors": [
+        2.093,
+        1.9556,
+        1.3333
+      ],
       "dimensions_m": [
-        0.86,
         0.9,
-        0.9
+        0.6,
+        0.88
       ],
       "bounds": {
         "min": [
-          -0.43,
+          -0.45,
           0.0,
-          -0.45
+          -0.3
         ],
         "max": [
-          0.43,
-          0.9,
-          0.45
+          0.45,
+          0.88,
+          0.3
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1083,31 +1339,41 @@
     },
     "kitchen_sink_unit": {
       "id": "kitchen_sink_unit",
-      "name": "Kitchen Sink Unit",
+      "name": "Kitchen Sink Counter",
       "category": "kitchen_sink",
       "glb": "/models/furniture/kitchen_sink_unit.glb",
-      "uniform_scale": 2.0,
+      "scaling_type": "non_uniform_box",
+      "scale_factors": [
+        2.093,
+        1.7959,
+        1.3333
+      ],
       "dimensions_m": [
-        0.86,
         0.9,
-        0.98
+        0.6,
+        0.88
       ],
       "bounds": {
         "min": [
-          -0.43,
+          -0.45,
           0.0,
-          -0.45
+          -0.3
         ],
         "max": [
-          0.43,
-          0.98,
-          0.45
+          0.45,
+          0.88,
+          0.3
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1125,28 +1391,38 @@
       "name": "Tall Refrigerator",
       "category": "refrigerator",
       "glb": "/models/furniture/refrigerator.glb",
-      "uniform_scale": 1.7,
+      "scaling_type": "non_uniform_box",
+      "scale_factors": [
+        1.4423,
+        1.9565,
+        1.7073
+      ],
       "dimensions_m": [
-        0.884,
-        0.689,
-        1.564
+        0.75,
+        0.692,
+        1.8
       ],
       "bounds": {
         "min": [
-          -0.442,
+          -0.375,
           0.0,
-          -0.345
+          -0.346
         ],
         "max": [
-          0.442,
-          1.564,
-          0.345
+          0.375,
+          1.8,
+          0.346
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1164,7 +1440,12 @@
       "name": "Floor Toilet",
       "category": "toilet",
       "glb": "/models/furniture/toilet.glb",
-      "uniform_scale": 1.5,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.5,
+        1.5,
+        1.5
+      ],
       "dimensions_m": [
         0.469,
         0.716,
@@ -1182,10 +1463,15 @@
           0.358
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1203,7 +1489,12 @@
       "name": "Bathroom Vanity Sink",
       "category": "bathroom_sink",
       "glb": "/models/furniture/bathroom_vanity.glb",
-      "uniform_scale": 1.8,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.8,
+        1.8,
+        1.8
+      ],
       "dimensions_m": [
         0.612,
         0.522,
@@ -1221,10 +1512,15 @@
           0.261
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1242,7 +1538,12 @@
       "name": "Full Bathtub",
       "category": "bathtub",
       "glb": "/models/furniture/bathtub.glb",
-      "uniform_scale": 1.4,
+      "scaling_type": "strict_uniform",
+      "scale_factors": [
+        1.4,
+        1.4,
+        1.4
+      ],
       "dimensions_m": [
         1.666,
         0.784,
@@ -1260,10 +1561,15 @@
           0.392
         ]
       },
+      "presets": [
+        "preset_1",
+        "preset_2",
+        "preset_3"
+      ],
       "styles": [
-        "modern",
-        "scandinavian",
-        "classic"
+        "preset_1",
+        "preset_2",
+        "preset_3"
       ],
       "placement_rule": "corner_or_wall",
       "clearance": {
