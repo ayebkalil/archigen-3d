@@ -178,6 +178,7 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
           map: facadeTexture,
           roughness: 0.7,
           metalness: 0.1,
+          side: THREE.DoubleSide,
           wireframe: wireframe,
         });
       } else if (wall.is_exterior) {
@@ -185,12 +186,14 @@ export default function Viewer3D({ layout, frontWallId, facadeTextureUrl, numFlo
           color: isFront ? 0xf59e0b : 0x0284c7,
           roughness: 0.5,
           metalness: 0.2,
+          side: THREE.DoubleSide,
           wireframe: wireframe,
         });
       } else {
         material = new THREE.MeshStandardMaterial({
           color: 0x64748b,
           roughness: 0.9,
+          side: THREE.DoubleSide,
           wireframe: wireframe,
         });
       }

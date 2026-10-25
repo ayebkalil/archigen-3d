@@ -20,9 +20,26 @@
     "unit": "meters"
   },
   "preset_support": {
-    "preset_1": "Contemporary neutral layout (clean lines, functional)",
-    "preset_2": "Organic curved timber layout (soft edges, warm tones)",
-    "preset_3": "Formal framed furniture layout (classic silhouettes)"
+    "contemporary_minimal": {
+      "label": "Contemporary Minimal",
+      "description": "Clean low-profile silhouettes, glass accents, and neutral upholstery"
+    },
+    "warm_wood": {
+      "label": "Warm Wood",
+      "description": "Natural oak and timber frames, curved joinery, and warm textiles"
+    },
+    "tailored_classic": {
+      "label": "Tailored Classic",
+      "description": "Structured armchairs, draped surfaces, and formal framed silhouettes"
+    }
+  },
+  "preset_aliases": {
+    "preset_1": "contemporary_minimal",
+    "preset_2": "warm_wood",
+    "preset_3": "tailored_classic",
+    "modern": "contemporary_minimal",
+    "scandinavian": "warm_wood",
+    "classic": "tailored_classic"
   },
   "items": {
     "bed_double": {
@@ -54,12 +71,12 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_3"
+        "contemporary_minimal",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_3"
+        "contemporary_minimal",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -101,14 +118,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -150,14 +167,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "adjacent_anchor",
       "clearance": {
@@ -199,14 +216,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -248,10 +265,10 @@
         ]
       },
       "presets": [
-        "preset_2"
+        "warm_wood"
       ],
       "styles": [
-        "preset_2"
+        "warm_wood"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -293,10 +310,10 @@
         ]
       },
       "presets": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "styles": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -338,10 +355,10 @@
         ]
       },
       "presets": [
-        "preset_3"
+        "tailored_classic"
       ],
       "styles": [
-        "preset_3"
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -383,10 +400,10 @@
         ]
       },
       "presets": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "styles": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -428,10 +445,10 @@
         ]
       },
       "presets": [
-        "preset_3"
+        "tailored_classic"
       ],
       "styles": [
-        "preset_3"
+        "tailored_classic"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -473,10 +490,10 @@
         ]
       },
       "presets": [
-        "preset_2"
+        "warm_wood"
       ],
       "styles": [
-        "preset_2"
+        "warm_wood"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -518,10 +535,10 @@
         ]
       },
       "presets": [
-        "preset_2"
+        "warm_wood"
       ],
       "styles": [
-        "preset_2"
+        "warm_wood"
       ],
       "placement_rule": "in_front_of_anchor",
       "clearance": {
@@ -563,10 +580,10 @@
         ]
       },
       "presets": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "styles": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "placement_rule": "in_front_of_anchor",
       "clearance": {
@@ -608,14 +625,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -657,14 +674,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "under_anchor",
       "clearance": {
@@ -706,14 +723,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "corner",
       "clearance": {
@@ -757,10 +774,10 @@
         ]
       },
       "presets": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "styles": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "placement_rule": "center",
       "clearance": {
@@ -802,10 +819,10 @@
         ]
       },
       "presets": [
-        "preset_2"
+        "warm_wood"
       ],
       "styles": [
-        "preset_2"
+        "warm_wood"
       ],
       "placement_rule": "center",
       "clearance": {
@@ -847,10 +864,10 @@
         ]
       },
       "presets": [
-        "preset_3"
+        "tailored_classic"
       ],
       "styles": [
-        "preset_3"
+        "tailored_classic"
       ],
       "placement_rule": "center",
       "clearance": {
@@ -892,10 +909,10 @@
         ]
       },
       "presets": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "styles": [
-        "preset_1"
+        "contemporary_minimal"
       ],
       "placement_rule": "around_anchor",
       "clearance": {
@@ -937,10 +954,10 @@
         ]
       },
       "presets": [
-        "preset_2"
+        "warm_wood"
       ],
       "styles": [
-        "preset_2"
+        "warm_wood"
       ],
       "placement_rule": "around_anchor",
       "clearance": {
@@ -982,10 +999,10 @@
         ]
       },
       "presets": [
-        "preset_3"
+        "tailored_classic"
       ],
       "styles": [
-        "preset_3"
+        "tailored_classic"
       ],
       "placement_rule": "around_anchor",
       "clearance": {
@@ -1027,14 +1044,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1076,12 +1093,12 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2"
+        "contemporary_minimal",
+        "warm_wood"
       ],
       "styles": [
-        "preset_1",
-        "preset_2"
+        "contemporary_minimal",
+        "warm_wood"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1123,10 +1140,10 @@
         ]
       },
       "presets": [
-        "preset_3"
+        "tailored_classic"
       ],
       "styles": [
-        "preset_3"
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1168,14 +1185,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "facing_anchor",
       "clearance": {
@@ -1217,14 +1234,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1267,14 +1284,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "corner",
       "clearance": {
@@ -1317,14 +1334,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1366,14 +1383,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1415,14 +1432,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1464,14 +1481,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1513,14 +1530,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "back_to_wall",
       "clearance": {
@@ -1562,14 +1579,14 @@
         ]
       },
       "presets": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "styles": [
-        "preset_1",
-        "preset_2",
-        "preset_3"
+        "contemporary_minimal",
+        "warm_wood",
+        "tailored_classic"
       ],
       "placement_rule": "corner_or_wall",
       "clearance": {

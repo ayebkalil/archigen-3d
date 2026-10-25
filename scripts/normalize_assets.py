@@ -37,6 +37,22 @@ BOX_LIKE_ITEMS = {
     "tv_unit",
 }
 
+# Descriptive human-readable presets (replacing abstract preset_1/2/3)
+PRESET_DESCRIPTIONS = {
+    "contemporary_minimal": {
+        "label": "Contemporary Minimal",
+        "description": "Clean low-profile silhouettes, glass accents, and neutral upholstery"
+    },
+    "warm_wood": {
+        "label": "Warm Wood",
+        "description": "Natural oak and timber frames, curved joinery, and warm textiles"
+    },
+    "tailored_classic": {
+        "label": "Tailored Classic",
+        "description": "Structured armchairs, draped surfaces, and formal framed silhouettes"
+    }
+}
+
 ASSET_SPEC = {
     # Bedroom
     "bed_double": {
@@ -45,7 +61,7 @@ ASSET_SPEC = {
         "category": "bed",
         "target_dims_m": [1.60, 2.05, 0.90],
         "scale": 1.67,  # uniform: 0.96m * 1.67 = 1.60m width
-        "presets": ["preset_1", "preset_3"],
+        "presets": ["contemporary_minimal", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.80, "sides": 0.60, "back": 0.00},
         "required": True,
@@ -57,7 +73,7 @@ ASSET_SPEC = {
         "category": "bed_single",
         "target_dims_m": [0.95, 2.00, 0.85],
         "scale": 1.67,  # uniform: 0.57m * 1.67 = 0.95m width
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.80, "sides": 0.50, "back": 0.00},
         "required": False,
@@ -69,7 +85,7 @@ ASSET_SPEC = {
         "category": "nightstand",
         "target_dims_m": [0.50, 0.45, 0.55],
         "scale": 1.90,  # uniform: 0.27m * 1.90 = 0.51m width
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "adjacent_anchor",
         "clearance": {"front": 0.50, "sides": 0.05, "back": 0.00},
         "required": False,
@@ -82,7 +98,7 @@ ASSET_SPEC = {
         "target_dims_m": [1.00, 0.60, 2.00],
         # Box-like item: non-uniform scale [sx, sy, sz]
         "scale": [2.50, 2.3529, 2.40],  # 0.40m*2.50=1.00m W, 0.85m*2.353=2.00m H, 0.25m*2.40=0.60m D
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.80, "sides": 0.05, "back": 0.00},
         "required": False,
@@ -96,7 +112,7 @@ ASSET_SPEC = {
         "category": "sofa",
         "target_dims_m": [2.00, 0.84, 0.94],
         "scale": 2.04,  # uniform: 0.98m * 2.04 = 2.00m width, 0.84m depth, 0.94m height
-        "presets": ["preset_2"],
+        "presets": ["warm_wood"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.80, "sides": 0.30, "back": 0.00},
         "required": True,
@@ -108,7 +124,7 @@ ASSET_SPEC = {
         "category": "sofa",
         "target_dims_m": [2.20, 0.80, 0.80],
         "scale": 1.96,  # uniform: 1.12m * 1.96 = 2.20m width, 0.80m depth
-        "presets": ["preset_1"],
+        "presets": ["contemporary_minimal"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.80, "sides": 0.30, "back": 0.00},
         "required": True,
@@ -121,7 +137,7 @@ ASSET_SPEC = {
         "category": "sofa",
         "target_dims_m": [2.00, 0.84, 0.94],
         "scale": 2.04,  # uniform: 0.98m * 2.04 = 2.00m width, 0.84m depth (NOT 1.75m!)
-        "presets": ["preset_3"],
+        "presets": ["tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.80, "sides": 0.30, "back": 0.00},
         "required": True,
@@ -133,7 +149,7 @@ ASSET_SPEC = {
         "category": "armchair",
         "target_dims_m": [0.85, 0.80, 0.80],
         "scale": 1.50,  # uniform: 0.73m * 1.50 = 1.10m width
-        "presets": ["preset_1"],
+        "presets": ["contemporary_minimal"],
         "placement_rule": "facing_anchor",
         "clearance": {"front": 0.60, "sides": 0.20, "back": 0.10},
         "required": False,
@@ -145,7 +161,7 @@ ASSET_SPEC = {
         "category": "armchair",
         "target_dims_m": [0.87, 0.73, 0.82],
         "scale": 1.78,  # uniform: 0.49m * 1.78 = 0.87m width, 0.73m depth, 0.82m height
-        "presets": ["preset_3"],
+        "presets": ["tailored_classic"],
         "placement_rule": "facing_anchor",
         "clearance": {"front": 0.60, "sides": 0.20, "back": 0.10},
         "required": False,
@@ -158,7 +174,7 @@ ASSET_SPEC = {
         "category": "armchair",
         "target_dims_m": [0.36, 0.36, 0.82],
         "scale": 1.78,  # uniform: 0.46m * 1.78 = 0.82m height (NOT 1.15m!)
-        "presets": ["preset_2"],
+        "presets": ["warm_wood"],
         "placement_rule": "facing_anchor",
         "clearance": {"front": 0.50, "sides": 0.15, "back": 0.10},
         "required": False,
@@ -172,7 +188,7 @@ ASSET_SPEC = {
         "category": "coffee_table",
         "target_dims_m": [1.10, 0.67, 0.38],
         "scale": 1.67,  # uniform: 0.66m * 1.67 = 1.10m width, 0.67m depth, 0.38m height
-        "presets": ["preset_2"],
+        "presets": ["warm_wood"],
         "placement_rule": "in_front_of_anchor",
         "clearance": {"front": 0.40, "sides": 0.40, "back": 0.40},
         "required": False,
@@ -184,7 +200,7 @@ ASSET_SPEC = {
         "category": "coffee_table",
         "target_dims_m": [0.90, 0.90, 0.45],
         "scale": 1.70,  # uniform
-        "presets": ["preset_1"],
+        "presets": ["contemporary_minimal"],
         "placement_rule": "in_front_of_anchor",
         "clearance": {"front": 0.40, "sides": 0.40, "back": 0.40},
         "required": False,
@@ -197,7 +213,7 @@ ASSET_SPEC = {
         "target_dims_m": [1.60, 0.45, 0.50],
         # Box-like item: non-uniform scale [sx, sy, sz]
         "scale": [2.00, 1.6129, 1.80],  # 0.80m*2.00=1.60m W, 0.31m*1.613=0.50m H, 0.25m*1.80=0.45m D
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 1.00, "sides": 0.10, "back": 0.00},
         "required": False,
@@ -209,7 +225,7 @@ ASSET_SPEC = {
         "category": "rug",
         "target_dims_m": [2.51, 1.47, 0.02],
         "scale": 1.60,  # uniform: 1.57m * 1.60 = 2.51m width, 1.47m depth
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "under_anchor",
         "clearance": {"front": 0.00, "sides": 0.00, "back": 0.00},
         "required": False,
@@ -221,7 +237,7 @@ ASSET_SPEC = {
         "category": "plant",
         "target_dims_m": [0.50, 0.50, 1.20],
         "scale": 2.20,  # uniform
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "corner",
         "clearance": {"front": 0.10, "sides": 0.10, "back": 0.10},
         "required": False,
@@ -235,7 +251,7 @@ ASSET_SPEC = {
         "category": "dining_table",
         "target_dims_m": [1.64, 0.88, 0.64],
         "scale": 1.95,  # uniform: 0.84m * 1.95 = 1.64m width, 0.88m depth, 0.64m height
-        "presets": ["preset_1"],
+        "presets": ["contemporary_minimal"],
         "placement_rule": "center",
         "clearance": {"front": 0.80, "sides": 0.80, "back": 0.80},
         "required": True,
@@ -247,7 +263,7 @@ ASSET_SPEC = {
         "category": "dining_table",
         "target_dims_m": [1.20, 1.20, 0.76],
         "scale": 1.80,  # uniform
-        "presets": ["preset_2"],
+        "presets": ["warm_wood"],
         "placement_rule": "center",
         "clearance": {"front": 0.80, "sides": 0.80, "back": 0.80},
         "required": True,
@@ -259,7 +275,7 @@ ASSET_SPEC = {
         "category": "dining_table",
         "target_dims_m": [1.64, 0.88, 0.64],
         "scale": 1.95,  # uniform
-        "presets": ["preset_3"],
+        "presets": ["tailored_classic"],
         "placement_rule": "center",
         "clearance": {"front": 0.80, "sides": 0.80, "back": 0.80},
         "required": True,
@@ -272,7 +288,7 @@ ASSET_SPEC = {
         "category": "dining_chair",
         "target_dims_m": [0.36, 0.36, 0.83],
         "scale": 1.80,  # uniform: 0.46m * 1.80 = 0.828m height (NOT 1.06m!)
-        "presets": ["preset_1"],
+        "presets": ["contemporary_minimal"],
         "placement_rule": "around_anchor",
         "clearance": {"front": 0.40, "sides": 0.10, "back": 0.40},
         "required": False,
@@ -285,7 +301,7 @@ ASSET_SPEC = {
         "category": "dining_chair",
         "target_dims_m": [0.36, 0.36, 0.82],
         "scale": 1.80,  # uniform: 0.455m * 1.80 = 0.819m height (NOT 1.00m!)
-        "presets": ["preset_2"],
+        "presets": ["warm_wood"],
         "placement_rule": "around_anchor",
         "clearance": {"front": 0.40, "sides": 0.10, "back": 0.40},
         "required": False,
@@ -298,7 +314,7 @@ ASSET_SPEC = {
         "category": "dining_chair",
         "target_dims_m": [0.35, 0.35, 0.82],
         "scale": 1.75,  # uniform: 0.47m * 1.75 = 0.823m height (NOT 1.03m!)
-        "presets": ["preset_3"],
+        "presets": ["tailored_classic"],
         "placement_rule": "around_anchor",
         "clearance": {"front": 0.40, "sides": 0.10, "back": 0.40},
         "required": False,
@@ -312,7 +328,7 @@ ASSET_SPEC = {
         "target_dims_m": [1.40, 0.45, 0.80],
         # Box-like item: non-uniform scale [sx, sy, sz]
         "scale": [1.75, 2.5806, 1.7308],  # 0.80m*1.75=1.40m W, 0.31m*2.581=0.80m H, 0.26m*1.731=0.45m D (NOT 1.46m!)
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.80, "sides": 0.10, "back": 0.00},
         "required": False,
@@ -326,7 +342,7 @@ ASSET_SPEC = {
         "category": "desk",
         "target_dims_m": [1.35, 0.72, 0.71],
         "scale": 1.85,  # uniform: 0.73m * 1.85 = 1.35m width, 0.72m depth, 0.71m height
-        "presets": ["preset_1", "preset_2"],
+        "presets": ["contemporary_minimal", "warm_wood"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.90, "sides": 0.20, "back": 0.00},
         "required": True,
@@ -338,7 +354,7 @@ ASSET_SPEC = {
         "category": "desk",
         "target_dims_m": [1.60, 1.60, 0.75],
         "scale": 1.65,  # uniform
-        "presets": ["preset_3"],
+        "presets": ["tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.90, "sides": 0.20, "back": 0.00},
         "required": True,
@@ -350,7 +366,7 @@ ASSET_SPEC = {
         "category": "office_chair",
         "target_dims_m": [0.59, 0.56, 1.10],
         "scale": 1.80,  # uniform: 0.33m * 1.80 = 0.59m width
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "facing_anchor",
         "clearance": {"front": 0.20, "sides": 0.20, "back": 0.60},
         "required": False,
@@ -362,7 +378,7 @@ ASSET_SPEC = {
         "category": "bookcase",
         "target_dims_m": [0.84, 0.52, 1.85],
         "scale": 2.10,  # uniform: 0.40m * 2.10 = 0.84m width, 1.85m height
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.60, "sides": 0.05, "back": 0.00},
         "required": False,
@@ -374,7 +390,7 @@ ASSET_SPEC = {
         "category": "lamp",
         "target_dims_m": [0.40, 0.40, 1.50],
         "scale": 2.00,  # uniform
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "corner",
         "clearance": {"front": 0.10, "sides": 0.10, "back": 0.10},
         "required": False,
@@ -390,7 +406,7 @@ ASSET_SPEC = {
         "target_dims_m": [0.90, 0.60, 0.88],
         # Box-like item: non-uniform scale [sx, sy, sz]
         "scale": [2.0930, 1.9556, 1.3333],  # 0.43m*2.093=0.90m W, 0.45m*1.956=0.88m H, 0.45m*1.333=0.60m D
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.90, "sides": 0.00, "back": 0.00},
         "required": True,
@@ -404,7 +420,7 @@ ASSET_SPEC = {
         "target_dims_m": [0.90, 0.60, 0.88],
         # Box-like item: non-uniform scale [sx, sy, sz]
         "scale": [2.0930, 1.7959, 1.3333],  # 0.43m*2.093=0.90m W, 0.49m*1.796=0.88m H, 0.45m*1.333=0.60m D
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.90, "sides": 0.00, "back": 0.00},
         "required": False,
@@ -417,7 +433,7 @@ ASSET_SPEC = {
         "target_dims_m": [0.75, 0.70, 1.80],
         # Box-like item: non-uniform scale [sx, sy, sz]
         "scale": [1.4423, 1.9565, 1.7073],  # 0.52m*1.442=0.75m W, 0.92m*1.957=1.80m H, 0.41m*1.707=0.70m D
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.90, "sides": 0.05, "back": 0.05},
         "required": False,
@@ -431,7 +447,7 @@ ASSET_SPEC = {
         "category": "toilet",
         "target_dims_m": [0.47, 0.72, 0.68],
         "scale": 1.50,  # uniform: 0.31m * 1.50 = 0.47m width, 0.72m depth, 0.68m height
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.60, "sides": 0.25, "back": 0.00},
         "required": True,
@@ -443,7 +459,7 @@ ASSET_SPEC = {
         "category": "bathroom_sink",
         "target_dims_m": [0.61, 0.52, 1.01],
         "scale": 1.80,  # uniform: 0.34m * 1.80 = 0.61m width, 0.52m depth, 1.01m height
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "back_to_wall",
         "clearance": {"front": 0.70, "sides": 0.15, "back": 0.00},
         "required": False,
@@ -455,7 +471,7 @@ ASSET_SPEC = {
         "category": "bathtub",
         "target_dims_m": [1.67, 0.78, 0.59],
         "scale": 1.40,  # uniform: 1.19m * 1.40 = 1.67m width, 0.78m depth, 0.59m height
-        "presets": ["preset_1", "preset_2", "preset_3"],
+        "presets": ["contemporary_minimal", "warm_wood", "tailored_classic"],
         "placement_rule": "corner_or_wall",
         "clearance": {"front": 0.70, "sides": 0.00, "back": 0.00},
         "required": False,
@@ -532,10 +548,14 @@ def run():
             "lateral": "+X (right)",
             "unit": "meters"
         },
-        "preset_support": {
-            "preset_1": "Contemporary neutral layout (clean lines, functional)",
-            "preset_2": "Organic curved timber layout (soft edges, warm tones)",
-            "preset_3": "Formal framed furniture layout (classic silhouettes)"
+        "preset_support": PRESET_DESCRIPTIONS,
+        "preset_aliases": {
+            "preset_1": "contemporary_minimal",
+            "preset_2": "warm_wood",
+            "preset_3": "tailored_classic",
+            "modern": "contemporary_minimal",
+            "scandinavian": "warm_wood",
+            "classic": "tailored_classic"
         },
         "items": {}
     }
