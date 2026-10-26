@@ -202,3 +202,105 @@ def test_tiny_room_fails_gracefully(engine):
     assert not res.is_valid
     assert res.failure_reason == "TOO_SMALL"
     assert len(res.items) == 0
+
+def test_partition_fallback_enclosed_room(engine):
+    """
+    Verify partition fallback: an enclosed room with empty wall_segments
+    (interior partitions omitted by vectorizer) successfully recognizes its
+    boundary edges as partition wall faces and furnishes validly.
+    """
+    room_pts = [
+        [0.0, 0.0],
+        [2.6, 0.0],
+        [2.6, 2.4],
+        [0.0, 2.4]
+    ]
+    doors = [{"position_m": [1.3, 2.4], "width_m": 0.80}]
+
+    res = engine.design_room(
+        room_polygon_meters=room_pts,
+        room_type="bathroom",
+        wall_segments=[], # Simulates missing interior partition wall evidence
+        doors=doors,
+        preset="contemporary_minimal",
+        seed=42
+    )
+
+    assert res.is_valid, f"Partition fallback failed: {res.failure_reason}"
+    assert len(res.items) >= 1
+    categories = [it.category for it in res.items]
+    assert "toilet" in categories
+    assert res.validation.overlap_count == 0
+    assert not res.validation.door_clearance_violation
+    assert res.validation.bfs_reachable
+
+def test_kitchen_secondary_wall_counter(engine):
+    """
+    Verify kitchen L-shaped counter fallback:
+    Primary wall (1.70m) cannot accommodate sink (0.90m) + counter (0.90m) + margin (0.10m),
+    which requires 1.90m. The counter is placed on the secondary wall (2.20m).
+    """
+    room_pts = [
+        [0.0, 0.0],
+        [2.2, 0.0],
+        [2.2, 1.7],
+        [0.0, 1.7]
+    ]
+    doors = [{"position_m": [0.0, 0.85], "width_m": 0.80}]
+
+    res = engine.design_room(
+        room_polygon_meters=room_pts,
+        room_type="kitchen",
+        doors=doors,
+        preset="contemporary_minimal",
+        seed=42
+    )
+
+    assert res.is_valid, f"Kitchen secondary counter failed: {res.failure_reason}"
+    categories = [it.category for it in res.items]
+    assert "kitchen_sink" in categories, "Kitchen must have sink"
+    assert "kitchen_counter" in categories, "Kitchen must have counter on secondary wall"
+
+    sink = next(it for it in res.items if it.category == "kitchen_sink")
+    counter = next(it for it in res.items if it.category == "kitchen_counter")
+
+    # They should be on different walls (different rotation angles)
+    assert abs(sink.rotation_deg - counter.rotation_deg) > 1e-3 or np.linalg.norm(np.array(sink.position_m) - np.array(counter.position_m)) > 0.80
+    assert res.validation.overlap_count == 0
+    assert not res.validation.door_clearance_violation
+    assert res.validation.bfs_reachable
+
+def test_optional_item_dropping_compact_bathroom(engine):
+    """
+    Verify optional item dropping:
+    A compact powder room / WC (2.0 m²) has enough space for a toilet,
+    but not enough space for a bathtub or large vanity without collision.
+    The engine gracefully drops the optional bathtub and vanity,
+    accepting the toilet alone as a valid collision-free half-bath.
+    """
+    # 1.5m x 1.35m room (area ~2.0 m²)
+    room_pts = [
+        [0.0, 0.0],
+        [1.5, 0.0],
+        [1.5, 1.35],
+        [0.0, 1.35]
+    ]
+    # Door occupies half of the south wall
+    doors = [{"position_m": [1.1, 1.35], "width_m": 0.75}]
+
+    res = engine.design_room(
+        room_polygon_meters=room_pts,
+        room_type="bathroom",
+        doors=doors,
+        preset="contemporary_minimal",
+        seed=42
+    )
+
+    assert res.is_valid, f"Compact bathroom failed: {res.failure_reason}"
+    categories = [it.category for it in res.items]
+    assert "toilet" in categories, "Toilet must be placed"
+    # Bathtub must be dropped because room is < 4.5 m²
+    assert "bathtub" not in categories, "Bathtub must be dropped in compact bathroom"
+    assert res.validation.overlap_count == 0
+    assert not res.validation.door_clearance_violation
+    assert res.validation.bfs_reachable

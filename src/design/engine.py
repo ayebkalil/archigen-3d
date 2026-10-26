@@ -119,6 +119,8 @@ class RoomDesignEngine:
                     "room_depth_m": room_depth,
                     "room_area_m2": room_area,
                     "usable_wall_segments_count": len(usable_segs),
+                    "scale_m_per_px": round(scale_m_per_px, 4),
+                    "scale_source": "2-Pt Calibrated" if not is_scale_uncalibrated else "Model Estimated",
                     "scale_uncalibrated": is_scale_uncalibrated,
                     "runtime_ms": round(runtime_ms, 2)
                 }
@@ -147,6 +149,8 @@ class RoomDesignEngine:
                 "room_depth_m": room_depth,
                 "room_area_m2": room_area,
                 "usable_wall_segments_count": len(usable_segs),
+                "scale_m_per_px": round(scale_m_per_px, 4),
+                "scale_source": "2-Pt Calibrated" if not is_scale_uncalibrated else "Model Estimated",
                 "scale_uncalibrated": is_scale_uncalibrated,
                 "runtime_ms": round(runtime_ms, 2)
             },

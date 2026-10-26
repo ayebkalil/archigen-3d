@@ -485,26 +485,30 @@ class RoomRuleEngine:
         curr_s = 0.10  # 10 cm corner margin
 
         # 1. Kitchen Sink Unit
-        if (curr_s + sw) <= seg_len:
-            sink_center_s = curr_s + sw / 2.0
-            sink_back = p1 + u_dir * sink_center_s
-            sink_c = sink_back + n_in * (sd / 2.0)
-            sink_poly = Polygon(compute_footprint_polygon(float(sink_c[0]), float(sink_c[1]), sw, sd, primary_seg.yaw_deg))
+        sink_placed = False
+        for s_trial in [0.10, max(0.0, seg_len - (sw + 0.10))]:
+            if (s_trial + sw) <= seg_len and s_trial >= 0.0:
+                sink_center_s = s_trial + sw / 2.0
+                sink_back = p1 + u_dir * sink_center_s
+                sink_c = sink_back + n_in * (sd / 2.0)
+                sink_poly = Polygon(compute_footprint_polygon(float(sink_c[0]), float(sink_c[1]), sw, sd, primary_seg.yaw_deg))
 
-            if room_poly.buffer(0.02).contains(sink_poly) and not any(dz.intersects(sink_poly) for dz in door_zones):
-                placed.append(PlacedItem(
-                    item_id="kitchen_sink_0",
-                    catalog_id="kitchen_sink_unit",
-                    name=sink_spec["name"],
-                    category="kitchen_sink",
-                    position_m=(float(sink_c[0]), float(sink_c[1])),
-                    rotation_deg=primary_seg.yaw_deg,
-                    dimensions_m=(sw, sd, sh),
-                    glb=sink_spec["glb"],
-                    polygon_coords=list(sink_poly.exterior.coords)[:-1],
-                    placement_rule="back_to_wall"
-                ))
-                curr_s += sw
+                if room_poly.buffer(0.02).contains(sink_poly) and not any(dz.intersects(sink_poly) for dz in door_zones):
+                    placed.append(PlacedItem(
+                        item_id="kitchen_sink_0",
+                        catalog_id="kitchen_sink_unit",
+                        name=sink_spec["name"],
+                        category="kitchen_sink",
+                        position_m=(float(sink_c[0]), float(sink_c[1])),
+                        rotation_deg=primary_seg.yaw_deg,
+                        dimensions_m=(sw, sd, sh),
+                        glb=sink_spec["glb"],
+                        polygon_coords=list(sink_poly.exterior.coords)[:-1],
+                        placement_rule="back_to_wall"
+                    ))
+                    curr_s = s_trial + sw
+                    sink_placed = True
+                    break
 
         # 2. Adjacent Base Counter Unit
         counter_placed = False

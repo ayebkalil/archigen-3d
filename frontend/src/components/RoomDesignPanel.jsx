@@ -37,6 +37,9 @@ export default function RoomDesignPanel({
   const failureReason = currentFurnishings?.failure_reason || null;
   const hasFailed = currentFurnishings && !currentFurnishings.is_valid;
   const isFurnished = currentFurnishings && currentFurnishings.is_valid && items.length > 0;
+  const meta = currentFurnishings?.metadata || {};
+  const actualScale = meta.scale_m_per_px || 0.03;
+  const scaleSource = meta.scale_source || (meta.scale_uncalibrated ? 'Model Estimated' : '2-Pt Calibrated');
 
   // Approximate room width & depth from bounding box
   const poly = selectedRoom.polygon_meters || [];
@@ -192,15 +195,19 @@ export default function RoomDesignPanel({
               </div>
             </div>
 
-            {/* Scale Uncalibrated Warning Badge (shown next to TOO_SMALL or when uncalibrated) */}
+            {/* Scale & Calibration Status Badge (shows actual scale & source) */}
             {failureReason === 'TOO_SMALL' && (
               <div className="bg-amber-500/10 border border-amber-600/30 p-2 rounded-sm text-amber-900 space-y-1">
                 <div className="flex items-center gap-1.5 font-semibold text-[10.5px] text-amber-800">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                  <span>Scale Uncalibrated Warning</span>
+                  <span>Scale Calibration Notice</span>
                 </div>
-                <p className="text-[9.5px] leading-relaxed text-amber-900/80">
-                  Estimated scale (0.03 m/px) may underestimate room physical dimensions. Use the <strong>2-Pt Calibrate</strong> tool in the toolbar to establish real scale from a known door or wall.
+                <div className="text-[10px] space-y-0.5 text-amber-900/90 font-mono">
+                  <div>Actual Scale: <strong className="font-semibold">{actualScale} m/px</strong></div>
+                  <div>Source: <strong className="font-semibold">{scaleSource}</strong></div>
+                </div>
+                <p className="text-[9.5px] leading-relaxed text-amber-900/80 pt-0.5 border-t border-amber-600/15 font-sans">
+                  Use the <strong>2-Pt Calibrate</strong> tool in the top bar to set precise physical scale from a known doorway or wall.
                 </p>
               </div>
             )}
@@ -213,7 +220,7 @@ export default function RoomDesignPanel({
             <div className="flex items-center justify-between text-[#2a7a6e] font-semibold text-[11px]">
               <div className="flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Layout Verified (0 Collisions)</span>
+                <span>Collision-free (0 Collisions)</span>
               </div>
               <span className="text-[10px]">{items.length} items</span>
             </div>
