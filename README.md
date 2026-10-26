@@ -106,18 +106,38 @@ Le module d'aménagement intérieur (`src/design/`) est un **système détermini
 2. **Règle Stricte d'Ancrage Mural ($\ge 80\%$ à $\le 0.10\text{ m}$) :** Tout meuble adossé au mur (`back_to_wall`) est échantillonné en 15 points le long de son arête arrière. Il est strictement rejeté si moins de 80% de ses points d'appui sont à moins de 0.10 m d'un pixel de mur prédit. Les éléments flottants (`rug`, `coffee_table`, `dining_table` centrée) sont exemptés.
 3. **Zéro Collision & Dégagement des Portes :** Aucun chevauchement entre polygones de meubles ($> 1\text{ cm}^2$), exclusion stricte des zones de battement de portes ($0.85\text{ m}$ de dégagement).
 4. **Accessibilité BFS :** Validation par flood-fill BFS sur grille de 10 cm vérifiant l'existence d'un chemin libre entre la porte d'entrée et la face avant de chaque meuble principal.
+5. **Filtrage des Fragments de Sur-Segmentation :** 
+   > **Note sur le choix des seuils :** Les seuils de surface minimale plausible (**salle de bain : $2.00\text{ m}^2$**, **chambre : $5.00\text{ m}^2$**, **cuisine : $3.00\text{ m}^2$**, **salon : $6.00\text{ m}^2$**) ont été **choisis après analyse directe des échecs sur le jeu de diagnostic** (plans 0 à 100 et 100 à 200), où $97.4\%$ des salles de bain en échec étaient de minuscules fragments de bruit UNet++ ($1.1 - 1.6\text{ m}^2$) incapables d'accueillir un équipement standard et un dégagement de porte. Les pièces sous ces seuils reçoivent le statut `"not a room (fragment)"` et le bouton "Générer" est désactivé dans l'UI.
 
-### Résultats sur 100 Plans de Validation Non Vus (Plans 100 à 200, $N = 513$ pièces) :
-* **Taux Sans Collision & Accessible :** **85.38%** (438 / 513 pièces valides).
-* **Taux Pièces Complètes (Tous meubles requis placés) :** **73.29%** (376 / 513 pièces).
-* **Distribution du Contact Mural des Meubles Adossés ($N=905$ meubles) :**
-  * **Conformes $\ge 80\%$ :** **100.00%** (905 / 905 meubles).
-  * **Moyenne de contact :** **99.29%** | **Médiane :** **100.00%**.
-  * **Zéro meuble flottant.**
-* **Analyse des Échecs de Salles de Bain ($N=39$ échecs sur 150) :**
-  * **97.4% (38 / 39)** des échecs sont des pièces $< 2.0\text{ m}^2$ (médiane : $1.47\text{ m}^2$), correspondant à des fragments de sur-segmentation du modèle UNet++.
-  * **100.0% (39 / 39)** des échecs sont $< 3.0\text{ m}^2$. Aucune salle de bain $\ge 3.0\text{ m}^2$ n'a échoué.
-* **Temps de Calcul Moyen :** **53.20 ms / pièce** (100% hors-ligne, zéro latence réseau).
+### Benchmark Final sur 100 Plans Non Vus Réservés (Plans 200 à 300, Exécuté 1 Seule Fois Sans Tuning) :
+
+* **Jeu de données :** CubiCasa5k validation plans 200 à 300 ($N = 100$ plans, $N = 542$ pièces détectées).
+* **Fragments exclus (< seuil plausible) :** **13.28% (72 / 542 pièces)** (58 salles de bain, 10 chambres, 4 salons, 0 cuisine).
+* **Pièces Plausibles Évaluées :** **$N = 470$ pièces**.
+
+#### 1. Validité Comparée : Pièces Plausibles vs. Toutes Pièces Détectées
+| Type de Pièce | Pièces Détectées | Fragments Exclus | Pièces Plausibles | Validité Sans Collision (Plausibles) | Validité Sans Collision (Toutes Détectées) | Tous Meubles Requis (Plausibles) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Salle de bain** | 161 | 58 (36.0%) | 103 | **101 / 103 (98.06%)** | 101 / 161 (62.73%) | **100 / 103 (97.09%)** |
+| **Cuisine** | 97 | 0 (0.0%) | 97 | **95 / 97 (97.94%)** | 95 / 97 (97.94%) | **65 / 97 (67.01%)** |
+| **Salon** | 93 | 4 (4.3%) | 89 | **80 / 89 (89.89%)** | 80 / 93 (86.02%) | **67 / 89 (75.28%)** |
+| **Chambre** | 191 | 10 (5.2%) | 181 | **140 / 181 (77.35%)** | 140 / 191 (73.30%) | **111 / 181 (61.33%)** |
+| **TOTAL** | **542** | **72 (13.28%)** | **470** | **416 / 470 (88.51%)** | **416 / 542 (76.75%)** | **343 / 470 (72.98%)** |
+
+*Note sur la complétude des cuisines :* La baisse à 67.01% pour "tous meubles requis" est causée par les cuisines ouvertes (partitions sans mur solide où l'îlot/comptoir secondaire ne peut s'ancrer sans flotter ; le moteur omet le meuble secondaire plutôt que de le laisser flotter).
+
+#### 2. Contact Mural Arrière : Masque Prédit vs. Masque Vérité Terrain (Côte à Côte)
+Mesuré sur l'ensemble des $N = 849$ meubles adossés placés dans les pièces valides des plans 200 à 300 :
+
+| Métrique de Contact Mural | Masque de Mur Prédit (Modèle) | Masque Vérité Terrain (`struct_mask == 1 \| 2`) |
+| :--- | :---: | :---: |
+| **Part des meubles avec contact $\ge 80\%$** | **818 / 849 (96.35%)** | **630 / 849 (74.20%)** |
+| **Contact moyen le long de l'arête arrière** | **96.58%** | **74.97%** |
+| **Contact médian** | **100.00%** | **100.00%** |
+| **Meubles obstruant une fenêtre GT (`struct_mask == 4`)** | — | **10 / 1,277 meubles (0.78%)** |
+| **Meubles obstruant une fenêtre prédite** | **52 / 1,277 meubles (4.07%)** | — |
+
+* **Temps de Calcul Moyen :** **76.0 ms / pièce** (100% hors-ligne, déterministe).
 
 ---
 
