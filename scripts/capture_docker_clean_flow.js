@@ -11,7 +11,9 @@ async function testFullFlow() {
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--use-gl=angle',
-      '--use-angle=swiftshader',
+      '--use-angle=d3d11',
+      '--enable-gpu-rasterization',
+      '--enable-webgl',
       '--window-size=1600,1000'
     ]
   });
