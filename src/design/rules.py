@@ -52,6 +52,36 @@ class RoomRuleEngine:
     def __init__(self, catalog: Dict[str, Any]):
         self.catalog = catalog["items"]
 
+    def _check_back_edge_contact(
+        self,
+        poly_coords: List[Tuple[float, float]],
+        wall_dist_map_m: Optional[np.ndarray],
+        scale_m_per_px: float = 0.03,
+        threshold_m: float = 0.10,
+        required_ratio: float = 0.80
+    ) -> bool:
+        """
+        Checks if >= 80% of back edge sample points are within 0.10m of a wall pixel.
+        Floating items are exempt by not passing through back-to-wall checks.
+        """
+        if wall_dist_map_m is None or len(poly_coords) < 3:
+            return True
+        c_br = poly_coords[1]
+        c_bl = poly_coords[2]
+        back_line = LineString([c_br, c_bl])
+        if back_line.length < 1e-4:
+            return True
+        pts = [back_line.interpolate(frac, normalized=True) for frac in np.linspace(0.05, 0.95, 15)]
+        h, w = wall_dist_map_m.shape
+        in_contact = 0
+        for pt in pts:
+            ix = int(round(pt.x / scale_m_per_px))
+            iy = int(round(pt.y / scale_m_per_px))
+            if 0 <= ix < w and 0 <= iy < h:
+                if wall_dist_map_m[iy, ix] <= threshold_m:
+                    in_contact += 1
+        return (in_contact / len(pts)) >= required_ratio
+
     def furnish_room(
         self,
         room_type: str,
@@ -59,7 +89,9 @@ class RoomRuleEngine:
         usable_segments: List[UsableWallSegment],
         door_clearance_zones: List[Polygon],
         preset: str = "contemporary_minimal",
-        seed: int = 42
+        seed: int = 42,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         """
         Generates candidate furniture placements according to room type rules.
@@ -70,17 +102,17 @@ class RoomRuleEngine:
         area = room_poly.area
 
         if norm_type == "bedroom":
-            return self._furnish_bedroom(room_poly, usable_segments, door_clearance_zones, preset, area, rng)
+            return self._furnish_bedroom(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px)
         elif norm_type == "living":
-            return self._furnish_living(room_poly, usable_segments, door_clearance_zones, preset, area, rng)
+            return self._furnish_living(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px)
         elif norm_type == "kitchen":
-            return self._furnish_kitchen(room_poly, usable_segments, door_clearance_zones, preset, area, rng)
+            return self._furnish_kitchen(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px)
         elif norm_type == "bathroom":
-            return self._furnish_bathroom(room_poly, usable_segments, door_clearance_zones, preset, area, rng)
+            return self._furnish_bathroom(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px)
         elif norm_type == "dining":
-            return self._furnish_dining(room_poly, usable_segments, door_clearance_zones, preset, area, rng)
+            return self._furnish_dining(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px)
         elif norm_type == "office":
-            return self._furnish_office(room_poly, usable_segments, door_clearance_zones, preset, area, rng)
+            return self._furnish_office(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px)
         else:
             # Service room / balcony
             return [], None
@@ -110,7 +142,9 @@ class RoomRuleEngine:
         door_zones: List[Polygon],
         preset: str,
         area: float,
-        rng: random.Random
+        rng: random.Random,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         if area < 4.0:
             return [], "TOO_SMALL"
@@ -127,53 +161,45 @@ class RoomRuleEngine:
         bed_spec = self._get_item_spec(bed_id)
         bw, bd, bh = bed_spec["dimensions_m"]
 
-        # 1. Place Primary Bed on longest usable wall segment
+        # 1. Place Primary Bed on longest usable wall segment that satisfies >=80% wall contact
         bed_seg = None
+        bed_center = None
+        bed_poly = None
+        bed_poly_coords = None
+
         for seg in sorted_segs:
-            if seg.length_m >= (bw + 0.10):  # Must fit bed width
-                bed_seg = seg
-                break
+            if seg.length_m < (bw + 0.10):
+                continue
+            seg_len = seg.length_m
+            p1 = np.array(seg.start)
+            p2 = np.array(seg.end)
+            u_dir = (p2 - p1) / max(seg_len, 1e-6)
+            n_in = np.array(seg.normal)
 
-        if bed_seg is None:
-            return [], "NO_USABLE_WALL"
+            center_s = seg_len / 2.0
+            found_candidate = False
 
-        # Position bed centered or slightly offset on the segment
-        seg_len = bed_seg.length_m
-        p1 = np.array(bed_seg.start)
-        p2 = np.array(bed_seg.end)
-        u_dir = (p2 - p1) / max(seg_len, 1e-6)
-        n_in = np.array(bed_seg.normal)
-
-        # Center on segment
-        center_s = seg_len / 2.0
-        back_pt = p1 + u_dir * center_s
-        # Item center = back_pt + (depth / 2) * n_in
-        bed_center = back_pt + n_in * (bd / 2.0)
-
-        bed_poly_coords = compute_footprint_polygon(
-            float(bed_center[0]), float(bed_center[1]), bw, bd, bed_seg.yaw_deg
-        )
-        bed_poly = Polygon(bed_poly_coords)
-
-        # Collision check with room polygon and doors
-        if not room_poly.buffer(0.02).contains(bed_poly) or any(dz.intersects(bed_poly) for dz in door_zones):
-            # Try shifting left or right
-            shifted = False
-            for shift in [-0.4, 0.4, -0.7, 0.7]:
+            offsets = [0.0] + ([-0.4, 0.4, -0.7, 0.7] if seg_len >= (bw + 0.8) else [-0.2, 0.2])
+            for shift in offsets:
                 trial_s = center_s + shift
                 if (bw / 2.0) <= trial_s <= (seg_len - bw / 2.0):
                     b_pt = p1 + u_dir * trial_s
                     b_c = b_pt + n_in * (bd / 2.0)
-                    t_poly = Polygon(compute_footprint_polygon(float(b_c[0]), float(b_c[1]), bw, bd, bed_seg.yaw_deg))
+                    t_poly_coords = compute_footprint_polygon(float(b_c[0]), float(b_c[1]), bw, bd, seg.yaw_deg)
+                    t_poly = Polygon(t_poly_coords)
                     if room_poly.buffer(0.02).contains(t_poly) and not any(dz.intersects(t_poly) for dz in door_zones):
-                        bed_center = b_c
-                        bed_poly_coords = list(t_poly.exterior.coords)[:-1]
-                        bed_poly = t_poly
-                        center_s = trial_s
-                        shifted = True
-                        break
-            if not shifted and any(dz.intersects(bed_poly) for dz in door_zones):
-                return [], "DOOR_BLOCKED"
+                        if self._check_back_edge_contact(t_poly_coords, wall_dist_map_m, scale_m_per_px):
+                            bed_seg = seg
+                            bed_center = b_c
+                            bed_poly = t_poly
+                            bed_poly_coords = t_poly_coords
+                            found_candidate = True
+                            break
+            if found_candidate:
+                break
+
+        if bed_seg is None:
+            return [], "NO_USABLE_WALL"
 
         bed_item = PlacedItem(
             item_id="bed_0",
@@ -250,22 +276,24 @@ class RoomRuleEngine:
                 w_back = w_p1 + w_u * w_center_s
                 w_c = w_back + w_nin * (wd / 2.0)
 
-                w_poly = Polygon(compute_footprint_polygon(float(w_c[0]), float(w_c[1]), ww, wd, seg.yaw_deg))
+                w_poly_coords = compute_footprint_polygon(float(w_c[0]), float(w_c[1]), ww, wd, seg.yaw_deg)
+                w_poly = Polygon(w_poly_coords)
                 if room_poly.buffer(0.02).contains(w_poly) and not any(dz.intersects(w_poly) for dz in door_zones):
-                    if not any(w_poly.intersects(pp) for pp in placed_polys):
-                        placed.append(PlacedItem(
-                            item_id="wardrobe_0",
-                            catalog_id="wardrobe",
-                            name=ward_spec["name"],
-                            category="wardrobe",
-                            position_m=(float(w_c[0]), float(w_c[1])),
-                            rotation_deg=seg.yaw_deg,
-                            dimensions_m=(ww, wd, wh),
-                            glb=ward_spec["glb"],
-                            polygon_coords=list(w_poly.exterior.coords)[:-1],
-                            placement_rule="back_to_wall"
-                        ))
-                        break
+                    if self._check_back_edge_contact(w_poly_coords, wall_dist_map_m, scale_m_per_px):
+                        if not any(w_poly.intersects(pp) for pp in placed_polys):
+                            placed.append(PlacedItem(
+                                item_id="wardrobe_0",
+                                catalog_id="wardrobe",
+                                name=ward_spec["name"],
+                                category="wardrobe",
+                                position_m=(float(w_c[0]), float(w_c[1])),
+                                rotation_deg=seg.yaw_deg,
+                                dimensions_m=(ww, wd, wh),
+                                glb=ward_spec["glb"],
+                                polygon_coords=w_poly_coords,
+                                placement_rule="back_to_wall"
+                            ))
+                            break
 
         return placed, None
 
@@ -279,7 +307,9 @@ class RoomRuleEngine:
         door_zones: List[Polygon],
         preset: str,
         area: float,
-        rng: random.Random
+        rng: random.Random,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         if area < 6.0:
             return [], "TOO_SMALL"
@@ -292,60 +322,53 @@ class RoomRuleEngine:
         # Sofa selection based on preset
         sofa_id = "sofa_modern" if preset == "contemporary_minimal" else ("sofa_classic" if preset == "tailored_classic" else "sofa_3seater")
         sofa_spec = self._get_item_spec(sofa_id)
-        sw, sd, sh = sofa_spec["dimensions_m"]
 
         sofa_seg = None
-        for seg in sorted_segs:
-            if seg.length_m >= (sw + 0.10):
-                sofa_seg = seg
+        sofa_center = None
+        sofa_poly = None
+        sofa_poly_coords = None
+
+        candidate_sofas = [sofa_spec]
+        fallback_3s = self._get_item_spec("sofa_3seater")
+        if fallback_3s.get("id") != sofa_spec.get("id"):
+            candidate_sofas.append(fallback_3s)
+
+        for current_sofa in candidate_sofas:
+            c_sw, c_sd, c_sh = current_sofa["dimensions_m"]
+            for seg in sorted_segs:
+                if seg.length_m < (c_sw + 0.10):
+                    continue
+                seg_len = seg.length_m
+                p1 = np.array(seg.start)
+                p2 = np.array(seg.end)
+                u_dir = (p2 - p1) / max(seg_len, 1e-6)
+                n_in = np.array(seg.normal)
+
+                center_s = seg_len / 2.0
+                offsets = [0.0] + ([-0.5, 0.5, -0.9, 0.9] if seg_len >= (c_sw + 1.0) else [-0.3, 0.3])
+                for shift in offsets:
+                    trial_s = center_s + shift
+                    if (c_sw / 2.0) <= trial_s <= (seg_len - c_sw / 2.0):
+                        b_pt = p1 + u_dir * trial_s
+                        s_c = b_pt + n_in * (c_sd / 2.0)
+                        t_coords = compute_footprint_polygon(float(s_c[0]), float(s_c[1]), c_sw, c_sd, seg.yaw_deg)
+                        t_poly = Polygon(t_coords)
+                        if room_poly.buffer(0.02).contains(t_poly) and not any(dz.intersects(t_poly) for dz in door_zones):
+                            if self._check_back_edge_contact(t_coords, wall_dist_map_m, scale_m_per_px):
+                                sofa_spec = current_sofa
+                                sw, sd, sh = c_sw, c_sd, c_sh
+                                sofa_seg = seg
+                                sofa_center = s_c
+                                sofa_poly = t_poly
+                                sofa_poly_coords = t_coords
+                                break
+                if sofa_seg is not None:
+                    break
+            if sofa_seg is not None:
                 break
 
         if sofa_seg is None:
-            # Fallback to smaller 3-seater if modern was too wide
-            sofa_spec = self._get_item_spec("sofa_3seater")
-            sw, sd, sh = sofa_spec["dimensions_m"]
-            for seg in sorted_segs:
-                if seg.length_m >= (sw + 0.10):
-                    sofa_seg = seg
-                    break
-
-        if sofa_seg is None:
             return [], "NO_USABLE_WALL"
-
-        # 1. Place Sofa centered on primary wall
-        seg_len = sofa_seg.length_m
-        p1 = np.array(sofa_seg.start)
-        p2 = np.array(sofa_seg.end)
-        u_dir = (p2 - p1) / max(seg_len, 1e-6)
-        n_in = np.array(sofa_seg.normal)
-
-        center_s = seg_len / 2.0
-        back_pt = p1 + u_dir * center_s
-        sofa_center = back_pt + n_in * (sd / 2.0)
-
-        sofa_poly_coords = compute_footprint_polygon(
-            float(sofa_center[0]), float(sofa_center[1]), sw, sd, sofa_seg.yaw_deg
-        )
-        sofa_poly = Polygon(sofa_poly_coords)
-
-        # Shift if colliding with doors
-        if any(dz.intersects(sofa_poly) for dz in door_zones):
-            shifted = False
-            for shift in [-0.5, 0.5, -0.9, 0.9]:
-                trial_s = center_s + shift
-                if (sw / 2.0) <= trial_s <= (seg_len - sw / 2.0):
-                    b_pt = p1 + u_dir * trial_s
-                    s_c = b_pt + n_in * (sd / 2.0)
-                    t_poly = Polygon(compute_footprint_polygon(float(s_c[0]), float(s_c[1]), sw, sd, sofa_seg.yaw_deg))
-                    if not any(dz.intersects(t_poly) for dz in door_zones) and room_poly.buffer(0.02).contains(t_poly):
-                        sofa_center = s_c
-                        sofa_poly_coords = list(t_poly.exterior.coords)[:-1]
-                        sofa_poly = t_poly
-                        center_s = trial_s
-                        shifted = True
-                        break
-            if not shifted:
-                return [], "DOOR_BLOCKED"
 
         placed.append(PlacedItem(
             item_id="sofa_0",
@@ -422,23 +445,25 @@ class RoomRuleEngine:
                     t_nin = np.array(seg.normal)
                     t_back = t_p1 + t_u * (seg.length_m / 2.0)
                     t_c = t_back + t_nin * (td / 2.0)
-                    tv_poly = Polygon(compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, seg.yaw_deg))
+                    t_poly_coords = compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, seg.yaw_deg)
+                    tv_poly = Polygon(t_poly_coords)
 
                     if room_poly.buffer(0.02).contains(tv_poly) and not any(dz.intersects(tv_poly) for dz in door_zones):
-                        if not any(tv_poly.intersects(pp) for pp in placed_polys):
-                            placed.append(PlacedItem(
-                                item_id="tv_unit_0",
-                                catalog_id="tv_unit",
-                                name=tv_spec["name"],
-                                category="tv_unit",
-                                position_m=(float(t_c[0]), float(t_c[1])),
-                                rotation_deg=seg.yaw_deg,
-                                dimensions_m=(tw, td, th),
-                                glb=tv_spec["glb"],
-                                polygon_coords=list(tv_poly.exterior.coords)[:-1],
-                                placement_rule="back_to_wall"
-                            ))
-                            break
+                        if self._check_back_edge_contact(t_poly_coords, wall_dist_map_m, scale_m_per_px):
+                            if not any(tv_poly.intersects(pp) for pp in placed_polys):
+                                placed.append(PlacedItem(
+                                    item_id="tv_unit_0",
+                                    catalog_id="tv_unit",
+                                    name=tv_spec["name"],
+                                    category="tv_unit",
+                                    position_m=(float(t_c[0]), float(t_c[1])),
+                                    rotation_deg=seg.yaw_deg,
+                                    dimensions_m=(tw, td, th),
+                                    glb=tv_spec["glb"],
+                                    polygon_coords=t_poly_coords,
+                                    placement_rule="back_to_wall"
+                                ))
+                                break
 
         return placed, None
 
@@ -452,7 +477,9 @@ class RoomRuleEngine:
         door_zones: List[Polygon],
         preset: str,
         area: float,
-        rng: random.Random
+        rng: random.Random,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         if area < 3.5:
             return [], "TOO_SMALL"
@@ -471,44 +498,54 @@ class RoomRuleEngine:
         sw, sd, sh = sink_spec["dimensions_m"]
         fw, fd, fh = fridge_spec["dimensions_m"]
 
-        primary_seg = sorted_segs[0]
-        seg_len = primary_seg.length_m
-
-        if seg_len < (sw + 0.10):
-            return [], "NO_USABLE_WALL"
-
-        p1 = np.array(primary_seg.start)
-        p2 = np.array(primary_seg.end)
-        u_dir = (p2 - p1) / max(seg_len, 1e-6)
-        n_in = np.array(primary_seg.normal)
-
-        curr_s = 0.10  # 10 cm corner margin
-
-        # 1. Kitchen Sink Unit
+        primary_seg = None
         sink_placed = False
-        for s_trial in [0.10, max(0.0, seg_len - (sw + 0.10))]:
-            if (s_trial + sw) <= seg_len and s_trial >= 0.0:
-                sink_center_s = s_trial + sw / 2.0
-                sink_back = p1 + u_dir * sink_center_s
-                sink_c = sink_back + n_in * (sd / 2.0)
-                sink_poly = Polygon(compute_footprint_polygon(float(sink_c[0]), float(sink_c[1]), sw, sd, primary_seg.yaw_deg))
+        curr_s = 0.10
+        p1, p2, u_dir, n_in = None, None, None, None
+        seg_len = 0.0
 
-                if room_poly.buffer(0.02).contains(sink_poly) and not any(dz.intersects(sink_poly) for dz in door_zones):
-                    placed.append(PlacedItem(
-                        item_id="kitchen_sink_0",
-                        catalog_id="kitchen_sink_unit",
-                        name=sink_spec["name"],
-                        category="kitchen_sink",
-                        position_m=(float(sink_c[0]), float(sink_c[1])),
-                        rotation_deg=primary_seg.yaw_deg,
-                        dimensions_m=(sw, sd, sh),
-                        glb=sink_spec["glb"],
-                        polygon_coords=list(sink_poly.exterior.coords)[:-1],
-                        placement_rule="back_to_wall"
-                    ))
-                    curr_s = s_trial + sw
-                    sink_placed = True
-                    break
+        for cand_seg in sorted_segs:
+            if cand_seg.length_m < (sw + 0.10):
+                continue
+            cand_len = cand_seg.length_m
+            cand_p1 = np.array(cand_seg.start)
+            cand_p2 = np.array(cand_seg.end)
+            cand_u = (cand_p2 - cand_p1) / max(cand_len, 1e-6)
+            cand_nin = np.array(cand_seg.normal)
+
+            for s_trial in [0.10, max(0.0, cand_len - (sw + 0.10))]:
+                if (s_trial + sw) <= cand_len and s_trial >= 0.0:
+                    sink_center_s = s_trial + sw / 2.0
+                    sink_back = cand_p1 + cand_u * sink_center_s
+                    sink_c = sink_back + cand_nin * (sd / 2.0)
+                    sink_coords = compute_footprint_polygon(float(sink_c[0]), float(sink_c[1]), sw, sd, cand_seg.yaw_deg)
+                    sink_poly = Polygon(sink_coords)
+
+                    if room_poly.buffer(0.02).contains(sink_poly) and not any(dz.intersects(sink_poly) for dz in door_zones):
+                        if self._check_back_edge_contact(sink_coords, wall_dist_map_m, scale_m_per_px):
+                            primary_seg = cand_seg
+                            seg_len = cand_len
+                            p1, p2, u_dir, n_in = cand_p1, cand_p2, cand_u, cand_nin
+                            placed.append(PlacedItem(
+                                item_id="kitchen_sink_0",
+                                catalog_id="kitchen_sink_unit",
+                                name=sink_spec["name"],
+                                category="kitchen_sink",
+                                position_m=(float(sink_c[0]), float(sink_c[1])),
+                                rotation_deg=cand_seg.yaw_deg,
+                                dimensions_m=(sw, sd, sh),
+                                glb=sink_spec["glb"],
+                                polygon_coords=sink_coords,
+                                placement_rule="back_to_wall"
+                            ))
+                            curr_s = s_trial + sw
+                            sink_placed = True
+                            break
+            if sink_placed:
+                break
+
+        if not sink_placed or primary_seg is None:
+            return [], "NO_USABLE_WALL"
 
         # 2. Adjacent Base Counter Unit
         counter_placed = False
@@ -516,23 +553,25 @@ class RoomRuleEngine:
             cnt_center_s = curr_s + cw / 2.0
             cnt_back = p1 + u_dir * cnt_center_s
             cnt_c = cnt_back + n_in * (cd / 2.0)
-            cnt_poly = Polygon(compute_footprint_polygon(float(cnt_c[0]), float(cnt_c[1]), cw, cd, primary_seg.yaw_deg))
+            cnt_coords = compute_footprint_polygon(float(cnt_c[0]), float(cnt_c[1]), cw, cd, primary_seg.yaw_deg)
+            cnt_poly = Polygon(cnt_coords)
 
             if room_poly.buffer(0.02).contains(cnt_poly) and not any(dz.intersects(cnt_poly) for dz in door_zones):
-                placed.append(PlacedItem(
-                    item_id="kitchen_counter_0",
-                    catalog_id="kitchen_counter",
-                    name=counter_spec["name"],
-                    category="kitchen_counter",
-                    position_m=(float(cnt_c[0]), float(cnt_c[1])),
-                    rotation_deg=primary_seg.yaw_deg,
-                    dimensions_m=(cw, cd, ch),
-                    glb=counter_spec["glb"],
-                    polygon_coords=list(cnt_poly.exterior.coords)[:-1],
-                    placement_rule="back_to_wall"
-                ))
-                curr_s += cw
-                counter_placed = True
+                if self._check_back_edge_contact(cnt_coords, wall_dist_map_m, scale_m_per_px):
+                    placed.append(PlacedItem(
+                        item_id="kitchen_counter_0",
+                        catalog_id="kitchen_counter",
+                        name=counter_spec["name"],
+                        category="kitchen_counter",
+                        position_m=(float(cnt_c[0]), float(cnt_c[1])),
+                        rotation_deg=primary_seg.yaw_deg,
+                        dimensions_m=(cw, cd, ch),
+                        glb=counter_spec["glb"],
+                        polygon_coords=cnt_coords,
+                        placement_rule="back_to_wall"
+                    ))
+                    curr_s += cw
+                    counter_placed = True
 
         # Fallback: if counter didn't fit on primary wall, try secondary wall
         if not counter_placed and len(sorted_segs) > 1:
@@ -543,23 +582,25 @@ class RoomRuleEngine:
                 cnin = np.array(sec_cand.normal)
                 c_back = cp1 + cu * (cw / 2.0 + 0.10)
                 c_c = c_back + cnin * (cd / 2.0)
-                c_poly = Polygon(compute_footprint_polygon(float(c_c[0]), float(c_c[1]), cw, cd, sec_cand.yaw_deg))
+                c_coords = compute_footprint_polygon(float(c_c[0]), float(c_c[1]), cw, cd, sec_cand.yaw_deg)
+                c_poly = Polygon(c_coords)
                 placed_polys = [Polygon(p.polygon_coords) for p in placed]
                 if room_poly.buffer(0.02).contains(c_poly) and not any(dz.intersects(c_poly) for dz in door_zones):
                     if not any(c_poly.intersects(pp) for pp in placed_polys):
-                        placed.append(PlacedItem(
-                            item_id="kitchen_counter_0",
-                            catalog_id="kitchen_counter",
-                            name=counter_spec["name"],
-                            category="kitchen_counter",
-                            position_m=(float(c_c[0]), float(c_c[1])),
-                            rotation_deg=sec_cand.yaw_deg,
-                            dimensions_m=(cw, cd, ch),
-                            glb=counter_spec["glb"],
-                            polygon_coords=list(c_poly.exterior.coords)[:-1],
-                            placement_rule="back_to_wall"
-                        ))
-                        counter_placed = True
+                        if self._check_back_edge_contact(c_coords, wall_dist_map_m, scale_m_per_px):
+                            placed.append(PlacedItem(
+                                item_id="kitchen_counter_0",
+                                catalog_id="kitchen_counter",
+                                name=counter_spec["name"],
+                                category="kitchen_counter",
+                                position_m=(float(c_c[0]), float(c_c[1])),
+                                rotation_deg=sec_cand.yaw_deg,
+                                dimensions_m=(cw, cd, ch),
+                                glb=counter_spec["glb"],
+                                polygon_coords=c_coords,
+                                placement_rule="back_to_wall"
+                            ))
+                            counter_placed = True
 
         # 3. Refrigerator (at end of counter run or on secondary wall)
         fridge_placed = False
@@ -569,22 +610,24 @@ class RoomRuleEngine:
             fr_center_s = curr_s + fw / 2.0
             fr_back = p1 + u_dir * fr_center_s
             fr_c = fr_back + n_in * (fd / 2.0)
-            fr_poly = Polygon(compute_footprint_polygon(float(fr_c[0]), float(fr_c[1]), fw, fd, primary_seg.yaw_deg))
+            fr_coords = compute_footprint_polygon(float(fr_c[0]), float(fr_c[1]), fw, fd, primary_seg.yaw_deg)
+            fr_poly = Polygon(fr_coords)
 
             if room_poly.buffer(0.02).contains(fr_poly) and not any(dz.intersects(fr_poly) for dz in door_zones):
-                placed.append(PlacedItem(
-                    item_id="refrigerator_0",
-                    catalog_id="refrigerator",
-                    name=fridge_spec["name"],
-                    category="refrigerator",
-                    position_m=(float(fr_c[0]), float(fr_c[1])),
-                    rotation_deg=primary_seg.yaw_deg,
-                    dimensions_m=(fw, fd, fh),
-                    glb=fridge_spec["glb"],
-                    polygon_coords=list(fr_poly.exterior.coords)[:-1],
-                    placement_rule="back_to_wall"
-                ))
-                fridge_placed = True
+                if self._check_back_edge_contact(fr_coords, wall_dist_map_m, scale_m_per_px):
+                    placed.append(PlacedItem(
+                        item_id="refrigerator_0",
+                        catalog_id="refrigerator",
+                        name=fridge_spec["name"],
+                        category="refrigerator",
+                        position_m=(float(fr_c[0]), float(fr_c[1])),
+                        rotation_deg=primary_seg.yaw_deg,
+                        dimensions_m=(fw, fd, fh),
+                        glb=fridge_spec["glb"],
+                        polygon_coords=fr_coords,
+                        placement_rule="back_to_wall"
+                    ))
+                    fridge_placed = True
 
         if not fridge_placed and len(sorted_segs) > 1:
             sec_seg = sorted_segs[1]
@@ -594,22 +637,24 @@ class RoomRuleEngine:
                 s2_nin = np.array(sec_seg.normal)
                 fr_back = s2_p1 + s2_u * (fw / 2.0 + 0.10)
                 fr_c = fr_back + s2_nin * (fd / 2.0)
-                fr_poly = Polygon(compute_footprint_polygon(float(fr_c[0]), float(fr_c[1]), fw, fd, sec_seg.yaw_deg))
+                fr_coords = compute_footprint_polygon(float(fr_c[0]), float(fr_c[1]), fw, fd, sec_seg.yaw_deg)
+                fr_poly = Polygon(fr_coords)
 
                 if room_poly.buffer(0.02).contains(fr_poly) and not any(dz.intersects(fr_poly) for dz in door_zones):
                     if not any(fr_poly.intersects(pp) for pp in placed_polys):
-                        placed.append(PlacedItem(
-                            item_id="refrigerator_0",
-                            catalog_id="refrigerator",
-                            name=fridge_spec["name"],
-                            category="refrigerator",
-                            position_m=(float(fr_c[0]), float(fr_c[1])),
-                            rotation_deg=sec_seg.yaw_deg,
-                            dimensions_m=(fw, fd, fh),
-                            glb=fridge_spec["glb"],
-                            polygon_coords=list(fr_poly.exterior.coords)[:-1],
-                            placement_rule="back_to_wall"
-                        ))
+                        if self._check_back_edge_contact(fr_coords, wall_dist_map_m, scale_m_per_px):
+                            placed.append(PlacedItem(
+                                item_id="refrigerator_0",
+                                catalog_id="refrigerator",
+                                name=fridge_spec["name"],
+                                category="refrigerator",
+                                position_m=(float(fr_c[0]), float(fr_c[1])),
+                                rotation_deg=sec_seg.yaw_deg,
+                                dimensions_m=(fw, fd, fh),
+                                glb=fridge_spec["glb"],
+                                polygon_coords=fr_coords,
+                                placement_rule="back_to_wall"
+                            ))
 
         if not placed:
             return [], "NO_USABLE_WALL"
@@ -626,7 +671,9 @@ class RoomRuleEngine:
         door_zones: List[Polygon],
         preset: str,
         area: float,
-        rng: random.Random
+        rng: random.Random,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         if area < 1.8:
             return [], "TOO_SMALL"
@@ -667,24 +714,26 @@ class RoomRuleEngine:
                 if (tw / 2.0) <= t_center_s <= (seg_len - tw / 2.0):
                     t_back = p1 + u_dir * t_center_s
                     t_c = t_back + n_in * (td / 2.0)
-                    t_poly = Polygon(compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, t_seg.yaw_deg))
+                    t_coords = compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, t_seg.yaw_deg)
+                    t_poly = Polygon(t_coords)
 
                     if not any(dz.intersects(t_poly) for dz in door_zones) and room_poly.buffer(0.02).contains(t_poly):
-                        placed.append(PlacedItem(
-                            item_id="toilet_0",
-                            catalog_id="toilet",
-                            name=toilet_spec["name"],
-                            category="toilet",
-                            position_m=(float(t_c[0]), float(t_c[1])),
-                            rotation_deg=t_seg.yaw_deg,
-                            dimensions_m=(tw, td, th),
-                            glb=toilet_spec["glb"],
-                            polygon_coords=list(t_poly.exterior.coords)[:-1],
-                            placement_rule="back_to_wall"
-                        ))
-                        toilet_placed = True
-                        toilet_seg_idx = s_idx
-                        break
+                        if self._check_back_edge_contact(t_coords, wall_dist_map_m, scale_m_per_px):
+                            placed.append(PlacedItem(
+                                item_id="toilet_0",
+                                catalog_id="toilet",
+                                name=toilet_spec["name"],
+                                category="toilet",
+                                position_m=(float(t_c[0]), float(t_c[1])),
+                                rotation_deg=t_seg.yaw_deg,
+                                dimensions_m=(tw, td, th),
+                                glb=toilet_spec["glb"],
+                                polygon_coords=t_coords,
+                                placement_rule="back_to_wall"
+                            ))
+                            toilet_placed = True
+                            toilet_seg_idx = s_idx
+                            break
 
             if toilet_placed:
                 break
@@ -704,23 +753,25 @@ class RoomRuleEngine:
                     for v_s in [vw / 2.0 + 0.10, seg_len - (vw / 2.0 + 0.10)]:
                         v_back = seg_p1 + u_dir * v_s
                         v_c = v_back + n_in * (vd / 2.0)
-                        v_poly = Polygon(compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, v_seg.yaw_deg))
+                        v_coords = compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, v_seg.yaw_deg)
+                        v_poly = Polygon(v_coords)
                         if room_poly.buffer(0.02).contains(v_poly) and not any(dz.intersects(v_poly) for dz in door_zones):
                             if not any(v_poly.intersects(pp) for pp in placed_polys):
-                                placed.append(PlacedItem(
-                                    item_id="vanity_0",
-                                    catalog_id="bathroom_vanity",
-                                    name=vanity_spec["name"],
-                                    category="bathroom_sink",
-                                    position_m=(float(v_c[0]), float(v_c[1])),
-                                    rotation_deg=v_seg.yaw_deg,
-                                    dimensions_m=(vw, vd, vh),
-                                    glb=vanity_spec["glb"],
-                                    polygon_coords=list(v_poly.exterior.coords)[:-1],
-                                    placement_rule="back_to_wall"
-                                ))
-                                vanity_placed = True
-                                break
+                                if self._check_back_edge_contact(v_coords, wall_dist_map_m, scale_m_per_px):
+                                    placed.append(PlacedItem(
+                                        item_id="vanity_0",
+                                        catalog_id="bathroom_vanity",
+                                        name=vanity_spec["name"],
+                                        category="bathroom_sink",
+                                        position_m=(float(v_c[0]), float(v_c[1])),
+                                        rotation_deg=v_seg.yaw_deg,
+                                        dimensions_m=(vw, vd, vh),
+                                        glb=vanity_spec["glb"],
+                                        polygon_coords=v_coords,
+                                        placement_rule="back_to_wall"
+                                    ))
+                                    vanity_placed = True
+                                    break
             else:
                 # Different wall from toilet
                 if v_seg.length_m >= (vw + 0.05):
@@ -732,23 +783,25 @@ class RoomRuleEngine:
                         if (vw / 2.0) <= v_s <= (v_len - vw / 2.0):
                             v_back = vp1 + vu * v_s
                             v_c = v_back + vnin * (vd / 2.0)
-                            v_poly = Polygon(compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, v_seg.yaw_deg))
+                            v_coords = compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, v_seg.yaw_deg)
+                            v_poly = Polygon(v_coords)
                             if room_poly.buffer(0.02).contains(v_poly) and not any(dz.intersects(v_poly) for dz in door_zones):
                                 if not any(v_poly.intersects(pp) for pp in placed_polys):
-                                    placed.append(PlacedItem(
-                                        item_id="vanity_0",
-                                        catalog_id="bathroom_vanity",
-                                        name=vanity_spec["name"],
-                                        category="bathroom_sink",
-                                        position_m=(float(v_c[0]), float(v_c[1])),
-                                        rotation_deg=v_seg.yaw_deg,
-                                        dimensions_m=(vw, vd, vh),
-                                        glb=vanity_spec["glb"],
-                                        polygon_coords=list(v_poly.exterior.coords)[:-1],
-                                        placement_rule="back_to_wall"
-                                    ))
-                                    vanity_placed = True
-                                    break
+                                    if self._check_back_edge_contact(v_coords, wall_dist_map_m, scale_m_per_px):
+                                        placed.append(PlacedItem(
+                                            item_id="vanity_0",
+                                            catalog_id="bathroom_vanity",
+                                            name=vanity_spec["name"],
+                                            category="bathroom_sink",
+                                            position_m=(float(v_c[0]), float(v_c[1])),
+                                            rotation_deg=v_seg.yaw_deg,
+                                            dimensions_m=(vw, vd, vh),
+                                            glb=vanity_spec["glb"],
+                                            polygon_coords=v_coords,
+                                            placement_rule="back_to_wall"
+                                        ))
+                                        vanity_placed = True
+                                        break
             if vanity_placed:
                 break
 
@@ -765,23 +818,25 @@ class RoomRuleEngine:
                     bnin = np.array(seg.normal)
                     b_back = bp1 + bu * (bw / 2.0 + 0.10)
                     b_c = b_back + bnin * (bd / 2.0)
-                    b_poly = Polygon(compute_footprint_polygon(float(b_c[0]), float(b_c[1]), bw, bd, seg.yaw_deg))
+                    b_coords = compute_footprint_polygon(float(b_c[0]), float(b_c[1]), bw, bd, seg.yaw_deg)
+                    b_poly = Polygon(b_coords)
 
                     if room_poly.buffer(0.02).contains(b_poly) and not any(dz.intersects(b_poly) for dz in door_zones):
                         if not any(b_poly.intersects(pp) for pp in placed_polys):
-                            placed.append(PlacedItem(
-                                item_id="bathtub_0",
-                                catalog_id="bathtub",
-                                name=bt_spec["name"],
-                                category="bathtub",
-                                position_m=(float(b_c[0]), float(b_c[1])),
-                                rotation_deg=seg.yaw_deg,
-                                dimensions_m=(bw, bd, bh),
-                                glb=bt_spec["glb"],
-                                polygon_coords=list(b_poly.exterior.coords)[:-1],
-                                placement_rule="corner_or_wall"
-                            ))
-                            break
+                            if self._check_back_edge_contact(b_coords, wall_dist_map_m, scale_m_per_px):
+                                placed.append(PlacedItem(
+                                    item_id="bathtub_0",
+                                    catalog_id="bathtub",
+                                    name=bt_spec["name"],
+                                    category="bathtub",
+                                    position_m=(float(b_c[0]), float(b_c[1])),
+                                    rotation_deg=seg.yaw_deg,
+                                    dimensions_m=(bw, bd, bh),
+                                    glb=bt_spec["glb"],
+                                    polygon_coords=b_coords,
+                                    placement_rule="corner_or_wall"
+                                ))
+                                break
 
         if not placed:
             return [], "NO_USABLE_WALL"
@@ -798,7 +853,9 @@ class RoomRuleEngine:
         door_zones: List[Polygon],
         preset: str,
         area: float,
-        rng: random.Random
+        rng: random.Random,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         if area < 5.0:
             return [], "TOO_SMALL"
@@ -869,7 +926,9 @@ class RoomRuleEngine:
         door_zones: List[Polygon],
         preset: str,
         area: float,
-        rng: random.Random
+        rng: random.Random,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         if area < 4.0:
             return [], "TOO_SMALL"
@@ -884,25 +943,31 @@ class RoomRuleEngine:
         dw, dd, dh = desk_spec["dimensions_m"]
 
         d_seg = None
+        d_c = None
+        d_poly = None
+        d_coords = None
+
         for seg in sorted_segs:
             if seg.length_m >= (dw + 0.10):
-                d_seg = seg
-                break
+                p1 = np.array(seg.start)
+                u_dir = (np.array(seg.end) - p1) / max(seg.length_m, 1e-6)
+                n_in = np.array(seg.normal)
+                d_center_s = seg.length_m / 2.0
+                d_back = p1 + u_dir * d_center_s
+                cand_c = d_back + n_in * (dd / 2.0)
+                cand_coords = compute_footprint_polygon(float(cand_c[0]), float(cand_c[1]), dw, dd, seg.yaw_deg)
+                cand_poly = Polygon(cand_coords)
+
+                if room_poly.buffer(0.02).contains(cand_poly) and not any(dz.intersects(cand_poly) for dz in door_zones):
+                    if self._check_back_edge_contact(cand_coords, wall_dist_map_m, scale_m_per_px):
+                        d_seg = seg
+                        d_c = cand_c
+                        d_poly = cand_poly
+                        d_coords = cand_coords
+                        break
 
         if d_seg is None:
             return [], "NO_USABLE_WALL"
-
-        p1 = np.array(d_seg.start)
-        u_dir = (np.array(d_seg.end) - p1) / max(d_seg.length_m, 1e-6)
-        n_in = np.array(d_seg.normal)
-
-        d_center_s = d_seg.length_m / 2.0
-        d_back = p1 + u_dir * d_center_s
-        d_c = d_back + n_in * (dd / 2.0)
-        d_poly = Polygon(compute_footprint_polygon(float(d_c[0]), float(d_c[1]), dw, dd, d_seg.yaw_deg))
-
-        if not room_poly.buffer(0.02).contains(d_poly) or any(dz.intersects(d_poly) for dz in door_zones):
-            return [], "DOOR_BLOCKED"
 
         placed.append(PlacedItem(
             item_id="desk_0",
@@ -913,7 +978,7 @@ class RoomRuleEngine:
             rotation_deg=d_seg.yaw_deg,
             dimensions_m=(dw, dd, dh),
             glb=desk_spec["glb"],
-            polygon_coords=list(d_poly.exterior.coords)[:-1],
+            polygon_coords=d_coords,
             placement_rule="back_to_wall"
         ))
 

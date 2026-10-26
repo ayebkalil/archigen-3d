@@ -56,6 +56,33 @@ class EdgeClassifier:
         self.wall_tolerance_m = wall_tolerance_m
         self.door_snap_tolerance_m = door_snap_tolerance_m
 
+    @staticmethod
+    def rasterize_wall_segments(
+        wall_segments: List[Dict[str, Any]],
+        scale_m_per_px: float = 0.03,
+        shape: Tuple[int, int] = (512, 512)
+    ) -> np.ndarray:
+        """
+        Rasterizes vector wall polygons to a binary wall mask raster (Method B standard).
+        Ensures Method B raster distance transform is the default everywhere, even when
+        input consists of JSON polygon definitions.
+        """
+        import cv2
+        mask = np.zeros(shape, dtype=np.uint8)
+        for w in wall_segments:
+            pts_px = w.get("polygon_px", [])
+            if len(pts_px) >= 3:
+                cv2.fillPoly(mask, [np.array(pts_px, dtype=np.int32)], 1)
+            else:
+                pts_m = w.get("polygon_meters", [])
+                if len(pts_m) >= 3:
+                    pts_px = [
+                        [int(round(p[0] / max(scale_m_per_px, 1e-4))), int(round(p[1] / max(scale_m_per_px, 1e-4)))]
+                        for p in pts_m
+                    ]
+                    cv2.fillPoly(mask, [np.array(pts_px, dtype=np.int32)], 1)
+        return mask
+
     def classify_and_snap_edges(
         self,
         room_poly: Polygon,
@@ -80,6 +107,10 @@ class EdgeClassifier:
         # 1. Classify each edge: wall-backed vs open
         edge_info = []
         door_clearance_zones = []
+
+        # Method B default: if wall_mask is None but wall_segments is provided, rasterize to binary wall mask
+        if wall_mask is None and wall_segments:
+            wall_mask = self.rasterize_wall_segments(wall_segments, scale_m_per_px)
 
         # Precompute distance transform if wall_mask is provided
         dist_map_m = None

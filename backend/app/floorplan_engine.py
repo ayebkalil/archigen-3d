@@ -335,5 +335,6 @@ class FloorplanPipeline:
             "threejs_scene": threejs_scene,
             "front_wall_id": facade_meta.get("front_wall_id"),
             "exterior_walls_count": facade_meta.get("exterior_walls_count", 0),
-            "inference_mode": active_mode
+            "inference_mode": active_mode,
+            "wall_mask": (mask_4class == 1).astype(np.uint8)
         }

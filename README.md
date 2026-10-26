@@ -95,6 +95,32 @@ Mesuré sur station locale (GPU NVIDIA GeForce RTX 3050 Laptop 4 Go VRAM, CPU AM
 
 ---
 
+## 🛋️ Système d'Aménagement Intérieur (Stage 3 : Placement Basé sur des Règles)
+
+Le module d'aménagement intérieur (`src/design/`) est un **système déterministe basé sur des règles géométriques** pour le placement de mobilier 3D sous licence libre CC0 (modèles Kenney.nl). 
+
+> **Clarification méthodologique :** Ce module n'est **en aucun cas un modèle de Deep Learning ou d'IA générative**. Il n'effectue aucune revendication de "qualité de design" ou d'expertise décorative. Il s'agit strictement d'un moteur géométrique vérifiant l'absence de collisions, la continuité de passage et l'ancrage mural.
+
+### Principes Algorithmiques & Contraintes Vérifiées :
+1. **Classification des Arêtes par Transformée de Distance (Méthode B) :** Utilise directement la carte de distance euclidienne du masque de mur prédit par le réseau de neurones (`scipy.ndimage.distance_transform_edt`) pour identifier les faces de murs réelles.
+2. **Règle Stricte d'Ancrage Mural ($\ge 80\%$ à $\le 0.10\text{ m}$) :** Tout meuble adossé au mur (`back_to_wall`) est échantillonné en 15 points le long de son arête arrière. Il est strictement rejeté si moins de 80% de ses points d'appui sont à moins de 0.10 m d'un pixel de mur prédit. Les éléments flottants (`rug`, `coffee_table`, `dining_table` centrée) sont exemptés.
+3. **Zéro Collision & Dégagement des Portes :** Aucun chevauchement entre polygones de meubles ($> 1\text{ cm}^2$), exclusion stricte des zones de battement de portes ($0.85\text{ m}$ de dégagement).
+4. **Accessibilité BFS :** Validation par flood-fill BFS sur grille de 10 cm vérifiant l'existence d'un chemin libre entre la porte d'entrée et la face avant de chaque meuble principal.
+
+### Résultats sur 100 Plans de Validation Non Vus (Plans 100 à 200, $N = 513$ pièces) :
+* **Taux Sans Collision & Accessible :** **85.38%** (438 / 513 pièces valides).
+* **Taux Pièces Complètes (Tous meubles requis placés) :** **73.29%** (376 / 513 pièces).
+* **Distribution du Contact Mural des Meubles Adossés ($N=905$ meubles) :**
+  * **Conformes $\ge 80\%$ :** **100.00%** (905 / 905 meubles).
+  * **Moyenne de contact :** **99.29%** | **Médiane :** **100.00%**.
+  * **Zéro meuble flottant.**
+* **Analyse des Échecs de Salles de Bain ($N=39$ échecs sur 150) :**
+  * **97.4% (38 / 39)** des échecs sont des pièces $< 2.0\text{ m}^2$ (médiane : $1.47\text{ m}^2$), correspondant à des fragments de sur-segmentation du modèle UNet++.
+  * **100.0% (39 / 39)** des échecs sont $< 3.0\text{ m}^2$. Aucune salle de bain $\ge 3.0\text{ m}^2$ n'a échoué.
+* **Temps de Calcul Moyen :** **53.20 ms / pièce** (100% hors-ligne, zéro latence réseau).
+
+---
+
 ## ⚡ Démarrage Rapide (Production Docker Compose)
 
 ```bash

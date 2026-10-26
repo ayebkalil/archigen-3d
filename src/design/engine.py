@@ -84,6 +84,17 @@ class RoomDesignEngine:
         room_depth = round(maxy - miny, 2)
         room_area = round(room_poly.area, 2)
 
+        # Method B default everywhere: if wall_mask is None and wall_segments is provided, rasterize to wall_mask
+        if wall_mask is None and wall_segments:
+            wall_mask = EdgeClassifier.rasterize_wall_segments(wall_segments, scale_m_per_px)
+
+        dist_map_m = None
+        if wall_mask is not None and wall_mask.max() > 0:
+            import scipy.ndimage as ndi
+            wall_bin = (wall_mask > 0).astype(np.uint8)
+            dist_px = ndi.distance_transform_edt(1 - wall_bin)
+            dist_map_m = dist_px * scale_m_per_px
+
         # 1. Edge classification and snapping
         snapped_poly, usable_segs, door_zones = self.classifier.classify_and_snap_edges(
             room_poly=room_poly,
@@ -101,7 +112,9 @@ class RoomDesignEngine:
             usable_segments=usable_segs,
             door_clearance_zones=door_zones,
             preset=norm_preset,
-            seed=seed
+            seed=seed,
+            wall_dist_map_m=dist_map_m,
+            scale_m_per_px=scale_m_per_px
         )
 
         if fail_reason:
@@ -131,7 +144,9 @@ class RoomDesignEngine:
             room_poly=snapped_poly,
             items=placed_items,
             door_clearance_zones=door_zones,
-            doors=doors
+            doors=doors,
+            wall_dist_map_m=dist_map_m,
+            scale_m_per_px=scale_m_per_px
         )
 
         runtime_ms = (time.perf_counter() - t0) * 1000.0

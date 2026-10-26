@@ -19,16 +19,26 @@ from src.design.types import PlacedItem, ValidationReport
 class LayoutValidator:
     """Performs rigorous spatial verification on a generated room layout."""
 
-    def __init__(self, wall_contact_tolerance_m: float = 0.02, min_corridor_width_m: float = 0.50):
+    def __init__(
+        self,
+        wall_contact_tolerance_m: float = 0.02,
+        min_corridor_width_m: float = 0.50,
+        min_wall_contact_ratio: float = 0.80,
+        wall_contact_dist_threshold_m: float = 0.10
+    ):
         self.wall_contact_tolerance_m = wall_contact_tolerance_m
         self.min_corridor_width_m = min_corridor_width_m
+        self.min_wall_contact_ratio = min_wall_contact_ratio
+        self.wall_contact_dist_threshold_m = wall_contact_dist_threshold_m
 
     def validate(
         self,
         room_poly: Polygon,
         items: List[PlacedItem],
         door_clearance_zones: List[Polygon],
-        doors: Optional[List[Dict[str, Any]]] = None
+        doors: Optional[List[Dict[str, Any]]] = None,
+        wall_dist_map_m: Optional[np.ndarray] = None,
+        scale_m_per_px: float = 0.03
     ) -> ValidationReport:
         """
         Validates all constraints on the furnished layout.
@@ -115,6 +125,30 @@ class LayoutValidator:
                 if d > (self.wall_contact_tolerance_m + 0.015):  # > 3.5 cm
                     reasons.append(f"WALL_GAP: {it.item_id} back is {d_cm:.1f} cm from wall face (limit 2.0 cm)")
                     is_valid = False
+
+                # Strict wall raster contact check: >= 80% within 0.10 m (measured on predicted wall mask)
+                if wall_dist_map_m is not None and len(it.polygon_coords) >= 4:
+                    c_br = it.polygon_coords[1]
+                    c_bl = it.polygon_coords[2]
+                    back_line = LineString([c_br, c_bl])
+                    if back_line.length > 1e-4:
+                        pts_sample = [back_line.interpolate(frac, normalized=True) for frac in np.linspace(0.05, 0.95, 15)]
+                        h, w = wall_dist_map_m.shape
+                        contact_count = 0
+                        for pt in pts_sample:
+                            ix = int(round(pt.x / scale_m_per_px))
+                            iy = int(round(pt.y / scale_m_per_px))
+                            if 0 <= ix < w and 0 <= iy < h:
+                                if wall_dist_map_m[iy, ix] <= self.wall_contact_dist_threshold_m:
+                                    contact_count += 1
+                        ratio = contact_count / len(pts_sample)
+                        it.wall_contact_ratio = round(ratio, 3)
+                        if ratio < self.min_wall_contact_ratio:
+                            reasons.append(
+                                f"WALL_CONTACT_VIOLATION: {it.item_id} has only {ratio*100:.1f}% "
+                                f"of back edge within {self.wall_contact_dist_threshold_m*100:.0f}cm of wall pixel (minimum required: {self.min_wall_contact_ratio*100:.0f}%)"
+                            )
+                            is_valid = False
 
         # 5. BFS Reachability from door to primary items
         bfs_ok = self._check_bfs_reachability(room_poly, items, item_polys, doors)

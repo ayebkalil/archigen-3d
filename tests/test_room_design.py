@@ -304,3 +304,58 @@ def test_optional_item_dropping_compact_bathroom(engine):
     assert res.validation.overlap_count == 0
     assert not res.validation.door_clearance_violation
     assert res.validation.bfs_reachable
+
+
+def test_back_to_wall_80_percent_contact_rule(engine):
+    """
+    Verify the strict floating-item prevention rule:
+    Back-to-wall items must have >= 80% of their back edge within 0.10 m of a wall pixel.
+    When a room edge has no real wall behind it (e.g. open space), placement is rejected.
+    """
+    # 4.0m x 4.0m room
+    room_pts = [
+        [0.0, 0.0],
+        [4.0, 0.0],
+        [4.0, 4.0],
+        [0.0, 4.0]
+    ]
+    # Door on South wall
+    doors = [{"position_m": [2.0, 4.0], "width_m": 0.90}]
+
+    # Create a synthetic wall raster (512x512) at scale 0.03 m/px
+    # Room spans x: [0, 133px], y: [0, 133px]
+    scale_m = 0.03
+    wall_mask = np.zeros((512, 512), dtype=np.uint8)
+
+    # Put a real wall only along the North edge: y in [0..5px], x in [0..133px]
+    wall_mask[0:6, 0:134] = 1
+
+    # Design bedroom: North wall has real wall mask, East/West/South do not
+    res = engine.design_room(
+        room_polygon_meters=room_pts,
+        room_type="bedroom",
+        doors=doors,
+        wall_mask=wall_mask,
+        scale_m_per_px=scale_m,
+        seed=42
+    )
+
+    assert res.is_valid, f"Bedroom on real wall failed: {res.failure_reason}"
+    bed = next(it for it in res.items if it.category == "bed")
+    assert bed.wall_contact_ratio >= 0.80, f"Bed wall contact ratio {bed.wall_contact_ratio} is < 0.80"
+
+    # Now test with a wall mask that has NO wall pixels at all near any edge
+    empty_wall_mask = np.zeros((512, 512), dtype=np.uint8)
+    empty_wall_mask[400:450, 400:450] = 1  # Wall far away from room
+
+    res_floating = engine.design_room(
+        room_polygon_meters=room_pts,
+        room_type="bedroom",
+        doors=doors,
+        wall_mask=empty_wall_mask,
+        scale_m_per_px=scale_m,
+        seed=42
+    )
+    # The room cannot place floating furniture against non-existent walls
+    assert not res_floating.is_valid, "Floating furniture should be rejected by 80% contact rule"
+    assert res_floating.failure_reason in ["NO_USABLE_WALL", "VALIDATION_FAILED"]

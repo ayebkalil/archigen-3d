@@ -52,6 +52,7 @@ class PlacedItem:
     polygon_coords: List[Tuple[float, float]]  # Footprint polygon vertices in plan meters
     placement_rule: str        # "back_to_wall", "in_front_of_anchor", "center", etc.
     wall_distance_cm: float = 0.0  # Distance from back edge to wall face in cm (target <= 2.0 cm)
+    wall_contact_ratio: float = 1.0  # Share of back edge within 0.10m of a wall pixel (target >= 0.80)
 
 @dataclass
 class ValidationReport:
@@ -98,6 +99,7 @@ class RoomDesignResult:
                     "glb": it.glb,
                     "placement_rule": it.placement_rule,
                     "wall_distance_cm": round(it.wall_distance_cm, 1),
+                    "wall_contact_ratio": round(it.wall_contact_ratio, 3),
                     "footprint_polygon": [[round(p[0], 3), round(p[1], 3)] for p in it.polygon_coords]
                 }
                 for it in self.items
