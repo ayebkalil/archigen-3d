@@ -16,6 +16,15 @@ const ROOM_TYPE_OPTIONS = [
   'Dining'
 ];
 
+// Minimum plausible physical room areas (in m²) for residential spaces
+const MIN_PLAUSIBLE_ROOM_AREAS = {
+  bathroom: 2.0,
+  bedroom: 5.0,
+  kitchen: 3.0,
+  'living room': 6.0,
+  living_room: 6.0
+};
+
 export default function RoomDesignPanel({
   selectedRoom,
   onClose,
@@ -41,6 +50,13 @@ export default function RoomDesignPanel({
   const actualScale = meta.scale_m_per_px || 0.03;
   const scaleSource = meta.scale_source || (meta.scale_uncalibrated ? 'Model Estimated' : '2-Pt Calibrated');
 
+  // Fragment detection (< minimum plausible room area)
+  const normType = (selectedRoom.room_type || '').toLowerCase();
+  const minPlausibleArea = MIN_PLAUSIBLE_ROOM_AREAS[normType] || 2.0;
+  const isFragment = (selectedRoom.surface_m2 !== undefined && selectedRoom.surface_m2 < minPlausibleArea) ||
+                     failureReason === 'ROOM_FRAGMENT' ||
+                     currentFurnishings?.status === 'not a room (fragment)';
+
   // Approximate room width & depth from bounding box
   const poly = selectedRoom.polygon_meters || [];
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -55,6 +71,12 @@ export default function RoomDesignPanel({
 
   const getFailureMessage = (reason) => {
     switch (reason) {
+      case 'ROOM_FRAGMENT':
+        return {
+          title: 'Not a Room (Fragment)',
+          desc: `Area (${selectedRoom.surface_m2} m²) is below the plausible threshold (${minPlausibleArea} m²) for standard ${selectedRoom.room_type} furnishings. This is an over-segmentation fragment.`,
+          action: 'Merge this fragment with an adjacent room in the 2D CAD editor, or relabel as a closet.'
+        };
       case 'NO_USABLE_WALL':
         return {
           title: 'No Usable Wall Detected',
@@ -109,9 +131,16 @@ export default function RoomDesignPanel({
         {/* Room Info Card */}
         <div className="bg-[#1d1d1f]/5 border border-[#1d1d1f]/15 p-2.5 rounded-sm space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-[#1d1d1f] text-sm">
-              {selectedRoom.room_type || 'Selected Space'}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-[#1d1d1f] text-sm">
+                {selectedRoom.room_type || 'Selected Space'}
+              </span>
+              {isFragment && (
+                <span className="px-1.5 py-0.5 bg-[#b8452a]/15 text-[#b8452a] text-[9.5px] font-bold uppercase rounded-xs">
+                  fragment
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setShowRelabel(!showRelabel)}
               className="text-[10px] text-[#b8452a] underline uppercase hover:text-[#96351e]"
@@ -179,24 +208,24 @@ export default function RoomDesignPanel({
           </div>
         </div>
 
-        {/* Failure Notice / Guidance */}
-        {hasFailed && (
+        {/* Failure / Fragment Notice / Guidance */}
+        {(hasFailed || isFragment) && (
           <div className="space-y-2">
             <div className="bg-[#b8452a]/10 border border-[#b8452a]/30 p-2.5 rounded-sm text-[#b8452a] space-y-1">
               <div className="flex items-center gap-1.5 font-semibold text-[11px]">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{getFailureMessage(failureReason).title}</span>
+                <span>{getFailureMessage(isFragment ? 'ROOM_FRAGMENT' : failureReason).title}</span>
               </div>
               <p className="text-[10px] leading-relaxed text-[#1d1d1f]/80">
-                {getFailureMessage(failureReason).desc}
+                {getFailureMessage(isFragment ? 'ROOM_FRAGMENT' : failureReason).desc}
               </p>
               <div className="pt-1 border-t border-[#b8452a]/20 text-[10px] font-medium text-[#b8452a]">
-                Tip: {getFailureMessage(failureReason).action}
+                Tip: {getFailureMessage(isFragment ? 'ROOM_FRAGMENT' : failureReason).action}
               </div>
             </div>
 
             {/* Scale & Calibration Status Badge (shows actual scale & source) */}
-            {failureReason === 'TOO_SMALL' && (
+            {failureReason === 'TOO_SMALL' && !isFragment && (
               <div className="bg-amber-500/10 border border-amber-600/30 p-2 rounded-sm text-amber-900 space-y-1">
                 <div className="flex items-center gap-1.5 font-semibold text-[10.5px] text-amber-800">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
@@ -237,28 +266,35 @@ export default function RoomDesignPanel({
 
         {/* Action Controls */}
         <div className="space-y-1.5 pt-1">
-          <button
-            onClick={() => onGenerateDesign(selectedRoom, selectedPreset)}
-            disabled={isDesigning}
-            className="w-full bg-[#1d1d1f] hover:bg-[#333] text-[#efebe2] py-2 px-3 rounded-sm font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md disabled:opacity-50"
-          >
-            {isDesigning ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                <span>Generating Placement...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-[#b8452a]" />
-                <span>Generate Design</span>
-              </>
-            )}
-          </button>
+          {isFragment ? (
+            <div className="w-full bg-[#1d1d1f]/10 border border-[#1d1d1f]/20 text-[#1d1d1f]/60 py-2.5 px-3 rounded-sm font-semibold text-[10.5px] uppercase tracking-wider text-center flex items-center justify-center gap-1.5 cursor-not-allowed select-none">
+              <AlertCircle className="w-3.5 h-3.5 text-[#b8452a]" />
+              <span>Not a room (fragment) &bull; No Generate</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => onGenerateDesign(selectedRoom, selectedPreset)}
+              disabled={isDesigning}
+              className="w-full bg-[#1d1d1f] hover:bg-[#333] text-[#efebe2] py-2 px-3 rounded-sm font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md disabled:opacity-50"
+            >
+              {isDesigning ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Generating Placement...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-[#b8452a]" />
+                  <span>Generate Design</span>
+                </>
+              )}
+            </button>
+          )}
 
           <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={() => onRegenerateDesign(selectedRoom, selectedPreset)}
-              disabled={isDesigning || !isFurnished}
+              disabled={isDesigning || !isFurnished || isFragment}
               className="bg-white/80 hover:bg-white text-[#1d1d1f] border border-[#1d1d1f]/25 py-1.5 px-2 rounded-sm font-medium text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all disabled:opacity-40"
               title="Regenerate with a new random seed"
             >

@@ -17,7 +17,7 @@ import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from shapely.geometry import Polygon, box
 
-from src.design.types import RoomDesignResult, PlacedItem, ValidationReport
+from src.design.types import RoomDesignResult, PlacedItem, ValidationReport, MIN_PLAUSIBLE_ROOM_AREAS
 from src.design.edge_classifier import EdgeClassifier
 from src.design.rules import RoomRuleEngine
 from src.design.validator import LayoutValidator
@@ -83,6 +83,35 @@ class RoomDesignEngine:
         room_width = round(maxx - minx, 2)
         room_depth = round(maxy - miny, 2)
         room_area = round(room_poly.area, 2)
+
+        # Check minimum plausible room area (exclude neural over-segmentation fragments)
+        norm_type = room_type.lower().replace(" ", "_")
+        min_plausible_area = MIN_PLAUSIBLE_ROOM_AREAS.get(norm_type, 1.50)
+        if room_area < min_plausible_area:
+            runtime_ms = (time.perf_counter() - t0) * 1000.0
+            return RoomDesignResult(
+                room_id=room_id,
+                room_type=room_type,
+                preset=norm_preset,
+                seed=seed,
+                is_valid=False,
+                failure_reason="ROOM_FRAGMENT",
+                status="not a room (fragment)",
+                items=[],
+                metadata={
+                    "room_width_m": room_width,
+                    "room_depth_m": room_depth,
+                    "room_area_m2": room_area,
+                    "min_plausible_area_m2": min_plausible_area,
+                    "is_fragment": True,
+                    "room_status": "not a room (fragment)",
+                    "usable_wall_segments_count": 0,
+                    "scale_m_per_px": round(scale_m_per_px, 4),
+                    "scale_source": "2-Pt Calibrated" if not is_scale_uncalibrated else "Model Estimated",
+                    "scale_uncalibrated": is_scale_uncalibrated,
+                    "runtime_ms": round(runtime_ms, 2)
+                }
+            )
 
         # Method B default everywhere: if wall_mask is None and wall_segments is provided, rasterize to wall_mask
         if wall_mask is None and wall_segments:

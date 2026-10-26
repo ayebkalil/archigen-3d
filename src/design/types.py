@@ -9,6 +9,16 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from shapely.geometry import Polygon, Point, LineString
 
+# Minimum plausible physical room areas (in m²) for residential floorplans.
+# Polygons below these thresholds represent neural over-segmentation fragments
+# and receive status "not a room (fragment)" without placement.
+MIN_PLAUSIBLE_ROOM_AREAS: Dict[str, float] = {
+    "bathroom": 2.0,      # Compact powder room / toilet + sink
+    "bedroom": 5.0,       # Minimum single bedroom code standard
+    "kitchen": 3.0,       # Compact kitchenette
+    "living_room": 6.0,   # Compact studio living space
+}
+
 @dataclass
 class WallSegment:
     """A linear wall segment or snapped wall face in plan meters."""
@@ -75,17 +85,23 @@ class RoomDesignResult:
     seed: int
     is_valid: bool
     failure_reason: Optional[str]
+    status: Optional[str] = None
     items: List[PlacedItem] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     validation: Optional[ValidationReport] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        computed_status = self.status
+        if not computed_status:
+            computed_status = "valid" if self.is_valid else (self.failure_reason or "failed")
+
         return {
             "room_id": self.room_id,
             "room_type": self.room_type,
             "preset": self.preset,
             "seed": self.seed,
             "is_valid": self.is_valid,
+            "status": computed_status,
             "failure_reason": self.failure_reason,
             "items": [
                 {

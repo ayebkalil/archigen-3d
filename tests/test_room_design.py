@@ -185,8 +185,9 @@ def test_uncalibrated_scale_flag_and_dimensions(engine):
     assert res.metadata["room_depth_m"] == 4.0
     assert res.metadata["room_area_m2"] == 20.0
 
-def test_tiny_room_fails_gracefully(engine):
-    """Verify that a tiny room below minimum area threshold fails gracefully with TOO_SMALL."""
+def test_room_fragment_below_minimum_plausible_area(engine):
+    """Verify that a polygon below minimum plausible area is rejected as a room fragment."""
+    # 1.2m x 1.2m = 1.44 m² bedroom (threshold: 5.0 m²)
     tiny_pts = [
         [0.0, 0.0],
         [1.2, 0.0],
@@ -200,8 +201,46 @@ def test_tiny_room_fails_gracefully(engine):
     )
 
     assert not res.is_valid
-    assert res.failure_reason == "TOO_SMALL"
+    assert res.failure_reason == "ROOM_FRAGMENT"
+    assert res.status == "not a room (fragment)"
+    assert res.metadata["is_fragment"] is True
+    assert res.metadata["min_plausible_area_m2"] == 5.0
     assert len(res.items) == 0
+
+def test_minimum_plausible_area_thresholds(engine):
+    """Verify that each room type enforces its stated plausible threshold."""
+    # Bathroom: 1.5m x 1.2m = 1.80 m² (< 2.0 m²) -> fragment
+    res_bath_frag = engine.design_room(
+        room_polygon_meters=[[0.0, 0.0], [1.5, 0.0], [1.5, 1.2], [0.0, 1.2]],
+        room_type="bathroom"
+    )
+    assert not res_bath_frag.is_valid
+    assert res_bath_frag.failure_reason == "ROOM_FRAGMENT"
+    assert res_bath_frag.status == "not a room (fragment)"
+
+    # Bathroom: 1.8m x 1.5m = 2.70 m² (>= 2.0 m²) -> plausible room, processed
+    res_bath_ok = engine.design_room(
+        room_polygon_meters=[[0.0, 0.0], [1.8, 0.0], [1.8, 1.5], [0.0, 1.5]],
+        room_type="bathroom",
+        doors=[{"position_m": [0.9, 1.5], "width_m": 0.80}]
+    )
+    assert res_bath_ok.failure_reason != "ROOM_FRAGMENT"
+
+    # Kitchen: 2.0m x 1.2m = 2.40 m² (< 3.0 m²) -> fragment
+    res_kit_frag = engine.design_room(
+        room_polygon_meters=[[0.0, 0.0], [2.0, 0.0], [2.0, 1.2], [0.0, 1.2]],
+        room_type="kitchen"
+    )
+    assert not res_kit_frag.is_valid
+    assert res_kit_frag.failure_reason == "ROOM_FRAGMENT"
+
+    # Living Room: 2.5m x 2.0m = 5.00 m² (< 6.0 m²) -> fragment
+    res_liv_frag = engine.design_room(
+        room_polygon_meters=[[0.0, 0.0], [2.5, 0.0], [2.5, 2.0], [0.0, 2.0]],
+        room_type="living_room"
+    )
+    assert not res_liv_frag.is_valid
+    assert res_liv_frag.failure_reason == "ROOM_FRAGMENT"
 
 def test_partition_fallback_enclosed_room(engine):
     """
