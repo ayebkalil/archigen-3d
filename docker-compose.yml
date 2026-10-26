@@ -3,8 +3,8 @@ version: '3.8'
 services:
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: archigen_backend
     ports:
       - "8000:8000"
@@ -13,6 +13,7 @@ services:
       - MODEL_PATH=/app/models/generator.onnx
     volumes:
       - ./backend/app:/app/app:ro
+      - ./src:/app/src:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

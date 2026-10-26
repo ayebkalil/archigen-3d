@@ -2,8 +2,11 @@ import time
 import sys
 from pathlib import Path
 
-# Ensure project root is in sys.path for src.* imports
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+# Ensure backend and project root are in sys.path
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BACKEND_DIR.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -169,7 +172,7 @@ async def analyze_floorplan(
     - tta_mode: "none", "4_fold", or "8_fold" (full D4 dihedral group ensembling).
     - front_only: High-performance on-demand front facade synthesis (P95 latency < 35ms).
     """
-    if not file.content_type.startswith("image/"):
+    if file.content_type and not file.content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded file must be a valid image format (PNG, JPEG)."
@@ -269,7 +272,7 @@ async def generate_photorealistic_render(
     Synthesizes a high-fidelity photorealistic rendering from an architectural layout or sketch
     using the Pix2Pix / cGAN ONNX generator.
     """
-    if not file.content_type.startswith("image/"):
+    if file.content_type and not file.content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Uploaded file must be a valid image format."
@@ -299,6 +302,9 @@ async def design_room_endpoint(request: RoomDesignRequest):
     Returns 2D plan coordinates (meters) and clockwise rotation (degrees from North).
     """
     try:
+        root_dir = str(Path(__file__).resolve().parent.parent.parent)
+        if root_dir not in sys.path:
+            sys.path.insert(0, root_dir)
         from src.design.engine import RoomDesignEngine
         engine = RoomDesignEngine()
         result = engine.design_room(
@@ -325,6 +331,9 @@ async def design_layout_endpoint(request: LayoutDesignRequest):
     Furnishes all eligible rooms in a full floorplan layout using rule-based placement.
     """
     try:
+        root_dir = str(Path(__file__).resolve().parent.parent.parent)
+        if root_dir not in sys.path:
+            sys.path.insert(0, root_dir)
         from src.design.engine import RoomDesignEngine
         engine = RoomDesignEngine()
         result = engine.design_layout(

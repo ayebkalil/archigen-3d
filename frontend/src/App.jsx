@@ -5,6 +5,7 @@ import ControlPanel from './components/ControlPanel';
 import Floorplan2DCanvas from './components/Floorplan2DCanvas';
 import Viewer3D from './components/Viewer3D';
 import MetricsSummary from './components/MetricsSummary';
+import RoomDesignPanel from './components/RoomDesignPanel';
 
 export default function App() {
   const [currentView, setCurrentView] = useState(() => {
@@ -28,6 +29,11 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [latency, setLatency] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  // Room Design State (Stage 3)
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [furnishingData, setFurnishingData] = useState({});
+  const [isDesigning, setIsDesigning] = useState(false);
 
   // 1. Health check & Initial Demo load
   useEffect(() => {
@@ -196,6 +202,71 @@ export default function App() {
     }
   };
 
+  // --- Room Design Engine Handlers (Stage 3) ---
+  const handleSelectRoom = (room) => {
+    setSelectedRoom(room);
+  };
+
+  const handleGenerateDesign = async (room, preset = 'contemporary_minimal', seed = 42) => {
+    if (!room) return;
+    setIsDesigning(true);
+    try {
+      const payload = {
+        room_id: room.id,
+        room_type: room.room_type,
+        polygon_meters: room.polygon_meters,
+        doors: layout?.doors || [],
+        windows: layout?.windows || [],
+        wall_segments: layout?.walls || [],
+        preset: preset,
+        seed: seed
+      };
+      const response = await axios.post('/design', payload);
+      const result = response.data;
+      setFurnishingData((prev) => ({
+        ...prev,
+        [room.id]: result
+      }));
+    } catch (err) {
+      console.error('Room design request failed:', err);
+      setFurnishingData((prev) => ({
+        ...prev,
+        [room.id]: {
+          is_valid: false,
+          failure_reason: err.response?.data?.detail || 'INFERENCE_ERROR',
+          items: []
+        }
+      }));
+    } finally {
+      setIsDesigning(false);
+    }
+  };
+
+  const handleRegenerateDesign = (room, preset) => {
+    const newSeed = Math.floor(Math.random() * 1000000) + 1;
+    handleGenerateDesign(room, preset, newSeed);
+  };
+
+  const handleClearDesign = (roomId) => {
+    setFurnishingData((prev) => {
+      const next = { ...prev };
+      delete next[roomId];
+      return next;
+    });
+  };
+
+  const handleRelabelRoom = (roomId, newType) => {
+    if (!layout) return;
+    const updatedRooms = layout.rooms.map((r) =>
+      r.id === roomId ? { ...r, room_type: newType } : r
+    );
+    setLayout({ ...layout, rooms: updatedRooms });
+    if (selectedRoom?.id === roomId) {
+      setSelectedRoom((prev) => ({ ...prev, room_type: newType }));
+    }
+  };
+
+
   const renderTransitionOverlay = () => {
     if (!isTransitioning) return null;
     return (
@@ -301,7 +372,7 @@ export default function App() {
             </div>
           )}
 
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden relative">
             {/* Split View: 2D Canvas + 3D Viewer */}
             {activeTab === 'split' && (
               <>
@@ -315,6 +386,8 @@ export default function App() {
                   setIsCalibrating={setIsCalibrating}
                   onUpdateLayout={setLayout}
                   isSplit={true}
+                  selectedRoom={selectedRoom}
+                  onSelectRoom={handleSelectRoom}
                 />
                 <Viewer3D
                   layout={layout}
@@ -322,6 +395,10 @@ export default function App() {
                   facadeTextureUrl={facadeTextureUrl}
                   numFloors={numFloors}
                   isSplit={true}
+                  selectedRoom={selectedRoom}
+                  onSelectRoom={handleSelectRoom}
+                  furnishingData={furnishingData}
+                  onClearRoomFurnishings={handleClearDesign}
                 />
               </>
             )}
@@ -338,6 +415,8 @@ export default function App() {
                 setIsCalibrating={setIsCalibrating}
                 onUpdateLayout={setLayout}
                 isSplit={false}
+                selectedRoom={selectedRoom}
+                onSelectRoom={handleSelectRoom}
               />
             )}
 
@@ -349,6 +428,24 @@ export default function App() {
                 facadeTextureUrl={facadeTextureUrl}
                 numFloors={numFloors}
                 isSplit={false}
+                selectedRoom={selectedRoom}
+                onSelectRoom={handleSelectRoom}
+                furnishingData={furnishingData}
+                onClearRoomFurnishings={handleClearDesign}
+              />
+            )}
+
+            {/* Room Design Floating Panel (Stage 3) */}
+            {selectedRoom && (
+              <RoomDesignPanel
+                selectedRoom={selectedRoom}
+                onClose={() => setSelectedRoom(null)}
+                onGenerateDesign={handleGenerateDesign}
+                onRegenerateDesign={handleRegenerateDesign}
+                onClearDesign={handleClearDesign}
+                furnishingData={furnishingData}
+                isDesigning={isDesigning}
+                onRelabelRoom={handleRelabelRoom}
               />
             )}
           </div>

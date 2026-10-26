@@ -62,6 +62,8 @@ export default function Floorplan2DCanvas({
   setIsCalibrating,
   onUpdateLayout,
   isSplit = false,
+  selectedRoom = null,
+  onSelectRoom = null,
 }) {
   const [showRooms, setShowRooms] = useState(true);
   const [showWalls, setShowWalls] = useState(true);
@@ -217,6 +219,8 @@ export default function Floorplan2DCanvas({
     e.stopPropagation();
     if (activeTool === 'relabel') {
       setSelectedRoomForRelabel(room);
+    } else if (onSelectRoom) {
+      onSelectRoom(room);
     }
   };
 
@@ -484,23 +488,26 @@ export default function Floorplan2DCanvas({
                   ? [room.centroid_meters[0] / scaleMperPx, room.centroid_meters[1] / scaleMperPx]
                   : [0, 0];
 
+                const isSelected = selectedRoom?.id === room.id;
                 return (
-                  <g key={`room-${idx}`}>
+                  <g key={`room-${idx}`} data-room-id={room.id} className="room-group">
                     <polygon
+                      data-room-id={room.id}
                       points={pointsStr}
-                      fill={style.fill}
-                      stroke={style.stroke}
-                      strokeWidth="1.5"
-                      className={`transition-all ${
-                        activeTool === 'relabel' ? 'cursor-pointer hover:stroke-purple-400 hover:fill-purple-500/30' : ''
+                      fill={isSelected ? 'rgba(2, 132, 199, 0.28)' : style.fill}
+                      stroke={isSelected ? '#0284c7' : style.stroke}
+                      strokeWidth={isSelected ? '2.5' : '1.5'}
+                      className={`room-polygon transition-all cursor-pointer ${
+                        activeTool === 'relabel' ? 'hover:stroke-purple-400 hover:fill-purple-500/30' : 'hover:stroke-sky-500'
                       }`}
                       onClick={(e) => handleRoomClick(room, e)}
                     />
                     {/* Centroid Tag */}
                     {centroid[0] > 0 && (
                       <g
+                        data-room-id={room.id}
                         transform={`translate(${centroid[0]}, ${centroid[1]})`}
-                        className="cursor-pointer select-none"
+                        className="room-centroid-badge cursor-pointer select-none"
                         onClick={(e) => handleRoomClick(room, e)}
                       >
                         <rect
@@ -510,8 +517,8 @@ export default function Floorplan2DCanvas({
                           height="28"
                           rx="4"
                           fill="rgba(247, 244, 237, 0.95)"
-                          stroke={activeTool === 'relabel' ? '#b8452a' : style.stroke}
-                          strokeWidth="1.2"
+                          stroke={isSelected ? '#0284c7' : activeTool === 'relabel' ? '#b8452a' : style.stroke}
+                          strokeWidth={isSelected ? '2' : '1.2'}
                         />
                         <text
                           x="0"
