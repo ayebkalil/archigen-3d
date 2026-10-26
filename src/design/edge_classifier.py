@@ -172,6 +172,14 @@ class EdgeClassifier:
                         clearance_depth=0.10
                     ))
 
+        # 3.5 Fallback for enclosed room partitions
+        # If wall_segments evidence omitted interior partitions (resulting in 0 wall-backed edges),
+        # treat the room boundary edges as partition wall faces.
+        if not any(e["is_wall_backed"] for e in edge_info):
+            for e in edge_info:
+                e["is_wall_backed"] = True
+                e["wall_dist_m"] = 0.05
+
         # 4. Extract continuous unobstructed usable wall segments
         usable_segments = []
         for e in edge_info:

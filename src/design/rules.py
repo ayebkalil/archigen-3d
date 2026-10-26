@@ -507,6 +507,7 @@ class RoomRuleEngine:
                 curr_s += sw
 
         # 2. Adjacent Base Counter Unit
+        counter_placed = False
         if (curr_s + cw) <= seg_len:
             cnt_center_s = curr_s + cw / 2.0
             cnt_back = p1 + u_dir * cnt_center_s
@@ -527,6 +528,34 @@ class RoomRuleEngine:
                     placement_rule="back_to_wall"
                 ))
                 curr_s += cw
+                counter_placed = True
+
+        # Fallback: if counter didn't fit on primary wall, try secondary wall
+        if not counter_placed and len(sorted_segs) > 1:
+            sec_cand = sorted_segs[1]
+            if sec_cand.length_m >= (cw + 0.10):
+                cp1 = np.array(sec_cand.start)
+                cu = (np.array(sec_cand.end) - cp1) / sec_cand.length_m
+                cnin = np.array(sec_cand.normal)
+                c_back = cp1 + cu * (cw / 2.0 + 0.10)
+                c_c = c_back + cnin * (cd / 2.0)
+                c_poly = Polygon(compute_footprint_polygon(float(c_c[0]), float(c_c[1]), cw, cd, sec_cand.yaw_deg))
+                placed_polys = [Polygon(p.polygon_coords) for p in placed]
+                if room_poly.buffer(0.02).contains(c_poly) and not any(dz.intersects(c_poly) for dz in door_zones):
+                    if not any(c_poly.intersects(pp) for pp in placed_polys):
+                        placed.append(PlacedItem(
+                            item_id="kitchen_counter_0",
+                            catalog_id="kitchen_counter",
+                            name=counter_spec["name"],
+                            category="kitchen_counter",
+                            position_m=(float(c_c[0]), float(c_c[1])),
+                            rotation_deg=sec_cand.yaw_deg,
+                            dimensions_m=(cw, cd, ch),
+                            glb=counter_spec["glb"],
+                            polygon_coords=list(c_poly.exterior.coords)[:-1],
+                            placement_rule="back_to_wall"
+                        ))
+                        counter_placed = True
 
         # 3. Refrigerator (at end of counter run or on secondary wall)
         fridge_placed = False
@@ -609,87 +638,115 @@ class RoomRuleEngine:
         vanity_spec = self._get_item_spec("bathroom_vanity")
         vw, vd, vh = vanity_spec["dimensions_m"]
 
-        # 1. Place Toilet
-        t_seg = sorted_segs[0]
-        p1 = np.array(t_seg.start)
-        u_dir = (np.array(t_seg.end) - p1) / max(t_seg.length_m, 1e-6)
-        n_in = np.array(t_seg.normal)
+        # 1. Place Toilet with Multi-Wall and Adaptive Corner Clearance Fallbacks
+        toilet_placed = False
+        toilet_seg_idx = -1
 
-        t_center_s = tw / 2.0 + 0.15
-        t_back = p1 + u_dir * t_center_s
-        t_c = t_back + n_in * (td / 2.0)
-        t_poly = Polygon(compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, t_seg.yaw_deg))
+        for s_idx, t_seg in enumerate(sorted_segs):
+            if t_seg.length_m < (tw + 0.05):
+                continue
 
-        if any(dz.intersects(t_poly) for dz in door_zones):
-            # Try other side of segment
-            t_center_s = t_seg.length_m - (tw / 2.0 + 0.15)
-            t_back = p1 + u_dir * t_center_s
-            t_c = t_back + n_in * (td / 2.0)
-            t_poly = Polygon(compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, t_seg.yaw_deg))
+            p1 = np.array(t_seg.start)
+            seg_len = t_seg.length_m
+            u_dir = (np.array(t_seg.end) - p1) / max(seg_len, 1e-6)
+            n_in = np.array(t_seg.normal)
 
-        if not any(dz.intersects(t_poly) for dz in door_zones) and room_poly.buffer(0.02).contains(t_poly):
-            placed.append(PlacedItem(
-                item_id="toilet_0",
-                catalog_id="toilet",
-                name=toilet_spec["name"],
-                category="toilet",
-                position_m=(float(t_c[0]), float(t_c[1])),
-                rotation_deg=t_seg.yaw_deg,
-                dimensions_m=(tw, td, th),
-                glb=toilet_spec["glb"],
-                polygon_coords=list(t_poly.exterior.coords)[:-1],
-                placement_rule="back_to_wall"
-            ))
+            candidate_offsets = [
+                tw / 2.0 + 0.15,
+                seg_len - (tw / 2.0 + 0.15),
+                seg_len / 2.0,
+                tw / 2.0 + 0.05,
+                seg_len - (tw / 2.0 + 0.05)
+            ]
 
-        # 2. Place Vanity Sink (on secondary wall or further down segment)
+            for t_center_s in candidate_offsets:
+                if (tw / 2.0) <= t_center_s <= (seg_len - tw / 2.0):
+                    t_back = p1 + u_dir * t_center_s
+                    t_c = t_back + n_in * (td / 2.0)
+                    t_poly = Polygon(compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, t_seg.yaw_deg))
+
+                    if not any(dz.intersects(t_poly) for dz in door_zones) and room_poly.buffer(0.02).contains(t_poly):
+                        placed.append(PlacedItem(
+                            item_id="toilet_0",
+                            catalog_id="toilet",
+                            name=toilet_spec["name"],
+                            category="toilet",
+                            position_m=(float(t_c[0]), float(t_c[1])),
+                            rotation_deg=t_seg.yaw_deg,
+                            dimensions_m=(tw, td, th),
+                            glb=toilet_spec["glb"],
+                            polygon_coords=list(t_poly.exterior.coords)[:-1],
+                            placement_rule="back_to_wall"
+                        ))
+                        toilet_placed = True
+                        toilet_seg_idx = s_idx
+                        break
+
+            if toilet_placed:
+                break
+
+        # 2. Place Vanity Sink (on remaining walls or shared wall)
         placed_polys = [Polygon(p.polygon_coords) for p in placed]
         vanity_placed = False
 
-        if len(sorted_segs) > 1:
-            v_seg = sorted_segs[1]
-            if v_seg.length_m >= (vw + 0.10):
-                vp1 = np.array(v_seg.start)
-                vu = (np.array(v_seg.end) - vp1) / v_seg.length_m
-                vnin = np.array(v_seg.normal)
-                v_back = vp1 + vu * (v_seg.length_m / 2.0)
-                v_c = v_back + vnin * (vd / 2.0)
-                v_poly = Polygon(compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, v_seg.yaw_deg))
-
-                if room_poly.buffer(0.02).contains(v_poly) and not any(dz.intersects(v_poly) for dz in door_zones):
-                    if not any(v_poly.intersects(pp) for pp in placed_polys):
-                        placed.append(PlacedItem(
-                            item_id="vanity_0",
-                            catalog_id="bathroom_vanity",
-                            name=vanity_spec["name"],
-                            category="bathroom_sink",
-                            position_m=(float(v_c[0]), float(v_c[1])),
-                            rotation_deg=v_seg.yaw_deg,
-                            dimensions_m=(vw, vd, vh),
-                            glb=vanity_spec["glb"],
-                            polygon_coords=list(v_poly.exterior.coords)[:-1],
-                            placement_rule="back_to_wall"
-                        ))
-                        vanity_placed = True
-
-        if not vanity_placed and t_seg.length_m >= (tw + vw + 0.60):
-            v_center_s = t_center_s + (tw / 2.0) + 0.35 + (vw / 2.0)
-            if v_center_s + vw / 2.0 <= t_seg.length_m:
-                v_back = p1 + u_dir * v_center_s
-                v_c = v_back + n_in * (vd / 2.0)
-                v_poly = Polygon(compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, t_seg.yaw_deg))
-                if room_poly.buffer(0.02).contains(v_poly) and not any(dz.intersects(v_poly) for dz in door_zones):
-                    placed.append(PlacedItem(
-                        item_id="vanity_0",
-                        catalog_id="bathroom_vanity",
-                        name=vanity_spec["name"],
-                        category="bathroom_sink",
-                        position_m=(float(v_c[0]), float(v_c[1])),
-                        rotation_deg=t_seg.yaw_deg,
-                        dimensions_m=(vw, vd, vh),
-                        glb=vanity_spec["glb"],
-                        polygon_coords=list(v_poly.exterior.coords)[:-1],
-                        placement_rule="back_to_wall"
-                    ))
+        for s_idx, v_seg in enumerate(sorted_segs):
+            if s_idx == toilet_seg_idx:
+                # Same wall as toilet
+                seg_p1 = np.array(v_seg.start)
+                seg_len = v_seg.length_m
+                if seg_len >= (tw + vw + 0.40):
+                    u_dir = (np.array(v_seg.end) - seg_p1) / max(seg_len, 1e-6)
+                    n_in = np.array(v_seg.normal)
+                    for v_s in [vw / 2.0 + 0.10, seg_len - (vw / 2.0 + 0.10)]:
+                        v_back = seg_p1 + u_dir * v_s
+                        v_c = v_back + n_in * (vd / 2.0)
+                        v_poly = Polygon(compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, v_seg.yaw_deg))
+                        if room_poly.buffer(0.02).contains(v_poly) and not any(dz.intersects(v_poly) for dz in door_zones):
+                            if not any(v_poly.intersects(pp) for pp in placed_polys):
+                                placed.append(PlacedItem(
+                                    item_id="vanity_0",
+                                    catalog_id="bathroom_vanity",
+                                    name=vanity_spec["name"],
+                                    category="bathroom_sink",
+                                    position_m=(float(v_c[0]), float(v_c[1])),
+                                    rotation_deg=v_seg.yaw_deg,
+                                    dimensions_m=(vw, vd, vh),
+                                    glb=vanity_spec["glb"],
+                                    polygon_coords=list(v_poly.exterior.coords)[:-1],
+                                    placement_rule="back_to_wall"
+                                ))
+                                vanity_placed = True
+                                break
+            else:
+                # Different wall from toilet
+                if v_seg.length_m >= (vw + 0.05):
+                    vp1 = np.array(v_seg.start)
+                    v_len = v_seg.length_m
+                    vu = (np.array(v_seg.end) - vp1) / max(v_len, 1e-6)
+                    vnin = np.array(v_seg.normal)
+                    for v_s in [vw / 2.0 + 0.10, v_len / 2.0, v_len - (vw / 2.0 + 0.10)]:
+                        if (vw / 2.0) <= v_s <= (v_len - vw / 2.0):
+                            v_back = vp1 + vu * v_s
+                            v_c = v_back + vnin * (vd / 2.0)
+                            v_poly = Polygon(compute_footprint_polygon(float(v_c[0]), float(v_c[1]), vw, vd, v_seg.yaw_deg))
+                            if room_poly.buffer(0.02).contains(v_poly) and not any(dz.intersects(v_poly) for dz in door_zones):
+                                if not any(v_poly.intersects(pp) for pp in placed_polys):
+                                    placed.append(PlacedItem(
+                                        item_id="vanity_0",
+                                        catalog_id="bathroom_vanity",
+                                        name=vanity_spec["name"],
+                                        category="bathroom_sink",
+                                        position_m=(float(v_c[0]), float(v_c[1])),
+                                        rotation_deg=v_seg.yaw_deg,
+                                        dimensions_m=(vw, vd, vh),
+                                        glb=vanity_spec["glb"],
+                                        polygon_coords=list(v_poly.exterior.coords)[:-1],
+                                        placement_rule="back_to_wall"
+                                    ))
+                                    vanity_placed = True
+                                    break
+            if vanity_placed:
+                break
 
         # 3. Bathtub if room is spacious (>= 4.5 m²)
         if area >= 4.5:

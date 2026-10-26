@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, RefreshCw, Trash2, X, AlertCircle, CheckCircle2, ChevronRight, Info, Layers, Compass } from 'lucide-react';
+import { Sparkles, RefreshCw, Trash2, X, AlertCircle, AlertTriangle, CheckCircle2, ChevronRight, Info, Layers, Compass } from 'lucide-react';
 
 const PRESET_OPTIONS = [
   { id: 'contemporary_minimal', label: 'Contemporary Minimal', desc: 'Clean lines, neutral tones, light oak & steel' },
@@ -178,17 +178,32 @@ export default function RoomDesignPanel({
 
         {/* Failure Notice / Guidance */}
         {hasFailed && (
-          <div className="bg-[#b8452a]/10 border border-[#b8452a]/30 p-2.5 rounded-sm text-[#b8452a] space-y-1">
-            <div className="flex items-center gap-1.5 font-semibold text-[11px]">
-              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{getFailureMessage(failureReason).title}</span>
+          <div className="space-y-2">
+            <div className="bg-[#b8452a]/10 border border-[#b8452a]/30 p-2.5 rounded-sm text-[#b8452a] space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-[11px]">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{getFailureMessage(failureReason).title}</span>
+              </div>
+              <p className="text-[10px] leading-relaxed text-[#1d1d1f]/80">
+                {getFailureMessage(failureReason).desc}
+              </p>
+              <div className="pt-1 border-t border-[#b8452a]/20 text-[10px] font-medium text-[#b8452a]">
+                Tip: {getFailureMessage(failureReason).action}
+              </div>
             </div>
-            <p className="text-[10px] leading-relaxed text-[#1d1d1f]/80">
-              {getFailureMessage(failureReason).desc}
-            </p>
-            <div className="pt-1 border-t border-[#b8452a]/20 text-[10px] font-medium text-[#b8452a]">
-              Tip: {getFailureMessage(failureReason).action}
-            </div>
+
+            {/* Scale Uncalibrated Warning Badge (shown next to TOO_SMALL or when uncalibrated) */}
+            {failureReason === 'TOO_SMALL' && (
+              <div className="bg-amber-500/10 border border-amber-600/30 p-2 rounded-sm text-amber-900 space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-[10.5px] text-amber-800">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                  <span>Scale Uncalibrated Warning</span>
+                </div>
+                <p className="text-[9.5px] leading-relaxed text-amber-900/80">
+                  Estimated scale (0.03 m/px) may underestimate room physical dimensions. Use the <strong>2-Pt Calibrate</strong> tool in the toolbar to establish real scale from a known door or wall.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
