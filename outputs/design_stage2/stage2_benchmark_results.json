@@ -1,0 +1,264 @@
+{
+  "metadata": {
+    "dataset": "CubiCasa5k Validation Split (first 100 plans)",
+    "num_plans": 100,
+    "date": "2026-10-26",
+    "device": "cuda",
+    "engine": "ArchiGen 3D Rule-Based Placement Engine (Stage 2)"
+  },
+  "diagnostic_figure_explanation": {
+    "historical_figure": "97.6%",
+    "nature": "Raw Geometric Edge-Proximity Diagnostic (NOT an item-placement coverage projection)",
+    "definition": "Percentage of room boundary edges with median Euclidean distance <= 0.15m to GT wall mask",
+    "real_code_contrast": "The real placement engine subtracts 0.85m door swing clearance envelopes and window spans, requiring contiguous unobstructed wall segments >= item width (1.60m bed, 2.20m sofa, 1.20m counter). Real code usable anchor wall coverage is reported below."
+  },
+  "ground_truth_masks": {
+    "total_rooms_in_plans": 694,
+    "eligible_furnishable_rooms": 340,
+    "valid_layouts": 320,
+    "overall_validity_pct": 94.12,
+    "coverage": {
+      "rooms_with_ge1_wall_backed_edge": 340,
+      "rooms_with_ge1_wall_pct": 100.0,
+      "rooms_with_ge2_wall_backed_edges": 336,
+      "rooms_with_ge2_walls_pct": 98.82,
+      "rooms_with_usable_anchor_wall": 340,
+      "rooms_with_usable_anchor_pct": 100.0
+    },
+    "failure_breakdown": {
+      "TOO_SMALL": 15,
+      "NO_USABLE_WALL": 0,
+      "DOOR_BLOCKED": 0,
+      "COLLISION": 0,
+      "UNREACHABLE": 0,
+      "OTHER": 5
+    },
+    "average_latency_ms": 29.66,
+    "p95_latency_ms": 48.83,
+    "determinism_pct": 100.0,
+    "by_room_type": {
+      "bedroom": {
+        "total": 135,
+        "valid": 133,
+        "validity_pct": 98.52,
+        "ge1_wall_pct": 100.0,
+        "ge2_walls_pct": 100.0,
+        "usable_anchor_pct": 100.0,
+        "avg_runtime_ms": 35.91,
+        "failures": {
+          "TOO_SMALL": 2
+        }
+      },
+      "bathroom": {
+        "total": 115,
+        "valid": 97,
+        "validity_pct": 84.35,
+        "ge1_wall_pct": 100.0,
+        "ge2_walls_pct": 100.0,
+        "usable_anchor_pct": 100.0,
+        "avg_runtime_ms": 21.89,
+        "failures": {
+          "TOO_SMALL": 13,
+          "VALIDATION_FAILED": 5
+        }
+      },
+      "kitchen": {
+        "total": 89,
+        "valid": 89,
+        "validity_pct": 100.0,
+        "ge1_wall_pct": 100.0,
+        "ge2_walls_pct": 95.51,
+        "usable_anchor_pct": 100.0,
+        "avg_runtime_ms": 29.8,
+        "failures": {}
+      },
+      "office": {
+        "total": 1,
+        "valid": 1,
+        "validity_pct": 100.0,
+        "ge1_wall_pct": 100.0,
+        "ge2_walls_pct": 100.0,
+        "usable_anchor_pct": 100.0,
+        "avg_runtime_ms": 65.43,
+        "failures": {}
+      }
+    }
+  },
+  "model_predicted_masks": {
+    "total_rooms_in_plans": 778,
+    "eligible_furnishable_rooms": 368,
+    "valid_layouts": 214,
+    "overall_validity_pct": 58.15,
+    "failure_breakdown": {
+      "TOO_SMALL": 34,
+      "NO_USABLE_WALL": 119,
+      "DOOR_BLOCKED": 0,
+      "COLLISION": 0,
+      "UNREACHABLE": 0,
+      "OTHER": 1
+    },
+    "average_latency_ms": 23.74,
+    "p95_latency_ms": 53.85,
+    "by_room_type": {
+      "bedroom": {
+        "total": 144,
+        "valid": 100,
+        "validity_pct": 69.44,
+        "avg_runtime_ms": 29.71,
+        "failures": {
+          "NO_USABLE_WALL": 39,
+          "TOO_SMALL": 4,
+          "VALIDATION_FAILED": 1
+        }
+      },
+      "kitchen": {
+        "total": 96,
+        "valid": 71,
+        "validity_pct": 73.96,
+        "avg_runtime_ms": 29.87,
+        "failures": {
+          "NO_USABLE_WALL": 21,
+          "TOO_SMALL": 4
+        }
+      },
+      "bathroom": {
+        "total": 128,
+        "valid": 43,
+        "validity_pct": 33.59,
+        "avg_runtime_ms": 12.41,
+        "failures": {
+          "TOO_SMALL": 26,
+          "NO_USABLE_WALL": 59
+        }
+      }
+    }
+  },
+  "open_concept_living_rooms_review": [
+    {
+      "plan_file": "colorful_14036.npz",
+      "room_id": "room_0",
+      "area_m2": 25.49,
+      "num_polygon_edges": 4,
+      "wall_backed_edges_count": 1,
+      "usable_wall_lengths_m": [
+        6.33
+      ],
+      "max_wall_length_m": 6.33,
+      "is_furnishable": true,
+      "placed_items": [
+        "sofa_modern",
+        "coffee_table_glass",
+        "rug_living"
+      ],
+      "explanation": "Open-concept great room/studio connected to kitchen or corridor. Features exactly 1 long solid partition wall (>= 3.6m), with other edges open. Rule engine anchors sofa to the solid wall and floats coffee table/rug into the room."
+    },
+    {
+      "plan_file": "colorful_14923.npz",
+      "room_id": "room_0",
+      "area_m2": 15.18,
+      "num_polygon_edges": 4,
+      "wall_backed_edges_count": 1,
+      "usable_wall_lengths_m": [
+        4.34
+      ],
+      "max_wall_length_m": 4.34,
+      "is_furnishable": true,
+      "placed_items": [
+        "sofa_modern",
+        "coffee_table_glass",
+        "rug_living"
+      ],
+      "explanation": "Open-concept great room/studio connected to kitchen or corridor. Features exactly 1 long solid partition wall (>= 3.6m), with other edges open. Rule engine anchors sofa to the solid wall and floats coffee table/rug into the room."
+    },
+    {
+      "plan_file": "colorful_14935.npz",
+      "room_id": "room_0",
+      "area_m2": 10.26,
+      "num_polygon_edges": 4,
+      "wall_backed_edges_count": 1,
+      "usable_wall_lengths_m": [
+        3.63
+      ],
+      "max_wall_length_m": 3.63,
+      "is_furnishable": true,
+      "placed_items": [
+        "sofa_modern",
+        "coffee_table_glass",
+        "rug_living"
+      ],
+      "explanation": "Open-concept great room/studio connected to kitchen or corridor. Features exactly 1 long solid partition wall (>= 3.6m), with other edges open. Rule engine anchors sofa to the solid wall and floats coffee table/rug into the room."
+    },
+    {
+      "plan_file": "colorful_14938.npz",
+      "room_id": "room_0",
+      "area_m2": 10.7,
+      "num_polygon_edges": 4,
+      "wall_backed_edges_count": 1,
+      "usable_wall_lengths_m": [
+        3.72
+      ],
+      "max_wall_length_m": 3.72,
+      "is_furnishable": true,
+      "placed_items": [
+        "sofa_modern",
+        "coffee_table_glass",
+        "rug_living"
+      ],
+      "explanation": "Open-concept great room/studio connected to kitchen or corridor. Features exactly 1 long solid partition wall (>= 3.6m), with other edges open. Rule engine anchors sofa to the solid wall and floats coffee table/rug into the room."
+    },
+    {
+      "plan_file": "colorful_444.npz",
+      "room_id": "room_0",
+      "area_m2": 23.51,
+      "num_polygon_edges": 4,
+      "wall_backed_edges_count": 1,
+      "usable_wall_lengths_m": [
+        4.87
+      ],
+      "max_wall_length_m": 4.87,
+      "is_furnishable": true,
+      "placed_items": [
+        "sofa_modern",
+        "coffee_table_glass",
+        "rug_living"
+      ],
+      "explanation": "Open-concept great room/studio connected to kitchen or corridor. Features exactly 1 long solid partition wall (>= 3.6m), with other edges open. Rule engine anchors sofa to the solid wall and floats coffee table/rug into the room."
+    },
+    {
+      "plan_file": "colorful_6628.npz",
+      "room_id": "room_0",
+      "area_m2": 24.42,
+      "num_polygon_edges": 4,
+      "wall_backed_edges_count": 1,
+      "usable_wall_lengths_m": [
+        6.02
+      ],
+      "max_wall_length_m": 6.02,
+      "is_furnishable": true,
+      "placed_items": [
+        "sofa_modern",
+        "coffee_table_glass",
+        "rug_living"
+      ],
+      "explanation": "Open-concept great room/studio connected to kitchen or corridor. Features exactly 1 long solid partition wall (>= 3.6m), with other edges open. Rule engine anchors sofa to the solid wall and floats coffee table/rug into the room."
+    },
+    {
+      "plan_file": "high_quality_1034.npz",
+      "room_id": "room_0",
+      "area_m2": 30.22,
+      "num_polygon_edges": 6,
+      "wall_backed_edges_count": 1,
+      "usable_wall_lengths_m": [
+        4.56
+      ],
+      "max_wall_length_m": 4.56,
+      "is_furnishable": true,
+      "placed_items": [
+        "sofa_modern",
+        "coffee_table_glass",
+        "rug_living"
+      ],
+      "explanation": "Open-concept great room/studio connected to kitchen or corridor. Features exactly 1 long solid partition wall (>= 3.6m), with other edges open. Rule engine anchors sofa to the solid wall and floats coffee table/rug into the room."
+    }
+  ]
+}

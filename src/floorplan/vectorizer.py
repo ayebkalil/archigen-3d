@@ -410,6 +410,10 @@ class FloorplanVectorizer:
         doors = extract_openings(door_binary, "door")
         windows = extract_openings(window_binary, "window")
 
+        # Precompute wall distance transform map for edge classification
+        dist_px = cv2.distanceTransform((1 - wall_clean).astype(np.uint8), cv2.DIST_L2, 3)
+        wall_dist_map_m = dist_px * scale_m_per_px
+
         # 6. Extract Room Interior Spaces with Semantic Room Typing
         rooms = []
         room_idx = 0
@@ -510,13 +514,43 @@ class FloorplanVectorizer:
                 c_id = info["class_id"]
                 total_interior_area_m2 += area_m2
 
+                # Classify room edges against wall mask
+                room_edges = []
+                num_r_pts = len(r_poly_m)
+                for ei in range(num_r_pts):
+                    p1 = r_poly_m[ei]
+                    p2 = r_poly_m[(ei + 1) % num_r_pts]
+                    dx = p2[0] - p1[0]
+                    dy = p2[1] - p1[1]
+                    e_len = math.hypot(dx, dy)
+                    e_dists = []
+                    for ef in [0.2, 0.4, 0.5, 0.6, 0.8]:
+                        sx = p1[0] + dx * ef
+                        sy = p1[1] + dy * ef
+                        ix = int(round(sx / scale_m_per_px))
+                        iy = int(round(sy / scale_m_per_px))
+                        if 0 <= ix < w and 0 <= iy < h:
+                            e_dists.append(float(wall_dist_map_m[iy, ix]))
+                    e_med_d = float(np.median(e_dists)) if e_dists else 0.05
+                    room_edges.append({
+                        "start": [round(p1[0], 3), round(p1[1], 3)],
+                        "end": [round(p2[0], 3), round(p2[1], 3)],
+                        "length_m": round(e_len, 3),
+                        "is_wall_backed": bool(e_med_d <= 0.15),
+                        "wall_distance_m": round(e_med_d, 3)
+                    })
+
+                wb_count = sum(1 for e in room_edges if e["is_wall_backed"])
+
                 rooms.append({
                     "id": f"room_{room_idx}",
                     "room_type": ROOM_NAMES.get(c_id, "Other Room"),
                     "surface_m2": area_m2,
                     "centroid_meters": [round(cx, 3), round(cy, 3)],
                     "polygon_meters": r_poly_m,
-                    "was_repaired": r_repaired
+                    "was_repaired": r_repaired,
+                    "edges": room_edges,
+                    "wall_backed_edge_count": wb_count
                 })
                 room_idx += 1
         elif room_mask is not None:

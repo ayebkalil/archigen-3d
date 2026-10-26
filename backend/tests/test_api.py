@@ -73,3 +73,63 @@ def test_predict_floorplan_valid_image():
     assert "threejs_scene" in data
     assert "X-Inference-Latency-ms" in response.headers
 
+
+def test_design_room_endpoint():
+    """Verify that POST /design returns deterministic placed items with plan coordinates and rotation."""
+    payload = {
+        "room_id": "room_bed_1",
+        "room_type": "bedroom",
+        "polygon_meters": [[0.0, 0.0], [4.5, 0.0], [4.5, 4.0], [0.0, 4.0]],
+        "doors": [{"start_point": [0.0, 1.0], "end_point": [0.0, 1.9]}],
+        "preset": "contemporary_minimal",
+        "seed": 42
+    }
+    response = client.post("/design", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["room_id"] == "room_bed_1"
+    assert data["room_type"] == "bedroom"
+    assert data["is_valid"] is True
+    assert len(data["items"]) >= 2
+    # Check plan coordinate format and rotation
+    for item in data["items"]:
+        assert "position_m" in item
+        assert len(item["position_m"]) == 2
+        assert "rotation_deg" in item
+        assert "dimensions_m" in item
+        assert "glb" in item
+        assert "wall_distance_cm" in item
+    assert "validation" in data
+    assert data["validation"]["is_valid"] is True
+
+
+def test_design_layout_endpoint():
+    """Verify that POST /design/layout furnishes rooms across a full floorplan layout."""
+    layout_data = {
+        "rooms": [
+            {
+                "id": "room_0",
+                "room_type": "bedroom",
+                "polygon_meters": [[0.0, 0.0], [4.0, 0.0], [4.0, 3.5], [0.0, 3.5]]
+            },
+            {
+                "id": "room_1",
+                "room_type": "living_room",
+                "polygon_meters": [[4.5, 0.0], [9.5, 0.0], [9.5, 5.0], [4.5, 5.0]]
+            }
+        ],
+        "doors": [],
+        "windows": [],
+        "walls": [],
+        "metadata": {"scale_meters_per_pixel": 0.03}
+    }
+    response = client.post("/design/layout", json={"layout": layout_data, "preset": "contemporary_minimal", "seed": 42})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["num_rooms_furnished"] == 2
+    assert "room_0" in data["rooms"]
+    assert "room_1" in data["rooms"]
+    assert data["rooms"]["room_0"]["is_valid"] is True
+    assert data["rooms"]["room_1"]["is_valid"] is True
+
+

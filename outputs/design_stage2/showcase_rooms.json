@@ -1,0 +1,560 @@
+{
+  "bedroom": {
+    "plan": "colorful_11261.npz",
+    "room_type": "Bedroom",
+    "polygon": [
+      [
+        6.228,
+        9.571
+      ],
+      [
+        6.228,
+        11.809
+      ],
+      [
+        10.029,
+        11.809
+      ],
+      [
+        10.029,
+        9.005
+      ],
+      [
+        6.875,
+        9.005
+      ]
+    ],
+    "result": {
+      "room_id": "bedroom_showcase",
+      "room_type": "bedroom",
+      "preset": "contemporary_minimal",
+      "seed": 42,
+      "is_valid": true,
+      "failure_reason": null,
+      "items": [
+        {
+          "item_id": "bed_0",
+          "catalog_id": "bed_double",
+          "name": "Double Bed",
+          "category": "bed",
+          "position_m": [
+            8.452,
+            9.945
+          ],
+          "rotation_deg": 180.0,
+          "dimensions_m": [
+            1.597,
+            1.879,
+            0.626
+          ],
+          "glb": "/models/furniture/bed_double.glb",
+          "placement_rule": "back_to_wall",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              7.654,
+              10.884
+            ],
+            [
+              7.654,
+              9.005
+            ],
+            [
+              9.251,
+              9.005
+            ],
+            [
+              9.251,
+              10.884
+            ]
+          ]
+        },
+        {
+          "item_id": "nightstand_left",
+          "catalog_id": "nightstand",
+          "name": "Nightstand",
+          "category": "nightstand",
+          "position_m": [
+            9.543,
+            9.212
+          ],
+          "rotation_deg": 180.0,
+          "dimensions_m": [
+            0.505,
+            0.413,
+            0.5
+          ],
+          "glb": "/models/furniture/nightstand.glb",
+          "placement_rule": "adjacent_anchor",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              9.29,
+              9.418
+            ],
+            [
+              9.29,
+              9.005
+            ],
+            [
+              9.795,
+              9.005
+            ],
+            [
+              9.795,
+              9.418
+            ]
+          ]
+        },
+        {
+          "item_id": "nightstand_right",
+          "catalog_id": "nightstand",
+          "name": "Nightstand",
+          "category": "nightstand",
+          "position_m": [
+            7.361,
+            9.212
+          ],
+          "rotation_deg": 180.0,
+          "dimensions_m": [
+            0.505,
+            0.413,
+            0.5
+          ],
+          "glb": "/models/furniture/nightstand.glb",
+          "placement_rule": "adjacent_anchor",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              7.109,
+              9.418
+            ],
+            [
+              7.109,
+              9.005
+            ],
+            [
+              7.614,
+              9.005
+            ],
+            [
+              7.614,
+              9.418
+            ]
+          ]
+        },
+        {
+          "item_id": "wardrobe_0",
+          "catalog_id": "wardrobe",
+          "name": "Wardrobe Closet",
+          "category": "wardrobe",
+          "position_m": [
+            9.729,
+            11.209
+          ],
+          "rotation_deg": 270.0,
+          "dimensions_m": [
+            1.0,
+            0.6,
+            2.0
+          ],
+          "glb": "/models/furniture/wardrobe.glb",
+          "placement_rule": "back_to_wall",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              9.429,
+              10.709
+            ],
+            [
+              10.029,
+              10.709
+            ],
+            [
+              10.029,
+              11.709
+            ],
+            [
+              9.429,
+              11.709
+            ]
+          ]
+        }
+      ],
+      "metadata": {
+        "room_width_m": 3.8,
+        "room_depth_m": 2.8,
+        "room_area_m2": 10.47,
+        "usable_wall_segments_count": 4,
+        "scale_uncalibrated": false,
+        "runtime_ms": 455.21
+      },
+      "validation": {
+        "is_valid": true,
+        "overlap_count": 0,
+        "door_clearance_violation": false,
+        "out_of_bounds_count": 0,
+        "max_wall_gap_cm": 0.0,
+        "bfs_reachable": true,
+        "failure_reasons": []
+      }
+    }
+  },
+  "living_room": {
+    "plan": "colorful_11261.npz",
+    "room_type": "Living Room",
+    "polygon": [
+      [
+        5.769,
+        3.397
+      ],
+      [
+        5.769,
+        6.309
+      ],
+      [
+        10.029,
+        6.309
+      ],
+      [
+        10.029,
+        3.424
+      ]
+    ],
+    "result": {
+      "room_id": "living_showcase",
+      "room_type": "living_room",
+      "preset": "contemporary_minimal",
+      "seed": 42,
+      "is_valid": true,
+      "failure_reason": null,
+      "items": [
+        {
+          "item_id": "sofa_0",
+          "catalog_id": "sofa_modern",
+          "name": "Low-Profile Sofa",
+          "category": "sofa",
+          "position_m": [
+            6.171,
+            4.853
+          ],
+          "rotation_deg": 90.0,
+          "dimensions_m": [
+            2.195,
+            0.804,
+            0.784
+          ],
+          "glb": "/models/furniture/sofa_modern.glb",
+          "placement_rule": "back_to_wall",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              6.573,
+              5.95
+            ],
+            [
+              5.769,
+              5.95
+            ],
+            [
+              5.769,
+              3.755
+            ],
+            [
+              6.573,
+              3.755
+            ]
+          ]
+        },
+        {
+          "item_id": "coffee_table_0",
+          "catalog_id": "coffee_table_glass",
+          "name": "Square Coffee Table",
+          "category": "coffee_table",
+          "position_m": [
+            7.363,
+            4.853
+          ],
+          "rotation_deg": 90.0,
+          "dimensions_m": [
+            0.68,
+            0.68,
+            0.391
+          ],
+          "glb": "/models/furniture/coffee_table_glass.glb",
+          "placement_rule": "in_front_of_anchor",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              7.703,
+              5.193
+            ],
+            [
+              7.023,
+              5.193
+            ],
+            [
+              7.023,
+              4.513
+            ],
+            [
+              7.703,
+              4.513
+            ]
+          ]
+        },
+        {
+          "item_id": "rug_0",
+          "catalog_id": "rug_living",
+          "name": "Area Floor Rug",
+          "category": "rug",
+          "position_m": [
+            6.923,
+            4.853
+          ],
+          "rotation_deg": 90.0,
+          "dimensions_m": [
+            2.512,
+            1.472,
+            0.016
+          ],
+          "glb": "/models/furniture/rug_living.glb",
+          "placement_rule": "under_anchor",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              7.659,
+              6.109
+            ],
+            [
+              6.187,
+              6.109
+            ],
+            [
+              6.187,
+              3.597
+            ],
+            [
+              7.659,
+              3.597
+            ]
+          ]
+        },
+        {
+          "item_id": "tv_unit_0",
+          "catalog_id": "tv_unit",
+          "name": "Media TV Console",
+          "category": "tv_unit",
+          "position_m": [
+            9.804,
+            4.867
+          ],
+          "rotation_deg": 270.0,
+          "dimensions_m": [
+            1.6,
+            0.45,
+            0.5
+          ],
+          "glb": "/models/furniture/tv_unit.glb",
+          "placement_rule": "back_to_wall",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              9.579,
+              4.067
+            ],
+            [
+              10.029,
+              4.067
+            ],
+            [
+              10.029,
+              5.667
+            ],
+            [
+              9.579,
+              5.667
+            ]
+          ]
+        }
+      ],
+      "metadata": {
+        "room_width_m": 4.26,
+        "room_depth_m": 2.91,
+        "room_area_m2": 12.35,
+        "usable_wall_segments_count": 2,
+        "scale_uncalibrated": false,
+        "runtime_ms": 29.4
+      },
+      "validation": {
+        "is_valid": true,
+        "overlap_count": 0,
+        "door_clearance_violation": false,
+        "out_of_bounds_count": 0,
+        "max_wall_gap_cm": 0.0,
+        "bfs_reachable": true,
+        "failure_reasons": []
+      }
+    }
+  },
+  "kitchen": {
+    "plan": "colorful_1148.npz",
+    "room_type": "Kitchen",
+    "polygon": [
+      [
+        11.15,
+        14.35
+      ],
+      [
+        11.15,
+        18.15
+      ],
+      [
+        15.25,
+        18.15
+      ],
+      [
+        15.25,
+        14.4
+      ]
+    ],
+    "result": {
+      "room_id": "kitchen_showcase",
+      "room_type": "kitchen",
+      "preset": "contemporary_minimal",
+      "seed": 42,
+      "is_valid": true,
+      "failure_reason": null,
+      "items": [
+        {
+          "item_id": "kitchen_sink_0",
+          "catalog_id": "kitchen_sink_unit",
+          "name": "Kitchen Sink Counter",
+          "category": "kitchen_sink",
+          "position_m": [
+            14.696,
+            14.693
+          ],
+          "rotation_deg": 180.7,
+          "dimensions_m": [
+            0.9,
+            0.6,
+            0.88
+          ],
+          "glb": "/models/furniture/kitchen_sink_unit.glb",
+          "placement_rule": "back_to_wall",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              14.243,
+              14.988
+            ],
+            [
+              14.25,
+              14.388
+            ],
+            [
+              15.15,
+              14.399
+            ],
+            [
+              15.143,
+              14.999
+            ]
+          ]
+        },
+        {
+          "item_id": "kitchen_counter_0",
+          "catalog_id": "kitchen_counter",
+          "name": "Kitchen Base Counter",
+          "category": "kitchen_counter",
+          "position_m": [
+            13.796,
+            14.682
+          ],
+          "rotation_deg": 180.7,
+          "dimensions_m": [
+            0.9,
+            0.6,
+            0.88
+          ],
+          "glb": "/models/furniture/kitchen_counter.glb",
+          "placement_rule": "back_to_wall",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              13.343,
+              14.977
+            ],
+            [
+              13.35,
+              14.377
+            ],
+            [
+              14.25,
+              14.388
+            ],
+            [
+              14.243,
+              14.988
+            ]
+          ]
+        },
+        {
+          "item_id": "refrigerator_0",
+          "catalog_id": "refrigerator",
+          "name": "Tall Refrigerator",
+          "category": "refrigerator",
+          "position_m": [
+            12.971,
+            14.718
+          ],
+          "rotation_deg": 180.7,
+          "dimensions_m": [
+            0.75,
+            0.692,
+            1.8
+          ],
+          "glb": "/models/furniture/refrigerator.glb",
+          "placement_rule": "back_to_wall",
+          "wall_distance_cm": 0.0,
+          "footprint_polygon": [
+            [
+              12.592,
+              15.06
+            ],
+            [
+              12.6,
+              14.368
+            ],
+            [
+              13.35,
+              14.377
+            ],
+            [
+              13.342,
+              15.069
+            ]
+          ]
+        }
+      ],
+      "metadata": {
+        "room_width_m": 4.1,
+        "room_depth_m": 3.8,
+        "room_area_m2": 15.48,
+        "usable_wall_segments_count": 3,
+        "scale_uncalibrated": false,
+        "runtime_ms": 31.53
+      },
+      "validation": {
+        "is_valid": true,
+        "overlap_count": 0,
+        "door_clearance_violation": false,
+        "out_of_bounds_count": 0,
+        "max_wall_gap_cm": 0.0,
+        "bfs_reachable": true,
+        "failure_reasons": []
+      }
+    }
+  }
+}

@@ -25,12 +25,15 @@ class ModelMetadataResponse(BaseModel):
     fallback_router: Dict[str, Any] = Field(default={})
 
 class RoomSegment(BaseModel):
-    room_type: str = Field(..., example="Living Room")
-    surface_m2: float = Field(..., example=32.5)
-    polygon_points: List[List[float]] = Field(..., example=[[0.0, 0.0], [5.0, 0.0], [5.0, 6.5], [0.0, 6.5]])
+    id: Optional[str] = Field(default=None)
+    room_type: str = Field(...)
+    surface_m2: float = Field(...)
+    polygon_points: List[List[float]] = Field(...)
+    edges: Optional[List[Dict[str, Any]]] = Field(default=None)
+    wall_backed_edge_count: Optional[int] = Field(default=None)
 
 class WallSegment(BaseModel):
-    id: str = Field(..., example="wall_0")
+    id: str = Field(...)
     polygon_meters: List[List[float]] = Field(...)
     height_m: float = Field(default=2.8)
     is_exterior: bool = Field(default=False)
@@ -40,12 +43,31 @@ class WallSegment(BaseModel):
 
 
 class FloorPlanAnalysisResponse(BaseModel):
-    total_area_m2: float = Field(..., example=115.0)
-    num_rooms: int = Field(..., example=4)
+    total_area_m2: float = Field(...)
+    num_rooms: int = Field(...)
     rooms: List[RoomSegment]
     walls: List[WallSegment] = Field(default=[])
     doors: List[Dict[str, Any]] = Field(default=[])
     windows: List[Dict[str, Any]] = Field(default=[])
     has_garden_or_terrace: bool = Field(default=False)
     threejs_scene: Optional[Dict[str, Any]] = Field(default=None)
+
+
+class RoomDesignRequest(BaseModel):
+    room_id: Optional[str] = Field(default="room_0")
+    room_type: str = Field(...)
+    polygon_meters: List[List[float]] = Field(...)
+    doors: Optional[List[Dict[str, Any]]] = Field(default=[])
+    windows: Optional[List[Dict[str, Any]]] = Field(default=[])
+    wall_segments: Optional[List[Dict[str, Any]]] = Field(default=[])
+    preset: str = Field(default="contemporary_minimal")
+    seed: Optional[int] = Field(default=42)
+    room_edges: Optional[List[Dict[str, Any]]] = Field(default=None)
+
+
+class LayoutDesignRequest(BaseModel):
+    layout: Dict[str, Any] = Field(...)
+    preset: str = Field(default="contemporary_minimal")
+    seed: Optional[int] = Field(default=42)
+
 

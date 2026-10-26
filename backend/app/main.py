@@ -17,7 +17,9 @@ from app.schemas import (
     HealthResponse,
     ModelMetadataResponse,
     FloorPlanAnalysisResponse,
-    RoomSegment
+    RoomSegment,
+    RoomDesignRequest,
+    LayoutDesignRequest
 )
 
 app = FastAPI(
@@ -197,9 +199,12 @@ async def analyze_floorplan(
 
         rooms = [
             RoomSegment(
+                id=r.get("id"),
                 room_type=r["room_type"],
                 surface_m2=r["surface_m2"],
-                polygon_points=r["polygon_meters"]
+                polygon_points=r["polygon_meters"],
+                edges=r.get("edges"),
+                wall_backed_edge_count=r.get("wall_backed_edge_count")
             )
             for r in layout.get("rooms", [])
         ]
@@ -287,10 +292,62 @@ async def generate_photorealistic_render(
         print(f"[INFERENCE WARNING] ONNX Runtime error: {e}")
         return Response(content=content, media_type="image/png")
 
-# Mount frontend/dist for 1-click single-port full-stack serving
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
+@app.post("/design", tags=["Room Design"])
+async def design_room_endpoint(request: RoomDesignRequest):
+    """
+    Offline deterministic rule-based furnishing engine for a single room.
+    Returns 2D plan coordinates (meters) and clockwise rotation (degrees from North).
+    """
+    try:
+        from src.design.engine import RoomDesignEngine
+        engine = RoomDesignEngine()
+        result = engine.design_room(
+            room_polygon_meters=request.polygon_meters,
+            room_type=request.room_type,
+            room_id=request.room_id or "room_0",
+            wall_segments=request.wall_segments,
+            doors=request.doors,
+            windows=request.windows,
+            preset=request.preset,
+            seed=request.seed if request.seed is not None else 42
+        )
+        return result.to_dict()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Room design failed: {str(e)}"
+        )
 
+
+@app.post("/design/layout", tags=["Room Design"])
+async def design_layout_endpoint(request: LayoutDesignRequest):
+    """
+    Furnishes all eligible rooms in a full floorplan layout using rule-based placement.
+    """
+    try:
+        from src.design.engine import RoomDesignEngine
+        engine = RoomDesignEngine()
+        result = engine.design_layout(
+            layout=request.layout,
+            preset=request.preset,
+            seed=request.seed if request.seed is not None else 42
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Layout design failed: {str(e)}"
+        )
+
+
+# Mount static assets
+from fastapi.staticfiles import StaticFiles
+furniture_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "public" / "models" / "furniture"
+if furniture_dir.exists():
+    app.mount("/models/furniture", StaticFiles(directory=str(furniture_dir)), name="furniture_models")
+
+# Mount frontend/dist for 1-click single-port full-stack serving
 frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 if frontend_dist.exists():
     app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+
