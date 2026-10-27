@@ -237,28 +237,12 @@ async def analyze_floorplan(
             threejs_scene=threejs_scene
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"[FLOORPLAN INFERENCE ERROR]: {e}")
-        # Fallback to demo structure if image reading fails
-        mock_rooms = [
-            RoomSegment(
-                room_type="Living Room & Kitchen",
-                surface_m2=42.0,
-                polygon_points=[[0.0, 0.0], [7.0, 0.0], [7.0, 6.0], [0.0, 6.0]]
-            ),
-            RoomSegment(
-                room_type="Master Bedroom",
-                surface_m2=18.5,
-                polygon_points=[[7.0, 0.0], [12.0, 0.0], [12.0, 3.7], [7.0, 3.7]]
-            )
-        ]
-        return FloorPlanAnalysisResponse(
-            total_area_m2=60.5,
-            num_rooms=2,
-            rooms=mock_rooms,
-            walls=[],
-            doors=[],
-            windows=[],
-            has_garden_or_terrace=False
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Floorplan segmentation/vectorization error: {e}"
         )
 
 
