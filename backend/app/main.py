@@ -3,8 +3,15 @@ import sys
 from pathlib import Path
 
 # Ensure backend and project root are in sys.path
+def get_project_root() -> Path:
+    p = Path(__file__).resolve()
+    for parent in [p.parent, p.parent.parent, p.parent.parent.parent]:
+        if (parent / "models").exists() and (parent / "src").exists():
+            return parent
+    return Path("/app") if Path("/app").exists() else p.parent.parent.parent
+
+PROJECT_ROOT = get_project_root()
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = BACKEND_DIR.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 if str(PROJECT_ROOT) not in sys.path:

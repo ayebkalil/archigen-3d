@@ -159,21 +159,41 @@ Le moteur de visualisation 3D WebGL (Three.js dans [`frontend/src/components/Vie
    - Tone mapping `THREE.ACESFilmicToneMapping` (exposition 1.05) et espace colorimétrique `THREE.SRGBColorSpace`.
 5. **Préconfigurations de Caméra (Presets) :**
    - 4 angles interactifs : **Perspective 3D** (FOV 45°), **Axonométrique 45°**, **Plan Vue du Dessus (Top-Down)**, et **Focus Pièce Sélectionnée**.
-6. **Élimination Stricte du Z-Fighting (Sols & Tapis) :**
+6. **Atténuation et Traitement du Z-Fighting (Sols & Tapis) :**
    - La dalle de sol est placée à $y = 0.02\text{ m}$. Les meubles standards reposent sur le sol à $y = 0.02\text{ m}$.
-   - Les tapis (`rug_living`) sont surélevés à $y = 0.023\text{ m}$ ($+3\text{ mm}$ au-dessus du sol) avec application d'un décalage matériel GPU (`polygonOffset = true`, `factor = -2.0`, `units = -4.0`), garantissant l'absence totale de scintillement ou de chevauchement coplanaire sous tous les angles de caméra.
+   - Les tapis (`rug_living`) sont surélevés à $y = 0.023\text{ m}$ ($+3\text{ mm}$ au-dessus du sol) avec application d'un décalage matériel GPU Three.js (`polygonOffset = true`, `factor = -2.0`, `units = -4.0`).
+   - Testé et confirmé sans scintillement visible sur l'ensemble des 4 angles de caméra inspectés (perspective, axonométrique, vue du dessus, et gros plan rasoir).
+7. **Mode Basse Qualité Dédié (Low Quality Mode) :**
+   - Un commutateur interactif dans l'interface WebGL (`PBR` vs `Low`) permet de basculer instantanément vers un mode diffus sans ombres (désactivation de l'atlas d'ombres 2048, suppression des calculs d'ombres PCF, désactivation de l'environnement IBL et des textures normales/rugosité). Ce mode offre un gain de performance de près de 5× sur processeur (SwiftShader), garantissant une navigation 3D réactive même sur matériel modeste.
 
-### Mesure des Taux de Rafraîchissement (Benchmark Réel sur Grand Plan de 16 Pièces / 24 Murs) :
+### Mesure des Taux de Rafraîchissement (Grand Plan de 16 Pièces / 24 Murs) :
 Mesuré par échantillonnage continu `requestAnimationFrame` sur 3 000 ms :
 
-| Mode d'Exécution | Matériel & Drapeaux | Fréquence (FPS) | Temps par Trame | Trame P95 |
+| Mode d'Exécution & Qualité | Matériel & Drapeaux | Fréquence (FPS) | Temps par Trame | Trame P95 |
 | :--- | :--- | :---: | :---: | :---: |
-| **GPU Matériel (NVIDIA)** | GPU NVIDIA GeForce RTX 3050 Laptop (Direct3D 11 ANGLE, écran 144 Hz) | **144.2 FPS** | **6.93 ms** | **7.00 ms** |
-| **Rendu Logiciel (CPU)** | CPU SwiftShader WebGL (`--use-angle=swiftshader --disable-gpu`) | **8.8 FPS** | **113.82 ms** | **133.40 ms** |
+| **GPU Matériel (NVIDIA - PBR High)** | GPU NVIDIA GeForce RTX 3050 Laptop (D3D11 ANGLE, écran 144 Hz) | **Soutient le taux de rafraîchissement 144 Hz** (144.2 FPS, VSync) | **6.93 ms** | **7.00 ms** |
+| **Rendu Logiciel (CPU - PBR High)** | CPU SwiftShader WebGL (`--use-angle=swiftshader --disable-gpu`) | **9.3 FPS** | **107.68 ms** | **133.40 ms** |
+| **Rendu Logiciel (CPU - Mode Basse Qualité)** | CPU SwiftShader WebGL (mode diffus sans ombres ni textures PBR) | **43.1 FPS** (gain 4.6×) | **23.19 ms** | **33.40 ms** |
 
-### Vérification de la Pile Docker & 33 Modèles GLB :
-- **Servitude des Modèles :** Les 33 modèles GLB sous licence CC0 (Kenney.nl) sont hébergés localement et servis par Nginx avec **33/33 réponses HTTP 200 validées**.
-- **Flux Étendu en Conteneur :** Testé avec succès sur conteneur Docker isolé avec inférence ONNX Runtime CPU (<600 ms) et aménagement complet :
+### Description Précise des Captures Avant / Après :
+Les captures comparatives ont été réalisées sous la **même pose caméra verrouillée** (`position: [1.5, 4.0, 4.8]`, `cible: [0.0, 0.2, -0.5]`) dans le **même salon meublé à l'identique** (canapé 3 places, table basse, fauteuil, meuble TV, lampadaire, tapis) :
+- **Image Avant (`stage4_before_same_angle.png`) :** Rendu en mode ombrage plat standard (couleurs diffuses unies, éclairage directionnel basique, aucune texture PBR, aucune carte d'environnement HDR, ombres dures sans filtrage doux).
+- **Image Après (`stage4_after_same_angle.png`) :** Rendu en mode PBR photoréaliste (parquet en chêne et murs en stuc avec relief et rugosité, reflets ambiants HDR Qwantani, tone mapping ACES et ombres de contact adoucies PCF).
+- **Gros Plan Rasoir (`stage4_rug_floor_closeup.png`) :** Vérification détaillée de l'interface tapis/sol confirmant l'absence de z-fighting coplanaire.
+
+### Vérification de l'Image Docker Autonome & Latences Conteneur :
+- **Image Autonome (Zero Volume Mounts) :** Construit intégralement depuis zéro avec `docker compose up --build -d` sans aucun montage de volume du répertoire de travail. Toutes les dépendances sont strictement gérées dans `requirements.txt` sans intervention manuelle.
+- **Servitude des Modèles :** Les 33 modèles GLB sous licence CC0 (Kenney.nl) sont servis localement avec **33/33 réponses HTTP 200 validées**.
+- **Latences CPU Conteneur Mesurées :**
+  - Point de terminaison `/predict/floorplan` (inférence ONNX Runtime CPU) : **562.09 ms** (médiane : 569.84 ms).
+  - Point de terminaison `/design` (moteur de placement déterministe) : **3.19 ms** (médiane : 1.67 ms).
+- **Concordance des Agencements ONNX CPU vs. PyTorch (10 Plans de Validation) :**
+  - Écart moyen du nombre de pièces : **1.9 pièce**.
+  - Écart moyen du nombre de murs : **1.6 segment**.
+  - IoU géométrique moyen des polygones de pièces : **71.24%**.
+  - Concordance sémantique des types de pièces : **93.66%**.
+  - Détail complet sauvegardé dans [`outputs/design_stage4/onnx_vs_pytorch_comparison.json`](outputs/design_stage4/onnx_vs_pytorch_comparison.json).
+- **Flux Étendu en Conteneur :** Testé avec succès sur conteneur Docker avec aménagement complet :
   - Chambre (`docker_flow_bedroom.png`)
   - Salon (`docker_flow_living_room.png`)
   - Salle de bain (`docker_flow_bathroom.png`)

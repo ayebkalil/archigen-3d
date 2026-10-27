@@ -29,6 +29,7 @@ export default function Viewer3D({
   const [viewPreset, setViewPreset] = useState('perspective'); // 'perspective' | 'isometric' | 'top' | 'room'
   const [showFurniture, setShowFurniture] = useState(true);
   const [currentFps, setCurrentFps] = useState(60);
+  const [graphicsQuality, setGraphicsQuality] = useState('high'); // 'high' | 'low'
 
   // Store layout centers for furniture positioning
   const centersRef = useRef({ centerX: 0, centerZ: 0 });
@@ -40,6 +41,10 @@ export default function Viewer3D({
     marble: null,
     stucco: null
   });
+
+  const sunLightRef = useRef(null);
+  const shadowPlaneRef = useRef(null);
+  const envMapRef = useRef(null);
 
   // 1. Scene Setup & Lifecycle
   useEffect(() => {
@@ -98,7 +103,10 @@ export default function Viewer3D({
       '/showcase/sky/qwantani_late_afternoon_puresky_1k.hdr',
       (hdrTexture) => {
         const envMap = pmremGenerator.fromEquirectangular(hdrTexture).texture;
-        scene.environment = envMap;
+        envMapRef.current = envMap;
+        if (graphicsQuality === 'high') {
+          scene.environment = envMap;
+        }
         hdrTexture.dispose();
         pmremGenerator.dispose();
       },
@@ -127,6 +135,7 @@ export default function Viewer3D({
     sunLight.shadow.camera.top = 28;
     sunLight.shadow.camera.bottom = -28;
     scene.add(sunLight);
+    sunLightRef.current = sunLight;
 
     // Secondary Soft Cool Rim/Fill Light (ambient shadow illumination)
     const rimLight = new THREE.DirectionalLight(0xdbeafe, 0.40);
@@ -141,6 +150,7 @@ export default function Viewer3D({
     shadowPlane.position.y = -0.005;
     shadowPlane.receiveShadow = true;
     scene.add(shadowPlane);
+    shadowPlaneRef.current = shadowPlane;
 
     // Architectural Ground Grid
     const grid = new THREE.GridHelper(50, 50, 0xb8452a, 0xd8d2c4);
@@ -182,7 +192,12 @@ export default function Viewer3D({
       camera,
       controls,
       renderer,
-      pbrTexturesRef
+      pbrTexturesRef,
+      sunLightRef,
+      shadowPlaneRef,
+      envMapRef,
+      setGraphicsQuality: (q) => setGraphicsQuality(q),
+      getGraphicsQuality: () => graphicsQuality
     };
 
     // Raycaster for room clicking in 3D
@@ -254,7 +269,29 @@ export default function Viewer3D({
     };
   }, []);
 
-  // Update Building Meshes when Layout / Facade Texture / selectedRoom changes
+  // Handle Graphics Quality Mode (High: PBR, HDRI, Soft Shadows vs Low: Fast unshadowed diffuse for low-spec/CPU)
+  useEffect(() => {
+    if (!rendererRef.current || !sceneRef.current) return;
+    const renderer = rendererRef.current;
+    const scene = sceneRef.current;
+    const isHigh = graphicsQuality === 'high';
+
+    renderer.shadowMap.enabled = isHigh;
+    if (sunLightRef.current) {
+      sunLightRef.current.castShadow = isHigh;
+    }
+    if (shadowPlaneRef.current) {
+      shadowPlaneRef.current.visible = isHigh;
+    }
+    if (envMapRef.current) {
+      scene.environment = isHigh ? envMapRef.current : null;
+    }
+    renderer.toneMapping = isHigh ? THREE.ACESFilmicToneMapping : THREE.LinearToneMapping;
+    renderer.toneMappingExposure = isHigh ? 1.05 : 1.0;
+    renderer.shadowMap.needsUpdate = true;
+  }, [graphicsQuality]);
+
+  // Update Building Meshes when Layout / Facade Texture / selectedRoom / graphicsQuality changes
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene || !layout) return;
@@ -339,7 +376,7 @@ export default function Viewer3D({
           side: THREE.DoubleSide,
           wireframe: wireframe,
         });
-      } else if (pbr.stucco?.map) {
+      } else if (graphicsQuality === 'high' && pbr.stucco?.map) {
         // High quality PBR Stucco with Normal & AO
         const sMap = pbr.stucco.map.clone();
         sMap.repeat.set(3, 1.5);
@@ -378,8 +415,8 @@ export default function Viewer3D({
       }
 
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      mesh.castShadow = (graphicsQuality === 'high');
+      mesh.receiveShadow = (graphicsQuality === 'high');
       mesh.userData = { isBuildingMesh: true, wallId: wall.id };
       scene.add(mesh);
     });
@@ -417,7 +454,7 @@ export default function Viewer3D({
 
         let floorMat;
 
-        if (isWetArea && pbr.marble?.map) {
+        if (graphicsQuality === 'high' && isWetArea && pbr.marble?.map) {
           // Luxury Architectural Polished Marble Tile PBR
           const mMap = pbr.marble.map.clone();
           mMap.repeat.set(Math.max(1, rW / 1.6), Math.max(1, rD / 1.6));
@@ -445,7 +482,7 @@ export default function Viewer3D({
             side: THREE.DoubleSide,
             wireframe: wireframe,
           });
-        } else if (pbr.oak?.map) {
+        } else if (graphicsQuality === 'high' && pbr.oak?.map) {
           // Warm Architectural Oak Wood Planks PBR
           const oMap = pbr.oak.map.clone();
           oMap.repeat.set(Math.max(1, rW / 1.8), Math.max(1, rD / 1.8));
@@ -474,13 +511,13 @@ export default function Viewer3D({
             wireframe: wireframe,
           });
         } else {
-          // Sleek Matte Architectural Concrete
+          // Low Quality: Fast untextured architectural tones
           floorMat = new THREE.MeshStandardMaterial({
-            color: isSelected ? 0x0284c7 : 0x334155,
-            emissive: isSelected ? 0x0369a1 : 0x000000,
-            emissiveIntensity: isSelected ? 0.35 : 0.0,
+            color: isSelected ? 0xd0e8ff : (isWetArea ? 0xe2e8f0 : 0xdfd3c3),
+            emissive: isSelected ? 0x0284c7 : 0x000000,
+            emissiveIntensity: isSelected ? 0.28 : 0.0,
             roughness: 0.85,
-            metalness: 0.05,
+            metalness: 0.0,
             side: THREE.DoubleSide,
             wireframe: wireframe,
           });
@@ -488,7 +525,7 @@ export default function Viewer3D({
 
         const floorMesh = new THREE.Mesh(floorGeo, floorMat);
         floorMesh.position.y = 0.02;
-        floorMesh.receiveShadow = true;
+        floorMesh.receiveShadow = (graphicsQuality === 'high');
         floorMesh.userData = { isBuildingMesh: true, isFloorMesh: true, room: room };
         scene.add(floorMesh);
       });
@@ -501,7 +538,7 @@ export default function Viewer3D({
       cameraRef.current.position.set(maxDim * 1.15, maxDim * 1.35, maxDim * 1.35);
       controlsRef.current.update();
     }
-  }, [layout, frontWallId, facadeTextureUrl, numFloors, wireframe, showFloors, selectedRoom]);
+  }, [layout, frontWallId, facadeTextureUrl, numFloors, wireframe, showFloors, selectedRoom, graphicsQuality]);
 
   // Update 3D Furniture Assets when furnishingData changes
   useEffect(() => {
@@ -568,10 +605,10 @@ export default function Viewer3D({
 
             model.traverse((child) => {
               if (child.isMesh) {
-                child.castShadow = !isRug;
-                child.receiveShadow = true;
+                child.castShadow = (graphicsQuality === 'high' && !isRug);
+                child.receiveShadow = (graphicsQuality === 'high');
                 if (child.material) {
-                  child.material.envMapIntensity = 1.0;
+                  child.material.envMapIntensity = (graphicsQuality === 'high' ? 1.0 : 0.0);
                   if (isRug) {
                     child.material.polygonOffset = true;
                     child.material.polygonOffsetFactor = -2.0;
@@ -603,7 +640,7 @@ export default function Viewer3D({
         );
       });
     });
-  }, [furnishingData, showFurniture, layout]);
+  }, [furnishingData, showFurniture, layout, graphicsQuality]);
 
   // View Presets: 3-4 Distinct Architectural Camera Modes
   const setCameraPerspective = () => {
@@ -752,6 +789,20 @@ export default function Viewer3D({
               <span>Focus</span>
             </button>
           )}
+
+          {/* Graphics Quality Toggle (High: PBR/HDRI/Shadows vs Low: Fast unshadowed diffuse for low-spec/CPU) */}
+          <button
+            onClick={() => setGraphicsQuality(graphicsQuality === 'high' ? 'low' : 'high')}
+            className={`flex items-center space-x-1 px-2 py-1 rounded-sm text-[10.5px] font-medium transition-colors border ${
+              graphicsQuality === 'high'
+                ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+                : 'bg-white/60 text-[#1d1d1f]/70 border-[#1d1d1f]/20 hover:border-[#1d1d1f]'
+            }`}
+            title="Toggle graphics quality (High: PBR & Soft Shadows / Low: Fast unshadowed diffuse for CPU)"
+          >
+            <Sun className="w-3 h-3 text-[#b8452a]" />
+            <span>{graphicsQuality === 'high' ? 'PBR' : 'Low'}</span>
+          </button>
 
           {/* Wireframe Toggle */}
           <button

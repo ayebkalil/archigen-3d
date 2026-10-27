@@ -10,11 +10,7 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=production
-      - MODEL_PATH=/app/models/generator.onnx
-    volumes:
-      - ./backend/app:/app/app:ro
-      - ./src:/app/src:ro
-      - ./models:/app/models:ro
+      - MODEL_PATH=/app/models/saved/generator_perceptual_ema.onnx
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -29,8 +25,6 @@ services:
     container_name: archigen_frontend
     ports:
       - "3000:80"
-    volumes:
-      - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - backend
     restart: unless-stopped
