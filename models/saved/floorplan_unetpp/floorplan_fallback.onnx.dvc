@@ -1,0 +1,5 @@
+outs:
+- md5: 045589962a7661c905f9ec4ab03f9628
+  size: 104321167
+  hash: md5
+  path: floorplan_fallback.onnx

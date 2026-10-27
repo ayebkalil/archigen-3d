@@ -97,6 +97,7 @@ class FloorplanPipeline:
         if chosen_fb_onnx:
             try:
                 self.onnx_fallback = ort.InferenceSession(str(chosen_fb_onnx), providers=['CPUExecutionProvider'])
+                self.fallback_model_name = chosen_fb_onnx.stem
                 print(f"[FLOORPLAN ENGINE] Loaded ONNX Fallback Router from {chosen_fb_onnx.name}")
             except Exception as e:
                 print(f"[FLOORPLAN ENGINE] Warning loading ONNX fallback: {e}")
@@ -479,7 +480,7 @@ class FloorplanPipeline:
 
                 if len(fb_rooms) > len(primary_rooms) or (not is_shell_valid and fb_shell_valid):
                     layout = fb_layout
-                    model_routed = getattr(self, "fallback_model_name", "blend_alpha_0_3_onnx")
+                    model_routed = self.fallback_model_name or "floorplan_fallback"
                     fallback_triggered = True
 
         if "metadata" not in layout:

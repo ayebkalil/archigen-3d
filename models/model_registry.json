@@ -62,10 +62,13 @@
       "last_modified": "2026-10-15T19:41:04"
     },
     "models\\saved\\floorplan_unetpp\\floorplan_multitask.onnx": {
-      "sha256": "8f58ee58b7229e81aaa6139e69528d7f640747ba30a325d1fc321d80a5832be0",
+      "sha256": "538ade1935a9624e19047c910ed595f0e9a62aa08d872715216d3b323dfa034c",
       "size_bytes": 104321167,
       "size_mb": 99.49,
-      "last_modified": "2026-10-22T21:18:59"
+      "last_modified": "2026-10-27T09:30:00",
+      "role": "champion_floorplan_onnx",
+      "exported_from_checkpoint": "models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
+      "exported_from_sha256": "80fa1ea7780f7cb2f48d720abed8a62104ac90e0e40d99661f3022f3b472fcca"
     },
     "models\\saved\\floorplan_unetpp\\lovasz_epoch_01.pth": {
       "sha256": "56fe5ade98acc707a762f8ed5b9883167a7fb258f50f5988ad8288c422b26637",
@@ -139,6 +142,15 @@
       "size_mb": 99.69,
       "last_modified": "2026-10-23T19:10:00",
       "role": "fallback_router"
+    },
+    "models/saved/floorplan_unetpp/floorplan_fallback.onnx": {
+      "sha256": "7188af6fc15f11a8fc1979a02656e2bb32d200e7d2d7bb8b8d07b43296fff809",
+      "size_bytes": 104321167,
+      "size_mb": 99.49,
+      "last_modified": "2026-10-27T09:30:00",
+      "role": "fallback_router_onnx",
+      "exported_from_checkpoint": "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
+      "exported_from_sha256": "bba5d827e27e8a099cfbca07ec13cc862d2d6f3094574f16bac17b86c5301dc6"
     }
   },
   "champion_facade": {
@@ -152,5 +164,16 @@
     "psnr_db": 12.97,
     "l1_loss": 0.3403,
     "status": "PROMOTED_CHAMPION_EMA_SCHEDULE"
+  },
+  "champion_floorplan": {
+    "pytorch": "models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
+    "onnx": "models/saved/floorplan_unetpp/floorplan_multitask.onnx",
+    "sha256_pytorch": "80fa1ea7780f7cb2f48d720abed8a62104ac90e0e40d99661f3022f3b472fcca",
+    "sha256_onnx": "538ade1935a9624e19047c910ed595f0e9a62aa08d872715216d3b323dfa034c",
+    "fallback_pytorch": "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
+    "fallback_onnx": "models/saved/floorplan_unetpp/floorplan_fallback.onnx",
+    "sha256_fallback_pytorch": "bba5d827e27e8a099cfbca07ec13cc862d2d6f3094574f16bac17b86c5301dc6",
+    "sha256_fallback_onnx": "7188af6fc15f11a8fc1979a02656e2bb32d200e7d2d7bb8b8d07b43296fff809",
+    "status": "CHAMPION_VERIFIED_PARITY_98_4_IOU"
   }
 }
