@@ -22,25 +22,20 @@ from shapely.geometry import Polygon
 from backend.app.floorplan_engine import FloorplanPipeline
 from src.floorplan.vectorizer import FloorplanVectorizer
 
-def find_test_plans(n=10):
+def find_test_plans(n=50):
     candidates = []
-    # Try cubicasa val split first
-    cubi_val = PROJECT_ROOT / "data/cubicasa5k/val"
-    if cubi_val.exists():
-        for p in sorted(cubi_val.iterdir()):
-            img_p = p / "F1_scaled.png"
-            if img_p.exists():
-                candidates.append(img_p)
-            if len(candidates) >= n:
-                break
-    if len(candidates) < n:
-        # Fallback to dev/real external plans
-        for p in sorted((PROJECT_ROOT / "data/real_external_plans").rglob("*.png")):
+    # 1. Real external plans
+    for p in sorted((PROJECT_ROOT / "data/real_external_plans").rglob("*.*")):
+        if p.suffix.lower() in [".png", ".jpg", ".jpeg"] and not p.name.startswith("."):
             candidates.append(p)
-            if len(candidates) >= n:
-                break
-    if len(candidates) < n:
-        for p in sorted((PROJECT_ROOT / "data/dev_external_plans").rglob("*.png")):
+    # 2. Dev external plans
+    for p in sorted((PROJECT_ROOT / "data/dev_external_plans").rglob("*.*")):
+        if p.suffix.lower() in [".png", ".jpg", ".jpeg"] and not p.name.startswith("."):
+            candidates.append(p)
+    # 3. CubiCasa validation plans
+    cubi_dir = PROJECT_ROOT / "data/CubiCasa5k"
+    if cubi_dir.exists():
+        for p in sorted(cubi_dir.rglob("F1_scaled.png")):
             candidates.append(p)
             if len(candidates) >= n:
                 break
@@ -63,30 +58,24 @@ def compute_polygon_iou(poly1_coords, poly2_coords):
         return 0.0
 
 def main():
-    plans = find_test_plans(10)
+    plans = find_test_plans(50)
     print(f"Found {len(plans)} plans for ONNX vs PyTorch layout comparison:")
-    for i, p in enumerate(plans):
+    for i, p in enumerate(plans[:10]):
         print(f"  Plan {i+1}: {p.name} ({p.parent.name})")
+    if len(plans) > 10:
+        print(f"  ... and {len(plans) - 10} more plans")
 
-    # 1. Initialize PyTorch Pipeline
+    # 1. Initialize PyTorch Pipeline (forcing PyTorch mode)
     print("\n[1/3] Initializing PyTorch pipeline...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    pipeline_torch = FloorplanPipeline(device=device)
+    pipeline_torch = FloorplanPipeline(device=device, prefer_onnx=False)
 
-    # 2. Initialize ONNX CPU Pipeline (forcing ONNX model)
+    # 2. Initialize ONNX CPU Pipeline (forcing true ONNX runtime execution)
     print("\n[2/3] Initializing ONNX CPU pipeline...")
-    import onnxruntime as ort
-    onnx_path = PROJECT_ROOT / "models/saved/floorplan_unetpp/floorplan_multitask.onnx"
-    pipeline_onnx = FloorplanPipeline(device="cpu")
-    # Ensure it uses ONNX session
-    if not hasattr(pipeline_onnx, 'onnx_multitask') or pipeline_onnx.onnx_multitask is None:
-        pipeline_onnx.onnx_multitask = ort.InferenceSession(str(onnx_path), providers=['CPUExecutionProvider'])
-    # Disable PyTorch models on the ONNX instance to guarantee purely ONNX inference
-    pipeline_onnx.multitask_model = None
-    pipeline_onnx.baseline_model = None
+    pipeline_onnx = FloorplanPipeline(device="cpu", prefer_onnx=True)
 
     results = []
-    print("\n[3/3] Running comparative layout extraction on 10 plans...")
+    print(f"\n[3/3] Running comparative layout extraction on {len(plans)} plans...")
 
     for i, img_path in enumerate(plans):
         plan_name = f"{img_path.parent.name}/{img_path.name}"

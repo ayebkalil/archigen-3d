@@ -54,16 +54,55 @@ class FloorplanPipeline:
         self,
         multitask_weights_path: Optional[str] = None,
         baseline_weights_path: str = "models/saved/floorplan_baseline/best.safetensors",
-        device: Optional[str] = None
+        device: Optional[str] = None,
+        prefer_onnx: bool = False
     ):
         self.device = None
         self.baseline_model = None
         self.multitask_model = None
         self.fallback_model = None
+        self.fallback_model_name = None
         self.onnx_multitask = None
+        self.onnx_fallback = None
         self.is_multitask = False
+        self.prefer_onnx = prefer_onnx or (not HAS_TORCH)
+        self.checkpoint_hashes = {}
 
-        if HAS_TORCH:
+        import hashlib
+        def file_sha256(p: Optional[Path]) -> Optional[str]:
+            if p and p.exists():
+                with open(p, "rb") as f:
+                    return hashlib.sha256(f.read()).hexdigest()
+            return None
+
+        # 1. Always attempt loading production ONNX models (Primary Champion & Fallback Router)
+        onnx_candidates = [
+            PROJECT_ROOT / "models/saved/floorplan_unetpp/floorplan_multitask.onnx",
+            Path("/app/models/saved/floorplan_unetpp/floorplan_multitask.onnx")
+        ]
+        chosen_onnx = next((c for c in onnx_candidates if c.exists()), None)
+        if chosen_onnx:
+            try:
+                self.onnx_multitask = ort.InferenceSession(str(chosen_onnx), providers=['CPUExecutionProvider'])
+                self.is_multitask = True
+                print(f"[FLOORPLAN ENGINE] Loaded ONNX MultiTask UNet++ from {chosen_onnx.name} via ONNX Runtime")
+            except Exception as e:
+                print(f"[FLOORPLAN ENGINE] Error loading ONNX model: {e}")
+
+        fb_onnx_candidates = [
+            PROJECT_ROOT / "models/saved/floorplan_unetpp/floorplan_fallback.onnx",
+            Path("/app/models/saved/floorplan_unetpp/floorplan_fallback.onnx")
+        ]
+        chosen_fb_onnx = next((c for c in fb_onnx_candidates if c.exists()), None)
+        if chosen_fb_onnx:
+            try:
+                self.onnx_fallback = ort.InferenceSession(str(chosen_fb_onnx), providers=['CPUExecutionProvider'])
+                print(f"[FLOORPLAN ENGINE] Loaded ONNX Fallback Router from {chosen_fb_onnx.name}")
+            except Exception as e:
+                print(f"[FLOORPLAN ENGINE] Warning loading ONNX fallback: {e}")
+
+        # 2. If PyTorch is available and not in forced ONNX mode, load PyTorch models
+        if HAS_TORCH and not self.prefer_onnx:
             if device is not None:
                 self.device = torch.device(device)
             else:
@@ -81,11 +120,11 @@ class FloorplanPipeline:
                     if cand.exists():
                         chosen_mt = cand
                         break
-                multitask_weights_path = str(chosen_mt or candidates[1])
+                multitask_weights_path = str(chosen_mt or candidates[0])
             elif not Path(multitask_weights_path).is_absolute():
                 multitask_weights_path = str(PROJECT_ROOT / multitask_weights_path)
 
-            # 1. Load Baseline ResNet-34 UNet for high-precision structural elements (Walls, Doors, Windows)
+            # Load Baseline ResNet-34 UNet
             base_file = Path(baseline_weights_path)
             if not base_file.is_absolute():
                 base_file = PROJECT_ROOT / baseline_weights_path
@@ -99,7 +138,7 @@ class FloorplanPipeline:
                 except Exception as e:
                     print(f"[FLOORPLAN ENGINE] Error loading baseline weights: {e}")
 
-            # 2. Load Multi-Task UNet++ for semantic room classification (12 room types)
+            # Load Multi-Task UNet++
             mt_file = Path(multitask_weights_path)
             if mt_file.exists():
                 try:
@@ -111,16 +150,17 @@ class FloorplanPipeline:
                     ).to(self.device)
                     self.multitask_model.load_state_dict(ckpt["model_state_dict"])
                     self.multitask_model.eval()
+                    self.is_multitask = True
                     print(f"[FLOORPLAN ENGINE] Loaded MultiTask UNet++ from {mt_file} on {self.device}")
                 except Exception as e:
                     print(f"[FLOORPLAN ENGINE] Warning loading multitask weights: {e}")
 
-            # 3. Load Fallback Routing Model (Blend a=0.3 / Challenger) for zero-detection recovery
-            self.fallback_model = None
+            # Load Fallback Routing Model
             fallback_candidates = [
                 PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
                 PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_restyled_challenger.pth"
             ]
+            chosen_fb = None
             for fb_cand in fallback_candidates:
                 if fb_cand.exists():
                     try:
@@ -134,25 +174,37 @@ class FloorplanPipeline:
                         self.fallback_model.load_state_dict(sd_fb)
                         self.fallback_model.eval()
                         self.fallback_model_name = fb_cand.stem
+                        chosen_fb = fb_cand
                         print(f"[FLOORPLAN ENGINE] Loaded Fallback Router model from {fb_cand.name}")
                         break
                     except Exception as e:
                         print(f"[FLOORPLAN ENGINE] Warning loading fallback model: {e}")
 
             self.model = self.baseline_model or self.multitask_model
-            self.is_multitask = self.multitask_model is not None
             self.mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1).to(self.device)
             self.std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1).to(self.device)
+
+            self.checkpoint_hashes = {
+                "engine_mode": "PyTorch CUDA" if (self.device and self.device.type == "cuda") else "PyTorch CPU",
+                "primary_model": mt_file.name if mt_file and mt_file.exists() else None,
+                "primary_sha256": file_sha256(mt_file),
+                "fallback_loaded": self.fallback_model is not None,
+                "fallback_model": getattr(self, "fallback_model_name", None),
+                "fallback_sha256": file_sha256(chosen_fb) if chosen_fb else None,
+                "facade_model": "generator_perceptual_best.pth",
+                "facade_sha256": file_sha256(PROJECT_ROOT / "models/saved/generator_perceptual_best.pth")
+            }
         else:
-            # High-performance lightweight ONNX Runtime execution (e.g. in Docker)
-            onnx_path = PROJECT_ROOT / "models/saved/floorplan_unetpp/floorplan_multitask.onnx"
-            if onnx_path.exists():
-                try:
-                    self.onnx_multitask = ort.InferenceSession(str(onnx_path), providers=['CPUExecutionProvider'])
-                    self.is_multitask = True
-                    print(f"[FLOORPLAN ENGINE] Loaded ONNX MultiTask UNet++ from {onnx_path.name} via ONNX Runtime")
-                except Exception as e:
-                    print(f"[FLOORPLAN ENGINE] Error loading ONNX model: {e}")
+            self.checkpoint_hashes = {
+                "engine_mode": "ONNX Runtime CPU",
+                "primary_model": chosen_onnx.name if chosen_onnx else None,
+                "primary_sha256": file_sha256(chosen_onnx),
+                "fallback_loaded": self.onnx_fallback is not None,
+                "fallback_model": chosen_fb_onnx.name if chosen_fb_onnx else None,
+                "fallback_sha256": file_sha256(chosen_fb_onnx),
+                "facade_model": "generator_perceptual_ema.onnx",
+                "facade_sha256": file_sha256(PROJECT_ROOT / "models/saved/generator_perceptual_ema.onnx")
+            }
 
         self.mean_np = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
         self.std_np = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
@@ -206,8 +258,9 @@ class FloorplanPipeline:
         canvas.paste(resized, (pad_x, pad_y))
 
         active_mode = "single_pass"
+        use_onnx = self.prefer_onnx or (not HAS_TORCH) or (self.multitask_model is None and self.baseline_model is None)
 
-        if HAS_TORCH:
+        if (not use_onnx) and HAS_TORCH:
             # Tensor conversion
             tensor = TF.to_tensor(canvas).to(self.device)
             tensor = (tensor - self.mean) / self.std
@@ -303,9 +356,40 @@ class FloorplanPipeline:
             arr = (arr - self.mean_np) / self.std_np
             tensor_np = np.expand_dims(arr, 0)
 
-            outs = self.onnx_multitask.run(None, {'input': tensor_np})
-            prob_s = softmax(outs[0], axis=1)
-            prob_r = softmax(outs[1], axis=1)
+            effective_tta = tta_mode
+            if use_tta and effective_tta == "none":
+                effective_tta = "4_fold"
+
+            if effective_tta == "4_fold":
+                t0 = tensor_np
+                t_h = tensor_np[:, :, :, ::-1]
+                t_v = tensor_np[:, :, ::-1, :]
+                t_hv = tensor_np[:, :, ::-1, ::-1]
+
+                out0 = self.onnx_multitask.run(None, {'input': t0})
+                out_h = self.onnx_multitask.run(None, {'input': t_h})
+                out_v = self.onnx_multitask.run(None, {'input': t_v})
+                out_hv = self.onnx_multitask.run(None, {'input': t_hv})
+
+                prob_s = (
+                    softmax(out0[0], axis=1) +
+                    softmax(out_h[0], axis=1)[:, :, :, ::-1] +
+                    softmax(out_v[0], axis=1)[:, :, ::-1, :] +
+                    softmax(out_hv[0], axis=1)[:, :, ::-1, ::-1]
+                ) / 4.0
+
+                prob_r = (
+                    softmax(out0[1], axis=1) +
+                    softmax(out_h[1], axis=1)[:, :, :, ::-1] +
+                    softmax(out_v[1], axis=1)[:, :, ::-1, :] +
+                    softmax(out_hv[1], axis=1)[:, :, ::-1, ::-1]
+                ) / 4.0
+                active_mode = "onnx_4_fold_tta"
+            else:
+                outs = self.onnx_multitask.run(None, {'input': tensor_np})
+                prob_s = softmax(outs[0], axis=1)
+                prob_r = softmax(outs[1], axis=1)
+                active_mode = "onnx_single_pass"
 
             struct_pred = np.argmax(prob_s, axis=1).squeeze(0).astype(np.uint8)
             room_pred = np.argmax(prob_r, axis=1).squeeze(0).astype(np.uint8)
@@ -314,7 +398,6 @@ class FloorplanPipeline:
             mask_4class[(struct_pred == 1) | (struct_pred == 2)] = 1
             mask_4class[struct_pred == 3] = 2
             mask_4class[struct_pred == 4] = 3
-            active_mode = "onnx_single_pass"
         else:
             mask_4class = np.zeros((size, size), dtype=np.uint8)
             struct_pred = None
@@ -333,20 +416,52 @@ class FloorplanPipeline:
 
         # Fallback Routing: triggered only on genuine structural collapses
         # (0 detected rooms, invalid building shell, or single-room artifact under 8.0 m2).
-        # This isolates true model failures while preserving legitimate 1-2 room studio apartments.
         primary_rooms = layout.get("rooms", [])
         primary_area = layout.get("metadata", {}).get("total_surface_m2", 0.0)
         is_shell_valid = layout.get("metadata", {}).get("is_building_shell_valid", False)
 
         is_collapse = (len(primary_rooms) == 0) or (not is_shell_valid) or (len(primary_rooms) == 1 and primary_area < 8.0)
 
-        if is_collapse and HAS_TORCH and self.fallback_model is not None:
-            with torch.no_grad():
-                fb_out = self.fallback_model(tensor)
-                fb_prob_s = F.softmax(fb_out["struct"], dim=1)
-                fb_prob_r = F.softmax(fb_out["room"], dim=1)
-                fb_struct = torch.argmax(fb_prob_s, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
-                fb_room = torch.argmax(fb_prob_r, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+        if is_collapse:
+            if (not use_onnx) and HAS_TORCH and self.fallback_model is not None:
+                with torch.no_grad():
+                    fb_out = self.fallback_model(tensor)
+                    fb_prob_s = F.softmax(fb_out["struct"], dim=1)
+                    fb_prob_r = F.softmax(fb_out["room"], dim=1)
+                    fb_struct = torch.argmax(fb_prob_s, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+                    fb_room = torch.argmax(fb_prob_r, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+
+                    fb_m4 = np.zeros_like(fb_struct)
+                    fb_m4[(fb_struct == 1) | (fb_struct == 2)] = 1
+                    fb_m4[fb_struct == 3] = 2
+                    fb_m4[fb_struct == 4] = 3
+
+                    fb_layout = self.vectorizer.vectorize(
+                        mask=fb_m4,
+                        struct_mask=fb_struct,
+                        room_mask=fb_room,
+                        scale_override_m_per_px=scale_override
+                    )
+                    fb_rooms = fb_layout.get("rooms", [])
+                    fb_shell_valid = fb_layout.get("metadata", {}).get("is_building_shell_valid", False)
+
+                    if len(fb_rooms) > len(primary_rooms) or (not is_shell_valid and fb_shell_valid):
+                        layout = fb_layout
+                        model_routed = getattr(self, "fallback_model_name", "fallback_adapted")
+                        fallback_triggered = True
+            elif self.onnx_fallback is not None:
+                # High-speed ONNX Fallback execution
+                if 'tensor_np' not in locals():
+                    arr = np.array(canvas, dtype=np.float32) / 255.0
+                    arr = arr.transpose(2, 0, 1)
+                    arr = (arr - self.mean_np) / self.std_np
+                    tensor_np = np.expand_dims(arr, 0)
+
+                fb_outs = self.onnx_fallback.run(None, {'input': tensor_np})
+                fb_prob_s = softmax(fb_outs[0], axis=1)
+                fb_prob_r = softmax(fb_outs[1], axis=1)
+                fb_struct = np.argmax(fb_prob_s, axis=1).squeeze(0).astype(np.uint8)
+                fb_room = np.argmax(fb_prob_r, axis=1).squeeze(0).astype(np.uint8)
 
                 fb_m4 = np.zeros_like(fb_struct)
                 fb_m4[(fb_struct == 1) | (fb_struct == 2)] = 1
@@ -362,10 +477,9 @@ class FloorplanPipeline:
                 fb_rooms = fb_layout.get("rooms", [])
                 fb_shell_valid = fb_layout.get("metadata", {}).get("is_building_shell_valid", False)
 
-                # Adopt fallback if it found more rooms, or if primary shell was invalid and fallback produced a valid shell
                 if len(fb_rooms) > len(primary_rooms) or (not is_shell_valid and fb_shell_valid):
                     layout = fb_layout
-                    model_routed = getattr(self, "fallback_model_name", "fallback_adapted")
+                    model_routed = getattr(self, "fallback_model_name", "blend_alpha_0_3_onnx")
                     fallback_triggered = True
 
         if "metadata" not in layout:

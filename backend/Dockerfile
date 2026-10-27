@@ -23,6 +23,7 @@ COPY --from=builder /install /usr/local
 COPY ./src /app/src
 COPY ./backend/app /app/app
 COPY ./models/saved/floorplan_unetpp/floorplan_multitask.onnx /app/models/saved/floorplan_unetpp/floorplan_multitask.onnx
+COPY ./models/saved/floorplan_unetpp/floorplan_fallback.onnx /app/models/saved/floorplan_unetpp/floorplan_fallback.onnx
 COPY ./models/saved/generator_perceptual_ema.onnx /app/models/saved/generator_perceptual_ema.onnx
 COPY ./models/saved/generator.onnx /app/models/saved/generator.onnx
 COPY ./models/saved/facade_authoritative_metrics.json /app/models/saved/facade_authoritative_metrics.json

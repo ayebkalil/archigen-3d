@@ -16,7 +16,7 @@ class ONNXWrapper(torch.nn.Module):
         return out["struct"], out["room"]
 
 def export_and_verify(
-    checkpoint_path="models/saved/floorplan_unetpp/multitask_resnet34_best.pth",
+    checkpoint_path="models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
     onnx_path="models/saved/floorplan_unetpp/floorplan_multitask.onnx"
 ):
     os.makedirs(os.path.dirname(onnx_path), exist_ok=True)
@@ -24,7 +24,7 @@ def export_and_verify(
 
     print(f"Loading checkpoint: {checkpoint_path}")
     model = MultiTaskFloorplanUNet(encoder_weights=None)
-    ckpt = torch.load(checkpoint_path, map_location=device)
+    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
     if "model_state_dict" in ckpt:
         model.load_state_dict(ckpt["model_state_dict"])
     else:
@@ -66,7 +66,17 @@ def export_and_verify(
     print(f"Max room difference:   {diff_room:.6e}")
     assert diff_struct < 1e-4, f"Struct parity failed: {diff_struct}"
     assert diff_room < 1e-4, f"Room parity failed: {diff_room}"
-    print("[SUCCESS] ONNX export verified with sub-1e-4 parity!")
+    print(f"[SUCCESS] ONNX export {onnx_path} verified with sub-1e-4 parity!")
 
 if __name__ == "__main__":
-    export_and_verify()
+    print("=== Exporting Champion MultiTask UNet++ to ONNX ===")
+    export_and_verify(
+        checkpoint_path="models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
+        onnx_path="models/saved/floorplan_unetpp/floorplan_multitask.onnx"
+    )
+
+    print("\n=== Exporting Fallback Router (Blend alpha=0.3) to ONNX ===")
+    export_and_verify(
+        checkpoint_path="models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
+        onnx_path="models/saved/floorplan_unetpp/floorplan_fallback.onnx"
+    )

@@ -184,15 +184,36 @@ Les captures comparatives ont été réalisées sous la **même pose caméra ver
 ### Vérification de l'Image Docker Autonome & Latences Conteneur :
 - **Image Autonome (Zero Volume Mounts) :** Construit intégralement depuis zéro avec `docker compose up --build -d` sans aucun montage de volume du répertoire de travail. Toutes les dépendances sont strictement gérées dans `requirements.txt` sans intervention manuelle.
 - **Servitude des Modèles :** Les 33 modèles GLB sous licence CC0 (Kenney.nl) sont servis localement avec **33/33 réponses HTTP 200 validées**.
-- **Latences CPU Conteneur Mesurées :**
-  - Point de terminaison `/predict/floorplan` (inférence ONNX Runtime CPU) : **562.09 ms** (médiane : 569.84 ms).
-  - Point de terminaison `/design` (moteur de placement déterministe) : **3.19 ms** (médiane : 1.67 ms).
-- **Concordance des Agencements ONNX CPU vs. PyTorch (10 Plans de Validation) :**
-  - Écart moyen du nombre de pièces : **1.9 pièce**.
-  - Écart moyen du nombre de murs : **1.6 segment**.
-  - IoU géométrique moyen des polygones de pièces : **71.24%**.
-  - Concordance sémantique des types de pièces : **93.66%**.
-  - Détail complet sauvegardé dans [`outputs/design_stage4/onnx_vs_pytorch_comparison.json`](outputs/design_stage4/onnx_vs_pytorch_comparison.json).
+- **Routeur de Repli & Transparence Cryptographique (Conteneur ONNX CPU) :**
+  - Le conteneur embarque le modèle champion ONNX (`floorplan_multitask.onnx`) ainsi que le routeur de repli autonome ONNX (`floorplan_fallback.onnx`, exporté depuis `multitask_resnet34_blend_alpha_0_3.pth`).
+  - Les points `/health` et `/model/metadata` exposent `fallback_loaded: true` et les empreintes SHA-256 complètes :
+    - Modèle Principal : `floorplan_multitask.onnx` (`538ade1935a9624e19047c910ed595f0e9a62aa08d872715216d3b323dfa034c`)
+    - Modèle Repli : `floorplan_fallback.onnx` (`7188af6fc15f11a8fc1979a02656e2bb32d200e7d2d7bb8b8d07b43296fff809`)
+    - Modèle Façade cGAN : `generator_perceptual_ema.onnx` (`46d95ec2b937af63ef36e0f8c7d1255105e8546d0c7dab42919ae8e6d2fc25ab`)
+
+### Latences Conteneur CPU Mesurées sur 20 Exécutions (`/predict/floorplan`) :
+Mesuré via requêtes HTTP directes vers le conteneur Docker autonome (Pipeline : **ONNX Runtime CPU**) :
+
+| Configuration du Plan & Inférence | TTA (Test-Time Augmentation) | Repli Déclenché | Médiane (ms) | P95 (ms) | Moyenne (ms) | Min / Max (ms) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Plan Normal (`modern_06`)** | OFF | Non | **636.09 ms** | **1,168.14 ms** | 695.32 ms | 543.08 / 1,249.36 ms |
+| **Plan Normal (`modern_06`)** | ON (4-fold) | Non | **2,083.10 ms** | **2,375.15 ms** | 2,094.14 ms | 1,825.28 / 2,494.70 ms |
+| **Plan Vide Effondré (512×512)** | OFF | Oui (Fallback Router) | **1,128.82 ms** | **1,307.92 ms** | 1,138.03 ms | 909.35 / 1,428.18 ms |
+| **Plan Vide Effondré (512×512)** | ON (4-fold) | Oui (Fallback Router) | **2,679.59 ms** | **3,121.55 ms** | 2,723.78 ms | 2,291.28 / 3,196.69 ms |
+
+*Note sur `/design` (moteur de placement déterministe) :* Médiane conteneur de **1.67 ms** (Moyenne : 3.19 ms).
+
+### Parité des Agencements ONNX CPU vs. PyTorch GPU (Banc Réévalué sur 50 Plans Réels) :
+Après identification de l'écart initial (l'ancien ONNX provenait du checkpoint intermédiaire `multitask_resnet34_best.pth` au lieu du champion final `multitask_resnet34_finetuned_best.pth`), l'export a été réaligné avec une parité de logits sub-$10^{-4}$ ($1.79 \times 10^{-5}$ struct, $2.67 \times 10^{-5}$ room).
+
+Le benchmark sur 50 plans réels (architecturaux, CubiCasa5k, plans externes) montre une concordance quasi-parfaite :
+- **IoU Géométrique Moyen des Polygones de Pièces :** **98.39%** (Pipeline PyTorch GPU vs. Pipeline ONNX CPU).
+- **Écart Moyen du Nombre de Pièces Détectées :** **0.00** (50 / 50 plans ont exactement le même nombre de pièces).
+- **Écart Moyen du Nombre de Murs :** **0.02** (49 / 50 plans identiques à l'arête près).
+- **Concordance Sémantique des Types de Pièces :** **100.00%**.
+- **Latence Moyenne d'Inférence par Plan :** **344.4 ms** (PyTorch GPU) vs. **868.9 ms** (ONNX CPU).
+- Détail complet sauvegardé dans [`outputs/design_stage4/onnx_vs_pytorch_comparison.json`](outputs/design_stage4/onnx_vs_pytorch_comparison.json).
+
 - **Flux Étendu en Conteneur :** Testé avec succès sur conteneur Docker avec aménagement complet :
   - Chambre (`docker_flow_bedroom.png`)
   - Salon (`docker_flow_living_room.png`)

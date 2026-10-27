@@ -97,11 +97,13 @@ async def health_check():
 
     fb_loaded = False
     fb_name = None
+    engine_mode = None
     try:
         from app.floorplan_engine import FloorplanPipeline
         pipeline = FloorplanPipeline.get_instance()
-        fb_loaded = pipeline.fallback_model is not None
+        fb_loaded = (pipeline.fallback_model is not None) or (pipeline.onnx_fallback is not None)
         fb_name = getattr(pipeline, "fallback_model_name", None)
+        engine_mode = pipeline.checkpoint_hashes.get("engine_mode")
     except Exception:
         pass
 
@@ -111,7 +113,9 @@ async def health_check():
         gpu_available=gpu_avail,
         version="1.0.0",
         fallback_router_loaded=fb_loaded,
-        fallback_model_name=fb_name
+        fallback_loaded=fb_loaded,
+        fallback_model_name=fb_name,
+        engine_mode=engine_mode
     )
 
 @app.get("/metrics", tags=["Production Monitoring"])
@@ -132,15 +136,17 @@ async def get_monitoring_metrics():
 @app.get("/model/metadata", response_model=ModelMetadataResponse, tags=["Model Governance"])
 async def get_model_metadata():
     """
-    Returns characteristics of the loaded architectures, training metrics, and target resolutions.
+    Returns characteristics of the loaded architectures, training metrics, checkpoint hashes, and fallback routing status.
     """
     fb_loaded = False
     fb_name = None
+    chk_hashes = {}
     try:
         from app.floorplan_engine import FloorplanPipeline
         pipeline = FloorplanPipeline.get_instance()
-        fb_loaded = pipeline.fallback_model is not None
+        fb_loaded = (pipeline.fallback_model is not None) or (pipeline.onnx_fallback is not None)
         fb_name = getattr(pipeline, "fallback_model_name", None)
+        chk_hashes = pipeline.checkpoint_hashes
     except Exception:
         pass
 
@@ -156,7 +162,9 @@ async def get_model_metadata():
             "loaded": fb_loaded,
             "model_name": fb_name,
             "trigger_condition": "n_rooms == 0 or not is_shell_valid or (n_rooms == 1 and area < 8.0)"
-        }
+        },
+        fallback_loaded=fb_loaded,
+        checkpoint_hashes=chk_hashes
     )
 
 @app.post("/predict/floorplan", response_model=FloorPlanAnalysisResponse, tags=["Vision Inference"])

@@ -7,7 +7,9 @@ class HealthResponse(BaseModel):
     gpu_available: bool = Field(..., example=False)
     version: str = Field(..., example="1.0.0")
     fallback_router_loaded: bool = Field(default=False, example=True)
+    fallback_loaded: bool = Field(default=False, example=True)
     fallback_model_name: Optional[str] = Field(default=None, example="multitask_resnet34_blend_alpha_0_3")
+    engine_mode: Optional[str] = Field(default=None, example="ONNX Runtime CPU")
 
 class ModelMetadataResponse(BaseModel):
     project_name: str = Field(..., example="ArchiGen 3D (AI HomeByMe)")
@@ -23,6 +25,8 @@ class ModelMetadataResponse(BaseModel):
         default={"target_fid": 45.0, "target_lpips": 0.28, "target_miou": 0.78}
     )
     fallback_router: Dict[str, Any] = Field(default={})
+    fallback_loaded: bool = Field(default=False)
+    checkpoint_hashes: Dict[str, Any] = Field(default={})
 
 class RoomSegment(BaseModel):
     id: Optional[str] = Field(default=None)
