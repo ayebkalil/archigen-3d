@@ -85,13 +85,13 @@
 
 ## ⏱️ Métriques de Performance & Latence Réelle
 
-Mesuré sur station locale (GPU NVIDIA GeForce RTX 3050 Laptop 4 Go VRAM, CPU AMD Ryzen 5, 16 Go RAM) :
+Mesuré sur station locale (GPU NVIDIA GeForce RTX 3050 Laptop 4 Go VRAM, CPU AMD Ryzen 5, 16 Go RAM ; **paramètre TTA : aucun / passe unique (`use_tta=False`, `tta_mode="none"`)**) :
 * **1. Prétraitement d'Image (Letterbox 512×512 & Tenseurs) :** **73.3 ms**
-* **2. Inférence Tensorielle UNet++ (GPU CUDA) :** **64.9 ms**
+* **2. Inférence Tensorielle UNet++ (GPU CUDA, TTA désactivé) :** **64.9 ms**
 * **3. Vectorisation Polygonale Rectilinéaire (CPU) :** **76.6 ms**
 * **4. Synthèse de Façade cGAN PyTorch (GPU CUDA, mode `front_only=True`) :** **30.4 ms**
 * **5. Génération Scène 3D Three.js & Métadonnées (CPU) :** **1.3 ms**
-* **Latence Totale Bout-en-Bout (Moyenne mesurée) :** **246.5 ms** (P95 : 282.7 ms) — conforme au budget interactif (< 400 ms).
+* **Latence Totale Bout-en-Bout (Moyenne mesurée, TTA OFF) :** **246.5 ms** (P95 : 282.7 ms) — conforme au budget interactif (< 400 ms).
 
 ---
 
@@ -192,26 +192,45 @@ Les captures comparatives ont été réalisées sous la **même pose caméra ver
     - Modèle Façade cGAN : `generator_perceptual_ema.onnx` (`46d95ec2b937af63ef36e0f8c7d1255105e8546d0c7dab42919ae8e6d2fc25ab`)
 
 ### Latences Conteneur CPU Mesurées sur 20 Exécutions (`/predict/floorplan`) :
-Mesuré via requêtes HTTP directes vers le conteneur Docker autonome (Pipeline : **ONNX Runtime CPU**) :
+Mesuré via requêtes HTTP directes vers le conteneur Docker autonome (Pipeline : **ONNX Runtime CPU**). Conformément aux bonnes pratiques de métrologie, **les 3 premières requêtes de démarrage à froid / warm-up sont exclues** des métriques principales pour refléter la performance en régime stationnaire ($N = 17$ requêtes évaluées) :
 
-| Configuration du Plan & Inférence | TTA (Test-Time Augmentation) | Repli Déclenché | Médiane (ms) | P95 (ms) | Moyenne (ms) | Min / Max (ms) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Plan Normal (`modern_06`)** | OFF | Non | **636.09 ms** | **1,168.14 ms** | 695.32 ms | 543.08 / 1,249.36 ms |
-| **Plan Normal (`modern_06`)** | ON (4-fold) | Non | **2,083.10 ms** | **2,375.15 ms** | 2,094.14 ms | 1,825.28 / 2,494.70 ms |
-| **Plan Vide Effondré (512×512)** | OFF | Oui (Fallback Router) | **1,128.82 ms** | **1,307.92 ms** | 1,138.03 ms | 909.35 / 1,428.18 ms |
-| **Plan Vide Effondré (512×512)** | ON (4-fold) | Oui (Fallback Router) | **2,679.59 ms** | **3,121.55 ms** | 2,723.78 ms | 2,291.28 / 3,196.69 ms |
+| Configuration du Plan & Inférence | TTA (Test-Time Augmentation) | Repli Déclenché | Médiane Régime Établi (ms) | P95 Régime Établi (ms) | Moyenne (ms) | Min / Max (ms) | Total 20 Runs (incl. Warm-up) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Plan Normal (`modern_06`)** | OFF (`tta_mode="none"`) | Non | **640.91 ms** | **887.07 ms** | 687.79 ms | 569.63 / 1,208.68 ms | Médiane 642.93 ms / P95 1,265.69 ms |
+| **Plan Normal (`modern_06`)** | ON (`tta_mode="4_fold"`) | Non | **2,336.75 ms** | **2,917.51 ms** | 2,463.01 ms | 2,040.35 / 3,028.91 ms | Médiane 2,333.57 ms / P95 2,968.56 ms |
+| **Plan Vide Effondré (512×512)** | OFF (`tta_mode="none"`) | Oui (Fallback Router) | **1,177.18 ms** | **1,354.71 ms** | 1,186.41 ms | 1,015.15 / 1,365.77 ms | Médiane 1,170.28 ms / P95 1,375.47 ms |
+| **Plan Vide Effondré (512×512)** | ON (`tta_mode="4_fold"`) | Oui (Fallback Router) | **2,714.47 ms** | **3,081.16 ms** | 2,784.86 ms | 2,496.50 / 3,373.68 ms | Médiane 2,709.61 ms / P95 3,026.32 ms |
 
 *Note sur `/design` (moteur de placement déterministe) :* Médiane conteneur de **1.67 ms** (Moyenne : 3.19 ms).
+*Sauvegarde complète des traces d'exécution :* [`outputs/design_stage4/predict_floorplan_latency_20runs.json`](outputs/design_stage4/predict_floorplan_latency_20runs.json).
+
+### Évaluation du Routeur de Repli sur Plans Réels Hors-Distribution :
+Testé sur `dev_07` et 4 autres plans où le modèle champion détectait $< 3$ pièces (mode TTA : **OFF / passe unique**) :
+
+| Plan Source | Pipeline | Pièces Détectées | Surface (m²) | Coque Valide | Modèle Routé & Statut |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **`dev_07` (Blueprint Ancien)** | **PyTorch CUDA** | 0 $\to$ **1** | 0.0 $\to$ **6.27 m²** | Non $\to$ **Oui** | `multitask_resnet34_blend_alpha_0_3` (Repli Déclenché) |
+| | **ONNX Runtime CPU** | 0 $\to$ **1** | 0.0 $\to$ **6.27 m²** | Non $\to$ **Oui** | `floorplan_fallback` (Repli Déclenché) |
+| **`dev_06` (Blueprint Ancien)** | **PyTorch CUDA** | 1 | 21.21 m² | Oui | `champion_v1_1` (Maintien, surface $\ge 8\text{ m}^2$) |
+| | **ONNX Runtime CPU** | 1 | 21.23 m² | Oui | `champion_v1_1` (Maintien, surface $\ge 8\text{ m}^2$) |
+| **`dev_03` (Blueprint Bleu)** | **PyTorch CUDA** | 2 (Direct FB: 4) | 13.48 m² (Direct FB: 33.81) | Oui | `champion_v1_1` (Maintien, 2 pièces valides) |
+| | **ONNX Runtime CPU** | 2 (Direct FB: 4) | 13.49 m² (Direct FB: 33.80) | Oui | `champion_v1_1` (Maintien, 2 pièces valides) |
+| **`fresh_01` (Appart. Halluciné)**| **PyTorch CUDA** | 0 $\to$ 0 | 0.0 m² | Non | Non résolu (échec géométrique intrinsèque) |
+| | **ONNX Runtime CPU** | 0 $\to$ 0 | 0.0 m² | Non | Non résolu (échec géométrique intrinsèque) |
+| **`fresh_12` (CAD Vectoriel)** | **PyTorch CUDA** | 0 $\to$ **1** | 0.0 $\to$ **3.05 m²** | Non $\to$ **Oui** | `multitask_resnet34_blend_alpha_0_3` (Repli Déclenché) |
+| | **ONNX Runtime CPU** | 0 $\to$ **1** | 0.0 $\to$ **3.04 m²** | Non $\to$ **Oui** | `floorplan_fallback` (Repli Déclenché) |
+
+*Détail complet sauvegardé dans :* [`outputs/design_stage4/fallback_real_plans_eval.json`](outputs/design_stage4/fallback_real_plans_eval.json).
 
 ### Parité des Agencements ONNX CPU vs. PyTorch GPU (Banc Réévalué sur 50 Plans Réels) :
 Après identification de l'écart initial (l'ancien ONNX provenait du checkpoint intermédiaire `multitask_resnet34_best.pth` au lieu du champion final `multitask_resnet34_finetuned_best.pth`), l'export a été réaligné avec une parité de logits sub-$10^{-4}$ ($1.79 \times 10^{-5}$ struct, $2.67 \times 10^{-5}$ room).
 
-Le benchmark sur 50 plans réels (architecturaux, CubiCasa5k, plans externes) montre une concordance quasi-parfaite :
+Le benchmark sur 50 plans réels (architecturaux, CubiCasa5k, plans externes ; **paramètre TTA : OFF / passe unique**) montre une concordance quasi-parfaite :
 - **IoU Géométrique Moyen des Polygones de Pièces :** **98.39%** (Pipeline PyTorch GPU vs. Pipeline ONNX CPU).
 - **Écart Moyen du Nombre de Pièces Détectées :** **0.00** (50 / 50 plans ont exactement le même nombre de pièces).
 - **Écart Moyen du Nombre de Murs :** **0.02** (49 / 50 plans identiques à l'arête près).
 - **Concordance Sémantique des Types de Pièces :** **100.00%**.
-- **Latence Moyenne d'Inférence par Plan :** **344.4 ms** (PyTorch GPU) vs. **868.9 ms** (ONNX CPU).
+- **Latence Moyenne d'Inférence par Plan (TTA OFF) :** **344.4 ms** (PyTorch GPU) vs. **868.9 ms** (ONNX CPU).
 - Détail complet sauvegardé dans [`outputs/design_stage4/onnx_vs_pytorch_comparison.json`](outputs/design_stage4/onnx_vs_pytorch_comparison.json).
 
 - **Flux Étendu en Conteneur :** Testé avec succès sur conteneur Docker avec aménagement complet :
