@@ -14,6 +14,7 @@ services:
     volumes:
       - ./backend/app:/app/app:ro
       - ./src:/app/src:ro
+      - ./models:/app/models:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -28,6 +29,8 @@ services:
     container_name: archigen_frontend
     ports:
       - "3000:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       - backend
     restart: unless-stopped

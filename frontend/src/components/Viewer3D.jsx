@@ -176,6 +176,15 @@ export default function Viewer3D({
       }
     };
 
+    window.THREE = THREE;
+    window.__ARCHIGEN_VIEWER__ = {
+      scene,
+      camera,
+      controls,
+      renderer,
+      pbrTexturesRef
+    };
+
     // Raycaster for room clicking in 3D
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -547,17 +556,27 @@ export default function Viewer3D({
             // Shared unmirrored transform: X_three = x_plan - centerX, Z_three = y_plan - centerZ
             const posX = item.position_m[0] - centerX;
             const posZ = item.position_m[1] - centerZ;
-            model.position.set(posX, 0.0, posZ);
+            const isRug = item.category === 'rug' || item.item_id?.includes('rug');
+            // Floor slab is at y = 0.02.
+            // Furniture sits on top of floor slab (y = 0.02).
+            // Rug is elevated to y = 0.023 with polygonOffset to strictly eliminate z-fighting with floor meshes.
+            const posY = isRug ? 0.023 : 0.02;
+            model.position.set(posX, posY, posZ);
 
             // Rotation convention: rotation.y = (180.0 - alpha_deg) * (pi / 180)
             model.rotation.y = (180.0 - item.rotation_deg) * (Math.PI / 180.0);
 
             model.traverse((child) => {
               if (child.isMesh) {
-                child.castShadow = true;
+                child.castShadow = !isRug;
                 child.receiveShadow = true;
                 if (child.material) {
                   child.material.envMapIntensity = 1.0;
+                  if (isRug) {
+                    child.material.polygonOffset = true;
+                    child.material.polygonOffsetFactor = -2.0;
+                    child.material.polygonOffsetUnits = -4.0;
+                  }
                 }
               }
             });

@@ -93,3 +93,28 @@ http://creativecommons.org/publicdomain/zero/1.0/
 This content is free to use in personal, educational and commercial projects.
 Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
 ```
+
+---
+
+## 6. PBR Textures & HDRI Environment Map Provenance
+
+All photorealistic PBR material texture maps and the high-dynamic-range environment map used in the Stage 4 visual quality upgrade are curated from **Poly Haven** ([polyhaven.com](https://polyhaven.com)).
+
+- **License**: **Creative Commons Zero (CC0 1.0 Universal) — Public Domain Dedication**
+- **License URL**: [https://creativecommons.org/publicdomain/zero/1.0/](https://creativecommons.org/publicdomain/zero/1.0/)
+
+### Curated Asset Inventory
+
+| Asset Name | Asset Type | Local Path | Upstream Source & Authors | License |
+| :--- | :--- | :--- | :--- | :--- |
+| **Qwantani Late Afternoon Pure Sky** | Radiance HDR (1K) | `frontend/public/showcase/sky/qwantani_late_afternoon_puresky_1k.hdr` | [polyhaven.com/a/qwantani_late_afternoon_puresky](https://polyhaven.com/a/qwantani_late_afternoon_puresky) by Sergej Majboroda & Greg Zaal | CC0 1.0 |
+| **Oak Wood Planks** | PBR Texture Set (Diff, Nor, ARM) | `frontend/public/showcase/tex-1k/oak_wood_planks/` | [polyhaven.com/a/wood_floor](https://polyhaven.com/a/wood_floor) by Rob Tuytel | CC0 1.0 |
+| **Marble 01 (Tiles)** | PBR Texture Set (Diff, Nor, ARM) | `frontend/public/showcase/tex-1k/marble_01/` | [polyhaven.com/a/marble_01](https://polyhaven.com/a/marble_01) by Rob Tuytel | CC0 1.0 |
+| **White Stucco (Plaster)** | PBR Texture Set (Diff, Nor, ARM) | `frontend/public/showcase/tex-1k/white_stucco/` | [polyhaven.com/a/painted_plaster_wall](https://polyhaven.com/a/painted_plaster_wall) by Rob Tuytel | CC0 1.0 |
+
+### Offline Bundling & Zero-Network Guarantee
+- All texture files and the `.hdr` sky map are stored locally in the Git repository under [`frontend/public/showcase/`](frontend/public/showcase/).
+- During frontend build (`npm run build`), Vite copies these assets into `dist/showcase/`.
+- The production Docker image (`archigen-3d-frontend`) copies `dist/` directly into `/usr/share/nginx/html`.
+- **Zero runtime network requests**: No external CDN, asset server, or remote API is queried for 3D textures, models, or lighting. All requests resolve to relative container endpoints `/showcase/...` and `/models/furniture/...`.
+
