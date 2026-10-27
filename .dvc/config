@@ -1,5 +1,5 @@
 [core]
-    remote = local_storage
+    remote = onedrive_backup
 ['remote "local_storage"']
     url = ../../dvc_storage
 ['remote "onedrive_backup"']
