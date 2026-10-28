@@ -90,7 +90,8 @@ class EdgeClassifier:
         scale_m_per_px: float = 0.03,
         wall_segments: Optional[List[Dict[str, Any]]] = None,
         doors: Optional[List[Dict[str, Any]]] = None,
-        windows: Optional[List[Dict[str, Any]]] = None
+        windows: Optional[List[Dict[str, Any]]] = None,
+        force_furnish: bool = False
     ) -> Tuple[Polygon, List[UsableWallSegment], List[Polygon]]:
         """
         Takes raw room polygon and wall evidence.
@@ -167,16 +168,22 @@ class EdgeClassifier:
                     start_s = max(0.0, best_proj - door_width_m / 2.0)
                     end_s = min(e_len, best_proj + door_width_m / 2.0)
 
+                    # Determine door clearance depth (adapt for compact rooms)
+                    min_room_dim = min(room_poly.bounds[2] - room_poly.bounds[0], room_poly.bounds[3] - room_poly.bounds[1])
+                    door_depth = 0.85
+                    if force_furnish or room_poly.area < 2.5 or min_room_dim < 1.5:
+                        door_depth = float(np.clip(min_room_dim * 0.35, 0.25, 0.85))
+
                     e["openings"].append(OpeningSpan(
                         opening_type="door",
                         start_dist=start_s,
                         end_dist=end_s,
-                        clearance_depth=0.85
+                        clearance_depth=door_depth
                     ))
 
                     # Construct 2D door clearance polygon (swing box)
                     cz = self._make_opening_clearance_polygon(
-                        e["p1"], e["p2"], start_s, end_s, e["inward_normal"], depth_m=0.85
+                        e["p1"], e["p2"], start_s, end_s, e["inward_normal"], depth_m=door_depth
                     )
                     if cz is not None and cz.is_valid:
                         door_clearance_zones.append(cz)

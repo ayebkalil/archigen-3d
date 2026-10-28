@@ -253,6 +253,12 @@ export default function RoomDesignPanel({
               </div>
               <span className="text-[10px]">{items.length} items</span>
             </div>
+            {items[0]?.scale && items[0].scale[0] < 0.99 && (
+              <div className="flex items-center justify-between text-[9.5px] font-semibold text-[#2a7a6e] bg-[#2a7a6e]/15 px-1.5 py-0.5 rounded-xs">
+                <span>Compact Proportional Mode</span>
+                <span>{Math.round(items[0].scale[0] * 100)}% scale</span>
+              </div>
+            )}
             <ul className="text-[10px] text-[#1d1d1f]/80 space-y-0.5 max-h-24 overflow-y-auto">
               {items.map((it, idx) => (
                 <li key={idx} className="flex justify-between items-center py-0.5 border-b border-[#1d1d1f]/5">
@@ -267,9 +273,27 @@ export default function RoomDesignPanel({
         {/* Action Controls */}
         <div className="space-y-1.5 pt-1">
           {isFragment ? (
-            <div className="w-full bg-[#1d1d1f]/10 border border-[#1d1d1f]/20 text-[#1d1d1f]/60 py-2.5 px-3 rounded-sm font-semibold text-[10.5px] uppercase tracking-wider text-center flex items-center justify-center gap-1.5 cursor-not-allowed select-none">
-              <AlertCircle className="w-3.5 h-3.5 text-[#b8452a]" />
-              <span>Not a room (fragment) &bull; No Generate</span>
+            <div className="space-y-1">
+              <button
+                onClick={() => onGenerateDesign(selectedRoom, selectedPreset, 42, true)}
+                disabled={isDesigning}
+                className="w-full bg-[#b8452a] hover:bg-[#a03b22] text-white py-2 px-3 rounded-sm font-semibold text-[11px] uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all shadow-md disabled:opacity-50"
+              >
+                {isDesigning ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Generating Compact Placement...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Furnish Anyway (Compact Placement)</span>
+                  </>
+                )}
+              </button>
+              <div className="text-[9.5px] text-[#b8452a] text-center font-medium">
+                Small area ({selectedRoom.surface_m2} m²) &bull; Compact mode
+              </div>
             </div>
           ) : (
             <button

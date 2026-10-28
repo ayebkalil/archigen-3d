@@ -53,6 +53,7 @@ class FloorPlanAnalysisResponse(BaseModel):
     walls: List[WallSegment] = Field(default=[])
     doors: List[Dict[str, Any]] = Field(default=[])
     windows: List[Dict[str, Any]] = Field(default=[])
+    envelope: Optional[List[List[List[float]]]] = Field(default=[])
     has_garden_or_terrace: bool = Field(default=False)
     threejs_scene: Optional[Dict[str, Any]] = Field(default=None)
 
@@ -67,6 +68,7 @@ class RoomDesignRequest(BaseModel):
     preset: str = Field(default="contemporary_minimal")
     seed: Optional[int] = Field(default=42)
     room_edges: Optional[List[Dict[str, Any]]] = Field(default=None)
+    force_furnish: Optional[bool] = Field(default=False)
 
 
 class LayoutDesignRequest(BaseModel):

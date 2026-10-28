@@ -25,6 +25,8 @@ export default function ControlPanel({
   facadeTextureUrl,
   isCalibrating,
   setIsCalibrating,
+  onOpenFacadeModal,
+  onOpenGenerativeStudio,
 }) {
   const fileInputRef = useRef(null);
 
@@ -139,10 +141,23 @@ export default function ControlPanel({
 
       {/* 3. Facade Style Selector */}
       <div className="space-y-2.5">
-        <label className="font-stencil text-xs text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
-          <Palette className="w-3.5 h-3.5 text-[#f0500f]" />
-          <span>03 // FACADE SYNTHESIS (cGAN)</span>
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="font-stencil text-xs text-[#1d1d1f] uppercase tracking-wider flex items-center space-x-1.5">
+            <Palette className="w-3.5 h-3.5 text-[#f0500f]" />
+            <span>03 // FACADE SYNTHESIS</span>
+          </label>
+          {onOpenGenerativeStudio && (
+            <button
+              type="button"
+              onClick={onOpenGenerativeStudio}
+              className="px-2 py-0.5 rounded text-[9.5px] font-mono text-[#f0500f] hover:bg-[#f0500f]/10 flex items-center space-x-1"
+              title="Open full Generative AI Studio page with 2D-to-3D Furniture and Facades"
+            >
+              <Sparkles className="w-2.5 h-2.5" />
+              <span>AI STUDIO ↗</span>
+            </button>
+          )}
+        </div>
 
         <div className="space-y-2">
           {STYLES.map((style) => (
@@ -163,6 +178,32 @@ export default function ControlPanel({
             </div>
           ))}
         </div>
+
+        {facadeTextureUrl && (
+          <div className="mt-2.5 p-2 bg-[#efebe2] border border-[#f0500f]/30 rounded-xl flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <img
+                src={facadeTextureUrl}
+                alt="Active Facade"
+                className="w-10 h-10 object-cover rounded border border-[#1d1d1f]/20 shadow-xs"
+              />
+              <div className="text-[10px] font-mono leading-tight">
+                <span className="font-bold text-[#1d1d1f] block">Facade Ready</span>
+                <span className="text-[#f0500f]">{selectedStyle}</span>
+              </div>
+            </div>
+            {onOpenFacadeModal && (
+              <button
+                type="button"
+                onClick={onOpenFacadeModal}
+                className="px-2 py-1 bg-white hover:bg-[#f6f3eb] border border-[#1d1d1f]/20 rounded-md font-mono text-[10px] text-[#1d1d1f] flex items-center space-x-1 shadow-xs cursor-pointer"
+              >
+                <span>STUDIO</span>
+                <span>↗</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 4. Action Buttons (Pill CTA) */}

@@ -49,7 +49,8 @@ class RoomDesignEngine:
         windows: Optional[List[Dict[str, Any]]] = None,
         preset: str = "contemporary_minimal",
         seed: int = 42,
-        is_scale_uncalibrated: bool = False
+        is_scale_uncalibrated: bool = False,
+        force_furnish: bool = False
     ) -> RoomDesignResult:
         """
         Designs a furnished layout for a single room.
@@ -87,7 +88,7 @@ class RoomDesignEngine:
         # Check minimum plausible room area (exclude neural over-segmentation fragments)
         norm_type = room_type.lower().replace(" ", "_")
         min_plausible_area = MIN_PLAUSIBLE_ROOM_AREAS.get(norm_type, 1.50)
-        if room_area < min_plausible_area:
+        if room_area < min_plausible_area and not force_furnish:
             runtime_ms = (time.perf_counter() - t0) * 1000.0
             return RoomDesignResult(
                 room_id=room_id,
@@ -131,7 +132,8 @@ class RoomDesignEngine:
             scale_m_per_px=scale_m_per_px,
             wall_segments=wall_segments,
             doors=doors,
-            windows=windows
+            windows=windows,
+            force_furnish=force_furnish
         )
 
         # 2. Rule-based furnishing
@@ -143,7 +145,8 @@ class RoomDesignEngine:
             preset=norm_preset,
             seed=seed,
             wall_dist_map_m=dist_map_m,
-            scale_m_per_px=scale_m_per_px
+            scale_m_per_px=scale_m_per_px,
+            force_furnish=force_furnish
         )
 
         if fail_reason:

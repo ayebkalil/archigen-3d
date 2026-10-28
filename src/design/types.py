@@ -63,6 +63,7 @@ class PlacedItem:
     placement_rule: str        # "back_to_wall", "in_front_of_anchor", "center", etc.
     wall_distance_cm: float = 0.0  # Distance from back edge to wall face in cm (target <= 2.0 cm)
     wall_contact_ratio: float = 1.0  # Share of back edge within 0.10m of a wall pixel (target >= 0.80)
+    scale: Tuple[float, float, float] = (1.0, 1.0, 1.0)  # 3D proportional scale factor (sx, sy, sz)
 
 @dataclass
 class ValidationReport:
@@ -112,6 +113,7 @@ class RoomDesignResult:
                     "position_m": [round(it.position_m[0], 3), round(it.position_m[1], 3)],
                     "rotation_deg": round(it.rotation_deg, 1),
                     "dimensions_m": [round(d, 3) for d in it.dimensions_m],
+                    "scale": [round(s, 3) for s in it.scale],
                     "glb": it.glb,
                     "placement_rule": it.placement_rule,
                     "wall_distance_cm": round(it.wall_distance_cm, 1),

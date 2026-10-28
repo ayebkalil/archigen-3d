@@ -171,10 +171,16 @@ class FloorplanVectorizer:
             scale_source = "door_width_estimation"
 
         # 3. Outer Building Shell (Watertight Exterior Envelope from Filled Footprint)
+        # Seal all structural boundaries (walls, doors, windows) with morphological closure
+        # so windows and exterior doors do not breach the exterior envelope.
+        all_structure = ((wall_clean > 0) | (door_binary > 0) | (window_binary > 0)).astype(np.uint8)
+        k_close = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+        sealed_structure = cv2.morphologyEx(all_structure, cv2.MORPH_CLOSE, k_close)
+
         if room_mask is not None and np.max(room_mask) > 0:
-            envelope_raw = ((wall_clean > 0) | (room_mask > 0)).astype(np.uint8)
+            envelope_raw = ((sealed_structure > 0) | (room_mask > 0)).astype(np.uint8)
         else:
-            envelope_raw = wall_clean.copy()
+            envelope_raw = sealed_structure.copy()
 
         # Fill internal courtyard/corridor holes to construct watertight exterior footprint
         env_cnts, _ = cv2.findContours(envelope_raw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -254,6 +260,27 @@ class FloorplanVectorizer:
 
             # Convert to meters
             poly_meters = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in snapped_poly]
+
+            # Validate and repair wall polygon with Shapely to guarantee solid, non-self-intersecting geometry
+            try:
+                poly_raw = Polygon(poly_meters)
+                if not poly_raw.is_valid:
+                    clean_wall_poly, rep_ok, _ = repair_polygon_to_single_polygon(poly_raw, max_area_change_pct=30.0)
+                    if rep_ok and clean_wall_poly.is_valid and clean_wall_poly.geom_type == "Polygon":
+                        poly_meters = [[round(pt[0], 3), round(pt[1], 3)] for pt in clean_wall_poly.exterior.coords[:-1]]
+                    else:
+                        b = poly_raw.buffer(0)
+                        if b.geom_type == "Polygon" and b.is_valid and not b.is_empty:
+                            poly_meters = [[round(pt[0], 3), round(pt[1], 3)] for pt in b.exterior.coords[:-1]]
+                        elif b.geom_type == "MultiPolygon" and len(b.geoms) > 0:
+                            dom = max(b.geoms, key=lambda p: p.area)
+                            if dom.is_valid and not dom.is_empty:
+                                poly_meters = [[round(pt[0], 3), round(pt[1], 3)] for pt in dom.exterior.coords[:-1]]
+            except Exception:
+                pass
+
+            if len(poly_meters) < 3:
+                continue
 
             # Determine if Exterior Wall:
             # Method A: from struct_mask (class 2 = Wall_External vs class 1 = Wall_Internal)
@@ -477,14 +504,65 @@ class FloorplanVectorizer:
                     labeled_map[s_mask > 0] = 0
                     del region_info[s_lbl]
 
+            # 3b. Iteratively absorb unassigned interior space bounded by walls into adjacent rooms
+            mask_interior = (filled_envelope > 0) & (wall_clean == 0)
+            k_abs = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+
+            for _ in range(12):
+                unassigned_interior = mask_interior & (labeled_map == 0)
+                if not unassigned_interior.any():
+                    break
+                num_u, labels_u = cv2.connectedComponents(unassigned_interior.astype(np.uint8))
+                if num_u <= 1:
+                    break
+                absorbed_any = False
+                for u_lbl in range(1, num_u):
+                    comp = (labels_u == u_lbl).astype(np.uint8)
+                    comp_area = int(comp.sum())
+                    if comp_area < 8:
+                        continue
+                    dilated_comp = cv2.dilate(comp, k_abs, iterations=2)
+                    touching = labeled_map[(dilated_comp > 0) & (labeled_map > 0)]
+                    if len(touching) > 0:
+                        best_lbl = Counter(touching).most_common(1)[0][0]
+                        labeled_map[comp > 0] = best_lbl
+                        if best_lbl in region_info:
+                            region_info[best_lbl]["area_px"] += comp_area
+                        absorbed_any = True
+                if not absorbed_any:
+                    # Isolated interior space without neighboring room: register as common space
+                    for u_lbl in range(1, num_u):
+                        comp = (labels_u == u_lbl).astype(np.uint8)
+                        comp_area = int(comp.sum())
+                        if comp_area >= px_area_service:
+                            labeled_map[comp > 0] = current_label
+                            region_info[current_label] = {
+                                "class_id": 1,  # Living Room / Common space
+                                "area_px": comp_area,
+                                "min_thresh": px_area_habitable
+                            }
+                            current_label += 1
+                    break
+
             # 4. Construct vectorized room instances
             for lbl, info in region_info.items():
                 r_mask = (labeled_map == lbl).astype(np.uint8)
                 area_px = int(r_mask.sum())
                 if area_px < 20:
                     continue
-                area_m2 = round(area_px * (scale_m_per_px ** 2), 2)
-                r_cnts, _ = cv2.findContours(r_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                # Fill any internal holes/notches inside room polygon (e.g. from text or furniture symbols)
+                cnts_ext, _ = cv2.findContours(r_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                if not cnts_ext:
+                    continue
+                filled_rm = np.zeros_like(r_mask)
+                cv2.drawContours(filled_rm, cnts_ext, -1, 1, -1)
+
+                # Smooth out jagged text edges with morphological close
+                k_smooth = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+                smoothed_rm = cv2.morphologyEx(filled_rm, cv2.MORPH_CLOSE, k_smooth)
+
+                r_cnts, _ = cv2.findContours(smoothed_rm, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 if not r_cnts:
                     continue
                 largest_c = max(r_cnts, key=cv2.contourArea)
@@ -493,6 +571,7 @@ class FloorplanVectorizer:
                 r_approx = cv2.approxPolyDP(largest_c, 2.5, True).reshape(-1, 2)
                 if len(r_approx) < 3:
                     continue
+                area_m2 = round(int(smoothed_rm.sum()) * (scale_m_per_px ** 2), 2)
                 r_poly_m = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in r_approx]
 
                 # Validate and repair room polygon with Shapely make_valid
@@ -620,6 +699,40 @@ class FloorplanVectorizer:
             except Exception:
                 pass
 
+        # 8. Watertight Exterior Building Envelope for Seamless Unified Roof
+        envelope_polygons = []
+        try:
+            from shapely.ops import unary_union
+            valid_r_polys = [
+                Polygon(r["polygon_meters"])
+                for r in rooms
+                if len(r.get("polygon_meters", [])) >= 3 and Polygon(r["polygon_meters"]).is_valid
+            ]
+            if valid_r_polys:
+                # Buffer rooms by 0.22m to bridge walls and corridors
+                buffered = [p.buffer(0.22, join_style=2) for p in valid_r_polys]
+                merged_env = unary_union(buffered)
+                if merged_env.geom_type == "Polygon" and merged_env.area > 5.0:
+                    outer = Polygon(merged_env.exterior)
+                    s = outer.simplify(0.08, preserve_topology=True)
+                    envelope_polygons.append([[round(pt[0], 3), round(pt[1], 3)] for pt in s.exterior.coords[:-1]])
+                elif merged_env.geom_type == "MultiPolygon":
+                    for g in merged_env.geoms:
+                        if g.area > 5.0:
+                            outer = Polygon(g.exterior)
+                            s = outer.simplify(0.08, preserve_topology=True)
+                            envelope_polygons.append([[round(pt[0], 3), round(pt[1], 3)] for pt in s.exterior.coords[:-1]])
+        except Exception:
+            pass
+
+        # Fallback to footprint_contours if room envelope was empty
+        if not envelope_polygons and len(footprint_contours) > 0:
+            for cnt in footprint_contours:
+                if cv2.contourArea(cnt) > 80:
+                    approx = cv2.approxPolyDP(cnt, 2.5, True).reshape(-1, 2)
+                    if len(approx) >= 3:
+                        envelope_polygons.append([[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in approx])
+
         # Strict Building Shell Validation:
         # A valid residential shell must enclose at least 1 room and have at least 4 walls or segments
         envelope_segments = sum(len(w.get("polygon_meters", [])) for w in walls)
@@ -664,8 +777,10 @@ class FloorplanVectorizer:
                 "num_rooms": len(rooms),
                 "num_rooms_repaired": num_rooms_repaired,
                 "num_doors": len(doors),
-                "num_windows": len(windows)
+                "num_windows": len(windows),
+                "envelope": envelope_polygons
             },
+            "envelope": envelope_polygons,
             "walls": walls,
             "rooms": rooms,
             "doors": doors,

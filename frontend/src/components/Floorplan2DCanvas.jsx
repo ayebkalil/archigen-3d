@@ -76,6 +76,39 @@ export default function Floorplan2DCanvas({
   const [editFeedback, setEditFeedback] = useState(null);
   const [showNotif, setShowNotif] = useState(true);
 
+  // Zoom & Pan interactive state (2D Blueprint Canvas)
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = React.useRef({ x: 0, y: 0 });
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.15 : -0.15;
+    setZoom((z) => Math.max(0.4, Math.min(4, +(z + delta).toFixed(2))));
+  };
+
+  const handlePanStart = (e) => {
+    // Pan with middle click (1), right click (2), Alt/Shift, or clicking background
+    if (e.button === 1 || e.button === 2 || e.altKey || e.shiftKey || e.target === e.currentTarget) {
+      e.preventDefault();
+      setIsPanning(true);
+      panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    }
+  };
+
+  const handlePanMove = (e) => {
+    if (!isPanning) return;
+    setPan({
+      x: e.clientX - panStartRef.current.x,
+      y: e.clientY - panStartRef.current.y
+    });
+  };
+
+  const handlePanEnd = () => {
+    if (isPanning) setIsPanning(false);
+  };
+
   // Movable Floating Layer Dock state (for split view)
   const [dockPos, setDockPos] = useState({ x: 20, y: 18 });
   const [isDraggingDock, setIsDraggingDock] = useState(false);
@@ -129,9 +162,10 @@ export default function Floorplan2DCanvas({
   };
 
   const handleCanvasClick = (e) => {
+    if (isPanning) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.round(e.clientX - rect.left);
-    const y = Math.round(e.clientY - rect.top);
+    const x = Math.round((e.clientX - rect.left) * (canvasSize[0] / rect.width));
+    const y = Math.round((e.clientY - rect.top) * (canvasSize[1] / rect.height));
 
     // 1. Calibration Tool
     if (isCalibrating) {
@@ -356,6 +390,34 @@ export default function Floorplan2DCanvas({
             <Ruler className="w-3.5 h-3.5 shrink-0" />
             <span>SCALE</span>
           </button>
+
+          {/* Zoom Controls */}
+          <div className="flex items-center space-x-1 pl-1 border-l border-[#1d1d1f]/15 ml-1">
+            <button
+              onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))}
+              className="h-7 w-7 rounded-full flex items-center justify-center text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5"
+              title="Zoom In (+)"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <span className="font-mono text-[9.5px] w-9 text-center select-none text-[#1d1d1f]/70">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.25).toFixed(2)))}
+              className="h-7 w-7 rounded-full flex items-center justify-center text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5"
+              title="Zoom Out (-)"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}
+              className="h-7 px-2 rounded-full font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60 hover:text-[#1d1d1f] hover:bg-black/5"
+              title="Fit to Screen"
+            >
+              FIT
+            </button>
+          </div>
         </div>
 
         {/* Right: In 2D-only full view (!isSplit), keep layer toggles in the top bar! */}
@@ -396,7 +458,16 @@ export default function Floorplan2DCanvas({
       </div>
 
       {/* Main Canvas Area */}
-      <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
+      <div
+        className="flex-1 flex items-center justify-center p-6 overflow-hidden relative select-none"
+        onWheel={handleWheel}
+        onMouseDown={handlePanStart}
+        onMouseMove={handlePanMove}
+        onMouseUp={handlePanEnd}
+        onMouseLeave={handlePanEnd}
+        onContextMenu={(e) => { e.preventDefault(); }}
+        style={{ cursor: isPanning ? 'grabbing' : undefined }}
+      >
         {/* Movable Floating Layer Visibility Dock (Only in 2D+3D Split Mode) */}
         {isSplit && (
           <div
@@ -458,7 +529,13 @@ export default function Floorplan2DCanvas({
           className={`relative rounded-xl overflow-hidden shadow-xl border border-[#1d1d1f]/25 bg-white ${canvasCursor} ${
             isCalibrating ? 'ring-2 ring-[#b8452a]' : activeTool !== 'select' ? 'ring-1 ring-[#1d1d1f]/40' : ''
           }`}
-          style={{ width: `${canvasSize[0]}px`, height: `${canvasSize[1]}px` }}
+          style={{
+            width: `${canvasSize[0]}px`,
+            height: `${canvasSize[1]}px`,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: 'center center',
+            transition: isPanning ? 'none' : 'transform 0.12s ease-out'
+          }}
         >
           {/* Base Image */}
           {imageUrl && (

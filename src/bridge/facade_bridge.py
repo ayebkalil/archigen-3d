@@ -55,6 +55,40 @@ def enhance_facade_details(
         return enhancer.enhance(contrast_factor)
     return sharpened
 
+def apply_facade_style(img: Image.Image, style: str) -> Image.Image:
+    """
+    Applies style-specific architectural color grading and textural enhancements
+    to the generated photorealistic facade.
+    """
+    norm_style = (style or "").lower()
+    arr = np.array(img, dtype=np.float32)
+    h, w, _ = arr.shape
+
+    if "brick" in norm_style:
+        # Traditional Brick: rich warm terracotta/clay brick palette
+        arr[:, :, 0] = np.clip(arr[:, :, 0] * 1.15 + 10, 0, 255)
+        arr[:, :, 1] = np.clip(arr[:, :, 1] * 0.94 - 4, 0, 255)
+        arr[:, :, 2] = np.clip(arr[:, :, 2] * 0.86 - 8, 0, 255)
+    elif "mediterranean" in norm_style or "stone" in norm_style:
+        # Mediterranean Stone: warm sandstone, golden sunlight warmth
+        arr[:, :, 0] = np.clip(arr[:, :, 0] * 1.10 + 12, 0, 255)
+        arr[:, :, 1] = np.clip(arr[:, :, 1] * 1.05 + 8, 0, 255)
+        arr[:, :, 2] = np.clip(arr[:, :, 2] * 0.88 - 6, 0, 255)
+    elif "vegetation" in norm_style or "lush" in norm_style:
+        # Lush Vegetation: biophilic greening on lower facade and architectural columns
+        y_grad = np.linspace(1.0, 0.0, h)[:, None, None]
+        lower_mask = np.clip((y_grad - 0.25) * 1.6, 0.0, 1.0)
+        arr[:, :, 1] = np.clip(arr[:, :, 1] + lower_mask[:, :, 0] * 28.0, 0, 255)
+        arr[:, :, 0] = np.clip(arr[:, :, 0] - lower_mask[:, :, 0] * 10.0, 0, 255)
+        arr[:, :, 2] = np.clip(arr[:, :, 2] - lower_mask[:, :, 0] * 14.0, 0, 255)
+    else:
+        # Modern Minimalist: clean white stucco, high contrast, crisp glass
+        enhancer = ImageEnhance.Contrast(Image.fromarray(arr.astype(np.uint8)))
+        enhanced = enhancer.enhance(1.08)
+        arr = np.array(enhanced, dtype=np.float32)
+
+    return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+
 class PyTorchFacadeInference:
     """
     Ultra-low-latency PyTorch CUDA Generator (~10ms per 256x256 facade).
@@ -152,11 +186,23 @@ class FacadeBridge:
 
         # 2. Fallback to ONNX Runtime Engine
         try:
-            from backend.app.inference import ArchiGenONNXInference
-            if self.onnx_model_path.exists():
-                self.inference_engine = ArchiGenONNXInference(str(self.onnx_model_path))
+            try:
+                from app.inference import ArchiGenONNXInference
+            except ImportError:
+                from backend.app.inference import ArchiGenONNXInference
+            
+            onnx_target = self.onnx_model_path
+            if not onnx_target.exists():
+                for alt_name in ["generator_perceptual_ema.onnx", "generator_perceptual.onnx", "generator.onnx"]:
+                    alt_path = onnx_target.parent / alt_name
+                    if alt_path.exists():
+                        onnx_target = alt_path
+                        break
+
+            if onnx_target.exists():
+                self.inference_engine = ArchiGenONNXInference(str(onnx_target))
                 self.device_name = "ONNX Runtime (CPU)"
-                print(f"[FACADE BRIDGE] Loaded ONNX facade generator from {self.onnx_model_path}")
+                print(f"[FACADE BRIDGE] Loaded ONNX facade generator from {onnx_target}")
             else:
                 print(f"[FACADE BRIDGE] Warning: ONNX model not found at {self.onnx_model_path}, mock mode active.")
         except Exception as e:
@@ -362,6 +408,7 @@ class FacadeBridge:
         num_floors: int = 1,
         floor_height_m: float = 2.8,
         is_front: bool = False,
+        style: str = "Modern Minimalist",
         output_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """
@@ -369,7 +416,8 @@ class FacadeBridge:
         Runs:
         1. Semantic sketch synthesis (aspect-ratio preserved).
         2. Pix2Pix ONNX neural generation.
-        3. Returns texture image, sketch image, and UV coordinates for Three.js.
+        3. Architectural style post-processing & enhancement.
+        4. Returns texture image, sketch image, and UV coordinates for Three.js.
         """
         sketch_img, uv_bounds = self.synthesize_facade_sketch(
             wall=wall,
@@ -389,13 +437,17 @@ class FacadeBridge:
             photo_img = Image.open(io.BytesIO(photo_bytes))
             if self.enhance_textures and not isinstance(self.inference_engine, PyTorchFacadeInference):
                 photo_img = enhance_facade_details(photo_img)
-                buf_enh = io.BytesIO()
-                photo_img.save(buf_enh, format="PNG")
-                photo_bytes = buf_enh.getvalue()
         else:
             # Fallback mock texture if ONNX engine not loaded
             photo_img = sketch_img
-            photo_bytes = sketch_bytes
+
+        # Apply style-specific architectural color grading and material enhancements
+        if style:
+            photo_img = apply_facade_style(photo_img, style)
+
+        buf_enh = io.BytesIO()
+        photo_img.save(buf_enh, format="PNG")
+        photo_bytes = buf_enh.getvalue()
 
         if output_path:
             out_file = Path(output_path)
@@ -405,7 +457,9 @@ class FacadeBridge:
         return {
             "wall_id": wall.get("id", "unknown_wall"),
             "is_front": is_front,
+            "style": style,
             "sketch_image": sketch_img,
+            "sketch_bytes": sketch_bytes,
             "photo_image": photo_img,
             "photo_bytes": photo_bytes,
             "uv_bounds": uv_bounds,
@@ -419,6 +473,7 @@ class FacadeBridge:
         front_wall_id: Optional[str] = None,
         num_floors: int = 1,
         front_only: bool = True,
+        style: str = "Modern Minimalist",
         save_to_disk: bool = False,
         output_dir: str = "models/samples/facades"
     ) -> Dict[str, Any]:
@@ -464,13 +519,17 @@ class FacadeBridge:
                         wall=w,
                         num_floors=num_floors,
                         is_front=True,
+                        style=style,
                         output_path=tex_filepath
                     )
                     b64_str = base64.b64encode(res["photo_bytes"]).decode("ascii")
+                    sketch_b64 = base64.b64encode(res["sketch_bytes"]).decode("ascii")
                     w["facade_texture"] = {
                         "texture_file": f"{w_id}_facade.png",
                         "texture_path": tex_filepath,
                         "texture_base64": f"data:image/png;base64,{b64_str}",
+                        "sketch_base64": f"data:image/png;base64,{sketch_b64}",
+                        "style": style,
                         "uv_bounds": res["uv_bounds"],
                         "is_front": True,
                         "mode": "neural_generated"

@@ -212,9 +212,23 @@ class FloorplanPipeline:
 
         self.vectorizer = FloorplanVectorizer()
         self.extruder = Floorplan3DExtruder()
+
+        # Find best available facade models
+        facade_onnx = PROJECT_ROOT / "models/saved/generator_perceptual_ema.onnx"
+        if not facade_onnx.exists():
+            facade_onnx = PROJECT_ROOT / "models/saved/generator_perceptual.onnx"
+        if not facade_onnx.exists():
+            facade_onnx = PROJECT_ROOT / "models/saved/generator.onnx"
+
+        facade_pth = PROJECT_ROOT / "models/saved/generator_perceptual_ema_best.pth"
+        if not facade_pth.exists():
+            facade_pth = PROJECT_ROOT / "models/saved/generator_perceptual_best.pth"
+        if not facade_pth.exists():
+            facade_pth = PROJECT_ROOT / "models/saved/generator_best.pth"
+
         self.bridge = FacadeBridge(
-            onnx_model_path=str(PROJECT_ROOT / "models/saved/generator_perceptual.onnx"),
-            pytorch_model_path=str(PROJECT_ROOT / "models/saved/generator_perceptual_best.pth"),
+            onnx_model_path=str(facade_onnx),
+            pytorch_model_path=str(facade_pth),
             prefer_cuda=(self.device is not None and getattr(self.device, "type", None) == "cuda")
         )
 
@@ -230,6 +244,7 @@ class FloorplanPipeline:
         scale_override: Optional[float] = None,
         num_floors: int = 1,
         front_wall_id: Optional[str] = None,
+        style: Optional[str] = "Modern Minimalist",
         use_tta: bool = False,
         tta_mode: str = "none",
         front_only: bool = True
@@ -495,7 +510,8 @@ class FloorplanPipeline:
             layout=layout,
             front_wall_id=front_wall_id,
             num_floors=num_floors,
-            front_only=front_only
+            front_only=front_only,
+            style=style
         )
 
         # 4. 3D Scene Generation

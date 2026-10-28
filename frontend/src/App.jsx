@@ -6,6 +6,67 @@ import Floorplan2DCanvas from './components/Floorplan2DCanvas';
 import Viewer3D from './components/Viewer3D';
 import MetricsSummary from './components/MetricsSummary';
 import RoomDesignPanel from './components/RoomDesignPanel';
+import FacadeModal from './components/FacadeModal';
+import GenerativeStudio from './components/GenerativeStudio';
+
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('ArchiGen ErrorBoundary caught:', error, errorInfo);
+  }
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null });
+    if (this.props.onReset) {
+      this.props.onReset();
+    } else {
+      window.location.hash = '#studio';
+      window.location.reload();
+    }
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full w-full bg-[#efebe2] text-[#1d1d1f] p-6 font-mono">
+          <div className="max-w-md w-full bg-white border border-[#1d1d1f]/20 rounded-2xl p-6 shadow-xl text-center space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[#f0500f]/10 text-[#f0500f] flex items-center justify-center font-stencil text-xl">
+              !
+            </div>
+            <h2 className="font-stencil text-lg uppercase tracking-wider text-[#1d1d1f]">
+              STUDIO RECOVERY INTERCEPTED
+            </h2>
+            <p className="text-xs text-[#1d1d1f]/70 leading-relaxed">
+              A render conflict was safely contained. You can reload the generative workspace or return to the 3D floorplan view.
+            </p>
+            {this.state.error && (
+              <div className="text-[10px] text-left bg-[#1d1d1f]/5 p-2.5 rounded border border-[#1d1d1f]/10 overflow-auto max-h-24 font-mono text-[#b8452a]">
+                {this.state.error.toString()}
+              </div>
+            )}
+            <div className="flex justify-center space-x-3 pt-2">
+              <button
+                onClick={this.handleReset}
+                className="px-5 py-2.5 rounded-full bg-[#f0500f] hover:bg-[#d8450a] text-white font-stencil text-xs uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+              >
+                RELOAD WORKSPACE
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [currentView, setCurrentView] = useState(() => {
@@ -14,6 +75,7 @@ export default function App() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState('studio');
   const [activeTab, setActiveTab] = useState('split');
+  const [pageView, setPageView] = useState('floorplan'); // 'floorplan' | 'generative_studio'
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('/sample_floorplan.png');
   const [scale, setScale] = useState(0.03);
@@ -34,6 +96,12 @@ export default function App() {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [furnishingData, setFurnishingData] = useState({});
   const [isDesigning, setIsDesigning] = useState(false);
+
+  // Facade Studio State
+  const [facadeData, setFacadeData] = useState(null);
+  const [showFacadeModal, setShowFacadeModal] = useState(false);
+  const [isSwitchingStyle, setIsSwitchingStyle] = useState(false);
+  const [facadeFocusTrigger, setFacadeFocusTrigger] = useState(0);
 
   // 1. Health check & Initial Demo load
   useEffect(() => {
@@ -155,6 +223,7 @@ export default function App() {
         })),
         doors: data.doors || [],
         windows: data.windows || [],
+        envelope: data.envelope || [],
       };
 
       setLayout(parsedLayout);
@@ -169,6 +238,7 @@ export default function App() {
         setFrontWallId(frontWall.id);
         if (frontWall.facade_texture?.texture_base64) {
           setFacadeTextureUrl(frontWall.facade_texture.texture_base64);
+          setFacadeData(frontWall.facade_texture);
         }
       }
     } catch (err) {
@@ -193,12 +263,60 @@ export default function App() {
     }
   };
 
-  const handleGenerateFacade = () => {
-    if (file) {
-      setIsGeneratingFacade(true);
-      executeAnalysis(file, scale, numFloors, frontWallId).finally(() => {
-        setIsGeneratingFacade(false);
-      });
+  const handleGenerateFacade = async (overrideStyle = null) => {
+    const targetStyle = overrideStyle || selectedStyle;
+    if (!layout) {
+      setErrorMsg('Please click "EXTRACT 3D FLOORPLAN" first before generating facade textures.');
+      return;
+    }
+
+    setIsGeneratingFacade(true);
+    try {
+      const payload = {
+        layout: layout,
+        wall_id: frontWallId,
+        style: targetStyle,
+        num_floors: numFloors
+      };
+
+      const res = await axios.post('/facade/generate', payload);
+      if (res.data?.status === 'success') {
+        setFacadeData(res.data);
+        if (res.data.texture_base64) {
+          setFacadeTextureUrl(res.data.texture_base64);
+        }
+        setShowFacadeModal(true);
+      }
+    } catch (err) {
+      console.error('Facade generation error:', err);
+      setErrorMsg(err.response?.data?.detail || 'Facade generation failed.');
+    } finally {
+      setIsGeneratingFacade(false);
+    }
+  };
+
+  const handleSwitchFacadeStyle = async (newStyle) => {
+    setSelectedStyle(newStyle);
+    setIsSwitchingStyle(true);
+    try {
+      const payload = {
+        layout: layout,
+        wall_id: frontWallId,
+        style: newStyle,
+        num_floors: numFloors
+      };
+      const res = await axios.post('/facade/generate', payload);
+      if (res.data?.status === 'success') {
+        setFacadeData(res.data);
+        if (res.data.texture_base64) {
+          setFacadeTextureUrl(res.data.texture_base64);
+        }
+      }
+    } catch (err) {
+      console.error('Facade style switch error:', err);
+      setErrorMsg(err.response?.data?.detail || 'Style generation failed.');
+    } finally {
+      setIsSwitchingStyle(false);
     }
   };
 
@@ -207,7 +325,7 @@ export default function App() {
     setSelectedRoom(room);
   };
 
-  const handleGenerateDesign = async (room, preset = 'contemporary_minimal', seed = 42) => {
+  const handleGenerateDesign = async (room, preset = 'contemporary_minimal', seed = 42, forceFurnish = false) => {
     if (!room) return;
     setIsDesigning(true);
     try {
@@ -219,7 +337,8 @@ export default function App() {
         windows: layout?.windows || [],
         wall_segments: layout?.walls || [],
         preset: preset,
-        seed: seed
+        seed: seed,
+        force_furnish: forceFurnish
       };
       const response = await axios.post('/design', payload);
       const result = response.data;
@@ -336,16 +455,32 @@ export default function App() {
         latency={latency}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        pageView={pageView}
+        setPageView={setPageView}
         onReturnToShowcase={() => triggerTransition('showcase')}
       />
 
-      {/* 2. Main Work Area */}
+      {/* 2. Main Page View: Generative AI Studio vs Floorplan Workspace */}
+      {pageView === 'generative_studio' ? (
+        <ErrorBoundary onReset={() => setPageView('floorplan')}>
+          <GenerativeStudio
+            layout={layout}
+            frontWallId={frontWallId}
+            onApplyFacadeTexture={(tex, data) => {
+              setFacadeTextureUrl(tex);
+              if (data) setFacadeData(data);
+            }}
+            onNavigateToFloorplan={() => setPageView('floorplan')}
+          />
+        </ErrorBoundary>
+      ) : (
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Sidebar Controls */}
         <ControlPanel
           onFileUpload={handleFileUpload}
           onRunAnalysis={() => executeAnalysis(file, scale, numFloors, frontWallId)}
           onGenerateFacade={handleGenerateFacade}
+          onOpenFacadeModal={() => setShowFacadeModal(true)}
           isAnalyzing={isAnalyzing}
           isGeneratingFacade={isGeneratingFacade}
           scale={scale}
@@ -399,6 +534,7 @@ export default function App() {
                   onSelectRoom={handleSelectRoom}
                   furnishingData={furnishingData}
                   onClearRoomFurnishings={handleClearDesign}
+                  facadeFocusTrigger={facadeFocusTrigger}
                 />
               </>
             )}
@@ -432,6 +568,7 @@ export default function App() {
                 onSelectRoom={handleSelectRoom}
                 furnishingData={furnishingData}
                 onClearRoomFurnishings={handleClearDesign}
+                facadeFocusTrigger={facadeFocusTrigger}
               />
             )}
 
@@ -454,6 +591,17 @@ export default function App() {
           <MetricsSummary layout={layout} frontWallId={frontWallId} />
         </main>
       </div>
+      )}
+
+      {/* Facade Synthesis Studio Modal */}
+      <FacadeModal
+        isOpen={showFacadeModal}
+        onClose={() => setShowFacadeModal(false)}
+        facadeData={facadeData}
+        onSwitchStyle={handleSwitchFacadeStyle}
+        isSwitchingStyle={isSwitchingStyle}
+        onFocusIn3D={() => setFacadeFocusTrigger((prev) => prev + 1)}
+      />
     </div>
   );
 }

@@ -124,3 +124,7 @@ scripts/cadrage_extracted.txt
 # Generated 3D outputs
 outputs/
 
+
+test_facade_out.png
+TripoSR/
+frontend/public/vendor/

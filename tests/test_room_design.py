@@ -398,3 +398,55 @@ def test_back_to_wall_80_percent_contact_rule(engine):
     # The room cannot place floating furniture against non-existent walls
     assert not res_floating.is_valid, "Floating furniture should be rejected by 80% contact rule"
     assert res_floating.failure_reason in ["NO_USABLE_WALL", "VALIDATION_FAILED"]
+
+
+def test_compact_room_furnishing_and_proportional_scaling(engine):
+    """Verify that compact / sub-threshold rooms scale furniture proportionally and satisfy validation."""
+    # Compact 3.2 m2 bedroom (1.8m x 1.8m)
+    room_pts = [
+        [0.0, 0.0],
+        [1.8, 0.0],
+        [1.8, 1.8],
+        [0.0, 1.8]
+    ]
+    doors = [{"position_m": [0.3, 1.8], "width_m": 0.65}]
+
+    # Force furnish mode on compact bedroom
+    res = engine.design_room(
+        room_polygon_meters=room_pts,
+        room_type="bedroom",
+        doors=doors,
+        preset="contemporary_minimal",
+        seed=42,
+        force_furnish=True
+    )
+
+    assert res.is_valid, f"Compact bedroom layout failed: {res.failure_reason}"
+    assert len(res.items) >= 1, "Should place at least a compact bed"
+    bed = next(it for it in res.items if it.category == "bed")
+    assert bed.scale[0] < 0.90, f"Bed scale should be < 0.90, got {bed.scale}"
+    assert bed.scale[0] >= 0.45, f"Bed scale should be >= 0.45, got {bed.scale}"
+    assert bed.dimensions_m[0] < 0.95
+    assert bed.dimensions_m[1] < 1.90
+    assert res.validation.overlap_count == 0
+
+    # Compact 0.85 m2 bathroom (0.92m x 0.92m)
+    bath_pts = [
+        [0.0, 0.0],
+        [0.92, 0.0],
+        [0.92, 0.92],
+        [0.0, 0.92]
+    ]
+    bath_doors = [{"position_m": [0.2, 0.92], "width_m": 0.55}]
+    res_bath = engine.design_room(
+        room_polygon_meters=bath_pts,
+        room_type="bathroom",
+        doors=bath_doors,
+        preset="contemporary_minimal",
+        seed=42,
+        force_furnish=True
+    )
+    assert res_bath.is_valid, f"Compact bathroom layout failed: {res_bath.failure_reason}"
+    toilet = next(it for it in res_bath.items if it.category == "toilet")
+    assert toilet.scale[0] < 0.80
+    assert toilet.dimensions_m[0] < 0.45
