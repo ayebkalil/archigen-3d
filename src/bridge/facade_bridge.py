@@ -209,39 +209,37 @@ class FacadeBridge:
             print(f"[FACADE BRIDGE] Inference engine init deferred: {e}")
 
     @staticmethod
-    def calculate_wall_length_m(wall: Dict[str, Any]) -> float:
-        """Calculates the physical length of the wall in meters from its polygon coordinates."""
+    def facade_frame(wall: Dict[str, Any]) -> Dict[str, Any]:
+        """Canonical physical exterior face, shared by sketch, UVs and frames."""
         pts = wall.get("polygon_meters", [])
         if len(pts) < 2:
-            return 4.0  # Default reasonable length
+            pts = [[0.0, 0.0], [4.0, 0.0]]
+        edges = [(pts[i], pts[(i + 1) % len(pts)]) for i in range(len(pts))]
+        a, b = max(edges, key=lambda e: math.dist(e[0], e[1]))
+        length = max(math.dist(a, b), 0.01)
+        dx, dz = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+        area = sum(p[0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * p[1] for i, p in enumerate(pts))
+        sign = 1 if area >= 0 else -1
+        outward = [sign * dz, -sign * dx]
+        # U increases to the right when looking at the wall from outside.
+        return {"origin": list(b if sign > 0 else a), "direction": [outward[1], -outward[0]], "outward": outward, "length_m": length}
 
-        # Find the two most distant points in the wall polygon
-        max_dist = 0.0
-        for i in range(len(pts)):
-            for j in range(i + 1, len(pts)):
-                d = math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1])
-                if d > max_dist:
-                    max_dist = d
-        return max(round(max_dist, 2), 1.0)
+    @staticmethod
+    def calculate_wall_length_m(wall: Dict[str, Any]) -> float:
+        return FacadeBridge.facade_frame(wall)["length_m"]
 
-    def synthesize_facade_sketch(
-        self,
-        wall: Dict[str, Any],
-        num_floors: int = 1,
-        floor_height_m: float = 2.8,
-        is_front: bool = False,
-        target_size: int = 256
-    ) -> Tuple[Image.Image, Dict[str, float]]:
+    def synthesize_facade_sketch(self, wall, num_floors=1, floor_height_m=2.8, is_front=False, target_size=256):
+        image, bounds, _, _ = self._build_facade_sketch(wall, num_floors, floor_height_m, is_front, target_size)
+        return image, bounds
+
+    def _build_facade_sketch(self, wall, num_floors=1, floor_height_m=2.8, is_front=False, target_size=256):
+        """Draw the semantic canvas and return the exact opening rectangles in meters.
+
+        Geometry is derived from the rasterized rectangles (including pixel rounding),
+        so a 3D frame projects onto precisely the semantic input given to the cGAN.
         """
-        Synthesizes a CMP 12-class semantic sketch for a specific exterior wall.
-        Preserves physical aspect ratio (length_m x total_height_m) with letterbox padding.
-
-        Returns:
-            sketch_img: PIL Image (256x256 RGB)
-            uv_bounds: Dict specifying active wall UV sub-rectangle in [0, 1] range:
-                       {'u_min': ..., 'u_max': ..., 'v_min': ..., 'v_max': ...}
-        """
-        wall_len_m = self.calculate_wall_length_m(wall)
+        frame = self.facade_frame(wall)
+        wall_len_m = frame["length_m"]
         total_height_m = num_floors * floor_height_m
 
         # Target dimensions inside 256x256 canvas with margins
@@ -298,109 +296,77 @@ class FacadeBridge:
             safe_rect(wall_x0, wall_y0 + cornice_h, wall_x0 + pillar_w, wall_y1 - base_h, CMP_PALETTE["molding"])
             safe_rect(wall_x1 - pillar_w, wall_y0 + cornice_h, wall_x1, wall_y1 - base_h, CMP_PALETTE["molding"])
 
-        # 4. Openings layout (Doors and Windows)
-        # Parse attached openings from wall metadata
-        attached_openings = wall.get("openings", [])
-        attached_windows = [op for op in attached_openings if op.get("type") == "window"]
-        attached_doors = [op for op in attached_openings if op.get("type") == "door"]
-
-        # Determine horizontal window positions along wall (in meters from left)
-        window_x_positions_m = []
-        if len(attached_windows) > 0:
-            for w_op in attached_windows:
-                # Distribute evenly if exact 1D projection is not available
-                w_pos = w_op.get("position_along_wall_m")
-                if w_pos is not None:
-                    window_x_positions_m.append(w_pos)
-            if not window_x_positions_m:
-                # Distribute detected windows evenly across wall
-                n_win = len(attached_windows)
-                spacing = wall_len_m / (n_win + 1)
-                window_x_positions_m = [(i + 1) * spacing for i in range(n_win)]
-        else:
-            # Procedural architectural default: 1 window bay every ~2.5 to 3.5 meters
-            n_bays = max(int(round(wall_len_m / 2.8)), 1)
-            spacing = wall_len_m / (n_bays + 1)
-            window_x_positions_m = [(i + 1) * spacing for i in range(n_bays)]
-
-        # Determine Door placement
-        door_x_m = None
-        has_door = is_front or (len(attached_doors) > 0)
-        if has_door:
-            if len(attached_doors) > 0 and attached_doors[0].get("position_along_wall_m") is not None:
-                door_x_m = attached_doors[0]["position_along_wall_m"]
-            else:
-                door_x_m = wall_len_m * 0.5  # Symmetrical center entrance
-
-        # Standard architectural dimensions in meters
-        win_w_m = 1.10
-        win_h_m = 1.45
-        win_sill_dist_m = 0.90  # Distance from floor to window sill
-        door_w_m = 1.15
-        door_h_m = 2.20
-
-        win_w_px = max(int(round(win_w_m * scale_px_per_m)), 10)
-        win_h_px = max(int(round(win_h_m * scale_px_per_m)), 14)
-        door_w_px = max(int(round(door_w_m * scale_px_per_m)), 12)
-        door_h_px = max(int(round(door_h_m * scale_px_per_m)), 20)
-
-        # 5. Draw Openings Per Floor (Bottom to Top)
-        for fl in range(num_floors):
-            floor_bottom_y = wall_y1 - int(round(fl * floor_height_m * scale_px_per_m))
-            floor_top_y = wall_y1 - int(round((fl + 1) * floor_height_m * scale_px_per_m))
-
-            # Floor dividing molding (for multi-story buildings)
-            if fl > 0:
-                mold_h = max(int(round(0.15 * scale_px_per_m)), 3)
-                safe_rect(wall_x0, floor_bottom_y - mold_h, wall_x1, floor_bottom_y, CMP_PALETTE["molding"])
-
-            # Ground Floor Door
-            if fl == 0 and has_door and door_x_m is not None:
-                d_cx_px = wall_x0 + int(round(door_x_m * scale_px_per_m))
-                d_x0 = d_cx_px - door_w_px // 2
-                d_x1 = d_cx_px + door_w_px // 2
-                d_y1 = floor_bottom_y - base_h
-                d_y0 = d_y1 - door_h_px
-                # Door surround molding
-                d_trim = max(int(round(0.08 * scale_px_per_m)), 2)
-                safe_rect(d_x0 - d_trim, d_y0 - d_trim, d_x1 + d_trim, d_y0, CMP_PALETTE["molding"])
-                safe_rect(d_x0 - d_trim, d_y0, d_x0, d_y1, CMP_PALETTE["molding"])
-                safe_rect(d_x1, d_y0, d_x1 + d_trim, d_y1, CMP_PALETTE["molding"])
-                safe_rect(d_x0, d_y0, d_x1, d_y1, CMP_PALETTE["door"])
-
-            # Windows on this floor
-            for wx_m in window_x_positions_m:
-                # If ground floor and door occupies this spot, omit window
-                if fl == 0 and has_door and door_x_m is not None and abs(wx_m - door_x_m) < (win_w_m + 0.5):
+        # Detected positions are projected onto the same finite wall face used
+        # for UVs. Openings belonging to another side of a compound wall are excluded.
+        attached = wall.get("openings", [])
+        templates = []
+        for idx, op in enumerate(attached):
+            kind = op.get("type")
+            if kind not in ("door", "window"):
+                continue
+            along = op.get("position_along_wall_m")
+            if along is None and op.get("position_meters") is not None:
+                px, pz = op["position_meters"]
+                ox, oz = frame["origin"]
+                dx, dz = frame["direction"]
+                along = (px - ox) * dx + (pz - oz) * dz
+                distance = abs((px - ox) * dz - (pz - oz) * dx)
+                if distance > 0.85 or along < 0 or along > wall_len_m:
                     continue
+            if along is None:
+                continue
+            templates.append({
+                "id": op.get("id", f"{kind}_{idx}"), "type": kind,
+                "position_along_wall_m": float(along),
+                "width_m": float(op.get("width_m", op.get("width", 1.15 if kind == "door" else 1.10))),
+                "height_m": float(op.get("height_m", op.get("height", 2.10 if kind == "door" else 1.40))),
+                "sill_m": float(op.get("sill_m", 0.0 if kind == "door" else 0.90)),
+            })
+        # Procedural preview only when no measured openings were supplied.
+        if not attached:
+            if is_front:
+                templates.append({"id": "facade_door", "type": "door", "position_along_wall_m": wall_len_m / 2, "width_m": 1.15, "height_m": 2.1, "sill_m": 0.0})
+            bays = max(int(round(wall_len_m / 2.8)), 1)
+            for i in range(bays):
+                along = (i + 1) * wall_len_m / (bays + 1)
+                if is_front and abs(along - wall_len_m / 2) < 1.3:
+                    continue
+                templates.append({"id": f"facade_window_{i}", "type": "window", "position_along_wall_m": along, "width_m": 1.1, "height_m": 1.4, "sill_m": 0.9})
 
-                w_cx_px = wall_x0 + int(round(wx_m * scale_px_per_m))
-                w_x0 = w_cx_px - win_w_px // 2
-                w_x1 = w_cx_px + win_w_px // 2
-                w_y1 = floor_bottom_y - int(round(win_sill_dist_m * scale_px_per_m))
-                w_y0 = w_y1 - win_h_px
+        rendered_openings = []
+        for fl in range(num_floors):
+            if fl > 0:
+                y = wall_y1 - fl * floor_height_m / total_height_m * draw_h
+                safe_rect(wall_x0, y - 2, wall_x1, y, CMP_PALETTE["molding"])
+            for op in templates:
+                if op["type"] == "door" and fl > 0:
+                    continue
+                cx = wall_x0 + op["position_along_wall_m"] / wall_len_m * draw_w
+                half = op["width_m"] / wall_len_m * draw_w / 2
+                x0 = max(wall_x0 + 1, int(round(cx - half)))
+                x1 = min(wall_x1 - 1, int(round(cx + half)))
+                sill = fl * floor_height_m + op["sill_m"]
+                y1 = min(wall_y1, int(round(wall_y1 - sill / total_height_m * draw_h)))
+                y0 = max(wall_y0 + 1, int(round(wall_y1 - (sill + op["height_m"]) / total_height_m * draw_h)))
+                if x1 <= x0 or y1 <= y0:
+                    continue
+                trim = 2
+                safe_rect(x0 - trim, y0 - trim, x1 + trim, y0, CMP_PALETTE["deco"])
+                safe_rect(x0 - trim, y0, x0, y1, CMP_PALETTE["molding"])
+                safe_rect(x1, y0, x1 + trim, y1, CMP_PALETTE["molding"])
+                if op["type"] == "window":
+                    safe_rect(x0 - trim, y1, x1 + trim, y1 + 2, CMP_PALETTE["sill"])
+                safe_rect(x0, y0, x1, y1, CMP_PALETTE[op["type"]])
+                rendered_openings.append({
+                    **op, "floor_index": fl,
+                    "position_along_wall_m": ((x0 + x1) / 2 - wall_x0) / draw_w * wall_len_m,
+                    "width_m": (x1 - x0) / draw_w * wall_len_m,
+                    "height_m": (y1 - y0) / draw_h * total_height_m,
+                    "sill_m": (wall_y1 - y1) / draw_h * total_height_m,
+                    "uv_rect": [x0 / target_size, 1 - y1 / target_size, x1 / target_size, 1 - y0 / target_size],
+                })
 
-                # Ensure within floor bounds
-                w_y0 = max(w_y0, floor_top_y + cornice_h + 2)
-
-                # Draw Window
-                safe_rect(w_x0, w_y0, w_x1, w_y1, CMP_PALETTE["window"])
-
-                # Draw Window Sill underneath
-                sill_h_px = max(int(round(0.08 * scale_px_per_m)), 3)
-                sill_margin = 2
-                safe_rect(w_x0 - sill_margin, w_y1, w_x1 + sill_margin, w_y1 + sill_h_px, CMP_PALETTE["sill"])
-
-                # Draw Window Lintel / Header above window
-                lintel_h_px = max(int(round(0.10 * scale_px_per_m)), 2)
-                safe_rect(w_x0 - sill_margin, w_y0 - lintel_h_px, w_x1 + sill_margin, w_y0, CMP_PALETTE["deco"])
-
-                # Upper-floor balcony railing (for multi-story facades)
-                if fl > 0:
-                    balcony_h_px = max(int(round(0.35 * scale_px_per_m)), 5)
-                    safe_rect(w_x0 - 3, w_y1 - balcony_h_px, w_x1 + 3, w_y1 + 1, CMP_PALETTE["balcony"])
-
-        return canvas, uv_bounds
+        return canvas, uv_bounds, frame, rendered_openings
 
     def render_wall_facade(
         self,
@@ -419,7 +385,7 @@ class FacadeBridge:
         3. Architectural style post-processing & enhancement.
         4. Returns texture image, sketch image, and UV coordinates for Three.js.
         """
-        sketch_img, uv_bounds = self.synthesize_facade_sketch(
+        sketch_img, uv_bounds, frame, openings = self._build_facade_sketch(
             wall=wall,
             num_floors=num_floors,
             floor_height_m=floor_height_m,
@@ -463,6 +429,8 @@ class FacadeBridge:
             "photo_image": photo_img,
             "photo_bytes": photo_bytes,
             "uv_bounds": uv_bounds,
+            "facade_frame": frame,
+            "openings": openings,
             "wall_length_m": uv_bounds["wall_length_m"],
             "wall_height_m": uv_bounds["wall_height_m"]
         }
@@ -531,6 +499,9 @@ class FacadeBridge:
                         "sketch_base64": f"data:image/png;base64,{sketch_b64}",
                         "style": style,
                         "uv_bounds": res["uv_bounds"],
+                        "facade_frame": res["facade_frame"],
+                        "openings": res["openings"],
+                        "wall_height_m": res["wall_height_m"],
                         "is_front": True,
                         "mode": "neural_generated"
                     }
@@ -551,20 +522,27 @@ class FacadeBridge:
                 w_id = w.get("id")
                 is_front = (w_id == front_wall_id)
                 w["is_front"] = is_front
-                sketch_img, uv_bounds = self.synthesize_facade_sketch(w, num_floors=num_floors, is_front=is_front)
+                sketch_img, uv_bounds, frame, openings = self._build_facade_sketch(w, num_floors=num_floors, is_front=is_front)
                 sketches.append(sketch_img)
-                wall_order.append((w, sketch_img, uv_bounds))
+                wall_order.append((w, sketch_img, uv_bounds, frame, openings))
 
             if hasattr(self.inference_engine, "generate_batch"):
                 generated_imgs = self.inference_engine.generate_batch(sketches)
             else:
-                generated_imgs = sketches  # fallback
+                generated_imgs = []
+                for sketch in sketches:
+                    if self.inference_engine is None:
+                        generated_imgs.append(sketch)
+                    else:
+                        buffer = io.BytesIO()
+                        sketch.save(buffer, format="PNG")
+                        generated_imgs.append(Image.open(io.BytesIO(self.inference_engine.generate(buffer.getvalue()))).convert("RGB"))
                 if self.enhance_textures:
                     generated_imgs = [enhance_facade_details(im) for im in generated_imgs]
 
-            for idx, (w, s_img, uv_bounds) in enumerate(wall_order):
+            for idx, (w, s_img, uv_bounds, frame, openings) in enumerate(wall_order):
                 w_id = w.get("id")
-                g_img = generated_imgs[idx]
+                g_img = apply_facade_style(generated_imgs[idx], style) if style else generated_imgs[idx]
                 buf = io.BytesIO()
                 g_img.save(buf, format="PNG")
                 photo_bytes = buf.getvalue()
@@ -582,6 +560,8 @@ class FacadeBridge:
                     "photo_image": g_img,
                     "photo_bytes": photo_bytes,
                     "uv_bounds": uv_bounds,
+                    "facade_frame": frame,
+                    "openings": openings,
                     "wall_length_m": uv_bounds["wall_length_m"],
                     "wall_height_m": uv_bounds["wall_height_m"]
                 }
@@ -590,6 +570,9 @@ class FacadeBridge:
                     "texture_path": tex_filepath,
                     "texture_base64": f"data:image/png;base64,{b64_str}",
                     "uv_bounds": uv_bounds,
+                    "facade_frame": frame,
+                    "openings": openings,
+                    "wall_height_m": uv_bounds["wall_height_m"],
                     "is_front": (w_id == front_wall_id),
                     "mode": "neural_batch"
                 }

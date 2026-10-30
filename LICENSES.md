@@ -118,3 +118,9 @@ All photorealistic PBR material texture maps and the high-dynamic-range environm
 - The production Docker image (`archigen-3d-frontend`) copies `dist/` directly into `/usr/share/nginx/html`.
 - **Zero runtime network requests**: No external CDN, asset server, or remote API is queried for 3D textures, models, or lighting. All requests resolve to relative container endpoints `/showcase/...` and `/models/furniture/...`.
 
+
+
+## Roof Geometry Libraries
+
+- `straight-skeleton` **1.1.0**: MIT, copyright 2021 vHawk. Pure JavaScript/TypeScript implementation (no CGAL/WASM runtime). Package license: `frontend/node_modules/straight-skeleton/LICENSE`.
+- `clipper-lib` **6.4.2**: Boost Software License 1.0, Angus Johnson / JavaScript port by Timo; includes Tom Wu's JSBN attribution. Copyright and notices are preserved in the installed library and production notices at `/third-party/roof-libraries.txt`.

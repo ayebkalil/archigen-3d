@@ -10,6 +10,7 @@ Performs:
 """
 
 import sys
+import threading
 from pathlib import Path
 
 def get_project_root() -> Path:
@@ -49,6 +50,7 @@ from src.bridge.facade_bridge import FacadeBridge
 
 class FloorplanPipeline:
     _instance = None
+    _instance_lock = threading.Lock()
 
     def __init__(
         self,
@@ -235,7 +237,11 @@ class FloorplanPipeline:
     @classmethod
     def get_instance(cls):
         if cls._instance is None:
-            cls._instance = cls()
+            # Startup warmup and the first HTTP request can arrive together.
+            # They must share one set of models on the 4GB GPU.
+            with cls._instance_lock:
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     def process_image(

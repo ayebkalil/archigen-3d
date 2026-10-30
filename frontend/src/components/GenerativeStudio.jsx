@@ -260,7 +260,8 @@ export default function GenerativeStudio({
             if (child.material) {
               child.material.side = THREE.DoubleSide;
               child.material.color.set(0xffffff);
-              child.material.vertexColors = false;
+              const hasVertexColors = Boolean(child.geometry && child.geometry.attributes && child.geometry.attributes.color);
+              child.material.vertexColors = hasVertexColors;
               child.material.roughness = generatedModel.roughness !== undefined ? generatedModel.roughness : 0.35;
               child.material.metalness = 0.05;
               child.material.flatShading = false;

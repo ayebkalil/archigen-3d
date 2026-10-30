@@ -3,12 +3,15 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { createRoofGeometries } from '../geometry/roofGeometry.js';
+import { createFacadeGeometry, wallFacadeFrame, facadeOpeningPosition, facadeBounds } from '../geometry/facadeGeometry.js';
 import { RotateCcw, Box, Eye, Layers, Sun, Sparkles, Compass, Maximize2, Activity, Home } from 'lucide-react';
 
 export default function Viewer3D({
   layout,
   frontWallId,
   facadeTextureUrl,
+  facadeData = null,
   numFloors = 1,
   isSplit = false,
   selectedRoom = null,
@@ -261,15 +264,19 @@ export default function Viewer3D({
       if (!containerRef.current || !renderer || !camera) return;
       const w = containerRef.current.clientWidth;
       const h = containerRef.current.clientHeight;
+      if (w < 1 || h < 1) return;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     };
     window.addEventListener('resize', handleResize);
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(containerRef.current);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       if (renderer.domElement) {
         renderer.domElement.removeEventListener('pointerdown', handleClick);
       }
@@ -324,107 +331,6 @@ export default function Viewer3D({
       result.pop();
     }
     return result;
-  };
-
-  // Helper: Buffer a 2D polygon outwards by offsetMeters (e.g. 0.22m for overhang eaves)
-  const bufferPolygon2D = (pts, offsetMeters = 0.22) => {
-    if (!pts || pts.length < 3) return pts;
-    const n = pts.length;
-    const result = [];
-    for (let i = 0; i < n; i++) {
-      const prev = pts[(i - 1 + n) % n];
-      const curr = pts[i];
-      const next = pts[(i + 1) % n];
-
-      const dx1 = curr[0] - prev[0];
-      const dz1 = curr[1] - prev[1];
-      const len1 = Math.hypot(dx1, dz1) || 1e-4;
-      const norm1X = -dz1 / len1;
-      const norm1Z = dx1 / len1;
-
-      const dx2 = next[0] - curr[0];
-      const dz2 = next[1] - curr[1];
-      const len2 = Math.hypot(dx2, dz2) || 1e-4;
-      const norm2X = -dz2 / len2;
-      const norm2Z = dx2 / len2;
-
-      let bisectX = norm1X + norm2X;
-      let bisectZ = norm1Z + norm2Z;
-      const bisectLen = Math.hypot(bisectX, bisectZ) || 1e-4;
-      bisectX /= bisectLen;
-      bisectZ /= bisectLen;
-
-      const dot = norm1X * bisectX + norm1Z * bisectZ;
-      const scale = Math.min(2.0, Math.max(0.5, 1.0 / Math.max(0.2, dot)));
-
-      result.push([
-        curr[0] + bisectX * offsetMeters * scale,
-        curr[1] + bisectZ * offsetMeters * scale
-      ]);
-    }
-    return result;
-  };
-
-  // Helper: Group rooms by proximity and compute convex hull envelope per building unit
-  const computeFallbackEnvelopes = (rooms) => {
-    if (!rooms || rooms.length === 0) return [];
-    const clusters = [];
-    rooms.forEach((r) => {
-      const pts = r.polygon_meters;
-      if (!pts || pts.length < 3) return;
-      let cx = 0, cz = 0;
-      pts.forEach(p => { cx += p[0]; cz += p[1]; });
-      cx /= pts.length; cz /= pts.length;
-
-      let found = null;
-      for (const cl of clusters) {
-        for (const rm of cl) {
-          if (Math.hypot(cx - rm.cx, cz - rm.cz) < 8.0) {
-            found = cl;
-            break;
-          }
-        }
-        if (found) break;
-      }
-      if (found) {
-        found.push({ room: r, cx, cz, pts });
-      } else {
-        clusters.push([{ room: r, cx, cz, pts }]);
-      }
-    });
-
-    const cross2D = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
-
-    const envelopes = [];
-    clusters.forEach((cl) => {
-      const allPts = [];
-      cl.forEach(item => item.pts.forEach(p => allPts.push([p[0], p[1]])));
-      if (allPts.length < 3) return;
-
-      allPts.sort((a, b) => a[0] === b[0] ? a[1] - b[1] : a[0] - b[0]);
-      const lower = [];
-      for (let p of allPts) {
-        while (lower.length >= 2 && cross2D(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
-          lower.pop();
-        }
-        lower.push(p);
-      }
-      const upper = [];
-      for (let i = allPts.length - 1; i >= 0; i--) {
-        const p = allPts[i];
-        while (upper.length >= 2 && cross2D(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
-          upper.pop();
-        }
-        upper.push(p);
-      }
-      upper.pop();
-      lower.pop();
-      const hull = lower.concat(upper);
-      if (hull.length >= 3) {
-        envelopes.push(hull);
-      }
-    });
-    return envelopes;
   };
 
   // Helper: Snap opening (door / window) onto closest wall segment and compute orientation
@@ -505,12 +411,15 @@ export default function Viewer3D({
       }
     });
     toRemove.forEach((obj) => {
-      scene.remove(obj);
-      if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) {
-        if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
-        else obj.material.dispose();
-      }
+      obj.parent?.remove(obj);
+      obj.traverse(child => {
+        child.geometry?.dispose();
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.filter(Boolean).forEach(m => {
+          for (const value of Object.values(m)) if (value?.isTexture) value.dispose();
+          m.dispose();
+        });
+      });
     });
 
     const walls = layout.walls || [];
@@ -519,7 +428,7 @@ export default function Viewer3D({
 
     // Center building at origin (0, 0, 0)
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    walls.forEach((w) => {
+    [...walls, ...rooms].forEach((w) => {
       w.polygon_meters?.forEach(([x, z]) => {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
@@ -532,15 +441,28 @@ export default function Viewer3D({
     const centerZ = (minZ + maxZ) / 2 || 0;
     centersRef.current = { centerX, centerZ };
 
-    // Optional Facade Texture
-    let facadeTexture = null;
-    if (facadeTextureUrl) {
-      const loader = new THREE.TextureLoader();
-      facadeTexture = loader.load(facadeTextureUrl);
-      facadeTexture.colorSpace = THREE.SRGBColorSpace;
-      facadeTexture.wrapS = THREE.ClampToEdgeWrapping;
-      facadeTexture.wrapT = THREE.ClampToEdgeWrapping;
-    }
+    const facadeSpecs = new Map();
+    const textureLoader = new THREE.TextureLoader();
+    walls.forEach(wall => {
+      const isFront = wall.id === frontWallId || (!frontWallId && wall.is_front);
+      const own = wall.facade_texture || {};
+      const data = isFront && facadeTextureUrl ? { ...own, ...(facadeData || {}), texture_base64: facadeTextureUrl } : own;
+      if (!data.texture_base64) return;
+      const frame = data.facade_frame || wallFacadeFrame(wall);
+      if (!frame) return;
+      const texture = textureLoader.load(data.texture_base64);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.repeat.set(1, 1);
+      const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.02, side: THREE.DoubleSide, wireframe });
+      const geometry = createFacadeGeometry(frame, data.uv_bounds || facadeBounds(frame.length_m, wallHeight), wallHeight, centerX, centerZ);
+      const skin = new THREE.Mesh(geometry, material);
+      skin.castShadow = graphicsQuality === 'high';
+      skin.receiveShadow = graphicsQuality === 'high';
+      skin.userData = { isBuildingMesh: true, type: 'facade', wallId: wall.id, frame, uvBounds: data.uv_bounds };
+      scene.add(skin);
+      facadeSpecs.set(wall.id, { ...data, frame });
+    });
 
     const pbr = pbrTexturesRef.current;
 
@@ -603,16 +525,7 @@ export default function Viewer3D({
       let material;
       const isFront = wall.id === frontWallId;
 
-      if (isFront && facadeTexture) {
-        material = new THREE.MeshStandardMaterial({
-          map: facadeTexture,
-          roughness: 0.65,
-          metalness: 0.05,
-          envMapIntensity: 0.9,
-          side: THREE.DoubleSide,
-          wireframe: wireframe,
-        });
-      } else if (graphicsQuality === 'high' && pbr.stucco?.map) {
+      if (graphicsQuality === 'high' && pbr.stucco?.map) {
         // High quality PBR Stucco with Normal & AO
         const sMap = pbr.stucco.map.clone();
         sMap.repeat.set(3, 1.5);
@@ -804,66 +717,51 @@ export default function Viewer3D({
         scene.add(floorMesh);
       });
 
-      // Ground Foundation Slab (Architectural Base Grounding for Building Units)
-      const foundationEnvelopes = (layout.envelope && layout.envelope.length > 0)
-        ? layout.envelope
-        : computeFallbackEnvelopes(rooms);
-
-      const foundationMat = new THREE.MeshStandardMaterial({
-        color: 0xd9d3c7, // Architectural concrete foundation base
-        roughness: 0.90,
-        metalness: 0.02,
-        side: THREE.DoubleSide
-      });
-
-      foundationEnvelopes.forEach((env) => {
-        const cleanEnv = cleanPolygonPoints(env);
-        if (cleanEnv.length < 3) return;
-        const bufferedBase = bufferPolygon2D(cleanEnv, 0.12);
-
-        const baseShape = new THREE.Shape();
-        baseShape.moveTo(bufferedBase[0][0] - centerX, -(bufferedBase[0][1] - centerZ));
-        for (let i = 1; i < bufferedBase.length; i++) {
-          baseShape.lineTo(bufferedBase[i][0] - centerX, -(bufferedBase[i][1] - centerZ));
-        }
-        baseShape.closePath();
-
-        const baseGeo = new THREE.ExtrudeGeometry(baseShape, {
-          depth: 0.08,
-          bevelEnabled: false
-        });
-        baseGeo.rotateX(-Math.PI / 2);
-
-        const baseMesh = new THREE.Mesh(baseGeo, foundationMat);
-        baseMesh.position.y = -0.06;
-        baseMesh.receiveShadow = (graphicsQuality === 'high');
-        baseMesh.userData = { isBuildingMesh: true, type: 'foundation_slab' };
-        scene.add(baseMesh);
-      });
+      // Foundation base: Room floors are fully rendered with distinct floor materials above.
+      // Global foundation slab is avoided to prevent Z-fighting and cross-building polygon bridging.
     }
 
     const scaleMperPx = layout.metadata?.scale_meters_per_pixel || 0.03;
-    const doors = layout.doors || [];
-    const windows = layout.windows || [];
+    const renderedOpenings = [];
+    facadeSpecs.forEach((spec, wallId) => {
+      // The bridge records quantized sketch rectangles, so frames and glass use
+      // exactly those dimensions rather than unrelated viewer defaults.
+      (spec.openings || []).forEach(op => renderedOpenings.push({
+        ...op, position_meters: facadeOpeningPosition(op, spec.frame),
+        associated_wall: wallId, facadeFrame: spec.frame,
+        facadeHeightScale: wallHeight / (spec.wall_height_m || spec.uv_bounds?.wall_height_m || wallHeight),
+      }));
+    });
+    const superseded = op => {
+      const spec = facadeSpecs.get(op.associated_wall);
+      return spec?.openings?.some(rendered => rendered.id === op.id);
+    };
+    const doors = [...(layout.doors || []).filter(op => !superseded(op)), ...renderedOpenings.filter(op => op.type === 'door')];
+    const windows = [...(layout.windows || []).filter(op => !superseded(op)), ...renderedOpenings.filter(op => op.type === 'window')];
+    const openingSegment = op => op.facadeFrame ? {
+      center: op.position_meters,
+      angleRad: Math.atan2(-op.facadeFrame.direction[1], op.facadeFrame.direction[0]),
+      wallThickness: 0.22, wallId: op.associated_wall, isExterior: true,
+    } : findWallSegmentForOpening(op.position_meters, walls);
 
     // D. 3D Doors & Wall Lintels (Green Dots on Blueprint)
     doors.forEach((door, dIdx) => {
       const posM = door.position_meters || (door.position_px ? [door.position_px[0] * scaleMperPx, door.position_px[1] * scaleMperPx] : null);
       if (!posM) return;
 
-      const segInfo = findWallSegmentForOpening(posM, walls);
+      const segInfo = openingSegment({ ...door, position_meters: posM });
       const [snappedXPlan, snappedZPlan] = segInfo.center;
       const snappedX = snappedXPlan - centerX;
       const snappedZ = snappedZPlan - centerZ;
       const angleRad = segInfo.angleRad;
       const wallThick = segInfo.wallThickness || 0.18;
 
-      const doorWidth = Math.max(0.70, Math.min(door.width_m || 0.90, 1.80));
-      const doorHeight = Math.min(2.15, wallHeight - 0.20);
+      const doorWidth = door.facadeFrame ? door.width_m : Math.max(0.70, Math.min(door.width_m || 0.90, 1.80));
+      const doorHeight = door.facadeFrame ? door.height_m * door.facadeHeightScale : Math.min(door.height_m || 2.15, wallHeight - 0.20);
       const lintelHeight = wallHeight - doorHeight;
 
       // 1. Wall Lintel above door (fills empty space with solid wall up to ceiling, embedded into flanking walls)
-      if (lintelHeight > 0.05) {
+      if (lintelHeight > 0.05 && !door.facadeFrame) {
         const lintelGeo = new THREE.BoxGeometry(doorWidth + 0.10, lintelHeight, wallThick + 0.02);
         const lintelMesh = new THREE.Mesh(lintelGeo, defaultWallMat);
         lintelMesh.position.set(
@@ -928,7 +826,7 @@ export default function Viewer3D({
 
       const hingePivot = new THREE.Group();
       hingePivot.position.set(-doorWidth / 2 + frameThick, 0, 0);
-      hingePivot.rotation.y = -0.35; // ~20° slightly ajar for realistic look
+      hingePivot.rotation.y = door.facadeFrame ? 0 : -0.35; // ~20° slightly ajar for realistic look
 
       const leafGeo = new THREE.BoxGeometry(leafWidth, leafHeight, leafThick);
       const leafMesh = new THREE.Mesh(leafGeo, leafMat);
@@ -961,7 +859,7 @@ export default function Viewer3D({
       threshMesh.position.set(0, 0.008, 0);
       doorGroup.add(threshMesh);
 
-      doorGroup.userData = { isBuildingMesh: true, type: 'door', doorId: door.id || `door_${dIdx}` };
+      doorGroup.userData = { isBuildingMesh: true, type: 'door', doorId: door.id || `door_${dIdx}`, facadeOpening: door.facadeFrame ? door : null };
       scene.add(doorGroup);
     });
 
@@ -970,21 +868,21 @@ export default function Viewer3D({
       const posM = win.position_meters || (win.position_px ? [win.position_px[0] * scaleMperPx, win.position_px[1] * scaleMperPx] : null);
       if (!posM) return;
 
-      const segInfo = findWallSegmentForOpening(posM, walls);
+      const segInfo = openingSegment({ ...win, position_meters: posM });
       const [snappedXPlan, snappedZPlan] = segInfo.center;
       const snappedX = snappedXPlan - centerX;
       const snappedZ = snappedZPlan - centerZ;
       const angleRad = segInfo.angleRad;
       const wallThick = segInfo.wallThickness || 0.20;
 
-      const winWidth = Math.max(0.60, Math.min(win.width_m || 1.10, 3.20));
-      const sillHeight = Math.min(0.95, wallHeight * 0.35);
-      const winHeight = Math.min(1.30, wallHeight - sillHeight - 0.35);
+      const winWidth = win.facadeFrame ? win.width_m : Math.max(0.60, Math.min(win.width_m || 1.10, 3.20));
+      const sillHeight = win.facadeFrame ? win.sill_m * win.facadeHeightScale : Math.min(win.sill_m ?? 0.90, wallHeight * 0.35);
+      const winHeight = win.facadeFrame ? win.height_m * win.facadeHeightScale : Math.min(win.height_m || 1.40, wallHeight - sillHeight - 0.35);
       const winTop = sillHeight + winHeight;
       const lintelHeight = wallHeight - winTop;
 
       // 1. Wall Sill below window (fills space from ground to sill, embedded into flanking walls)
-      if (sillHeight > 0.05) {
+      if (sillHeight > 0.05 && !win.facadeFrame) {
         const sillGeo = new THREE.BoxGeometry(winWidth + 0.12, sillHeight, wallThick + 0.02);
         const sillMesh = new THREE.Mesh(sillGeo, defaultWallMat);
         sillMesh.position.set(snappedX, sillHeight / 2, snappedZ);
@@ -996,7 +894,7 @@ export default function Viewer3D({
       }
 
       // 2. Wall Lintel above window (fills space from window top to ceiling, embedded into flanking walls)
-      if (lintelHeight > 0.05) {
+      if (lintelHeight > 0.05 && !win.facadeFrame) {
         const lintelGeo = new THREE.BoxGeometry(winWidth + 0.12, lintelHeight, wallThick + 0.02);
         const lintelMesh = new THREE.Mesh(lintelGeo, defaultWallMat);
         lintelMesh.position.set(snappedX, winTop + lintelHeight / 2, snappedZ);
@@ -1090,7 +988,7 @@ export default function Viewer3D({
       paneR.position.set(winWidth / 4 - frameThick / 4, sillHeight + winHeight / 2, 0);
       winGroup.add(paneR);
 
-      winGroup.userData = { isBuildingMesh: true, type: 'window', winId: win.id || `win_${wIdx}` };
+      winGroup.userData = { isBuildingMesh: true, type: 'window', winId: win.id || `win_${wIdx}`, facadeOpening: win.facadeFrame ? win : null };
       scene.add(winGroup);
     });
 
@@ -1131,142 +1029,39 @@ export default function Viewer3D({
         side: THREE.DoubleSide
       });
 
-      // 1. Obtain Unified Building Envelope Polygons (from backend layout or fallback cluster hulls)
-      let envelopeList = (layout.envelope && layout.envelope.length > 0)
-        ? layout.envelope
-        : computeFallbackEnvelopes(rooms);
-
-      envelopeList.forEach((rawEnvPts, envIdx) => {
-        if (!rawEnvPts || rawEnvPts.length < 3) return;
-
-        // Clean & ensure valid points
-        let envPts = cleanPolygonPoints(rawEnvPts);
-        if (envPts.length < 3) return;
-
-        // Check winding order (compute signed area in 2D plan space)
-        let signedArea = 0;
-        for (let i = 0; i < envPts.length; i++) {
-          const p1 = envPts[i];
-          const p2 = envPts[(i + 1) % envPts.length];
-          signedArea += (p2[0] - p1[0]) * (p2[1] + p1[1]);
-        }
-        if (signedArea < 0) {
-          envPts.reverse();
-        }
-
-        // Buffer outwards by 0.22m to create realistic architectural overhang eaves
-        const bufferedPts = bufferPolygon2D(envPts, 0.22);
-
-        // A. Ceiling Soffit Plate at wallHeight (closes rooms from below)
-        const soffitShape = new THREE.Shape();
-        soffitShape.moveTo(envPts[0][0] - centerX, -(envPts[0][1] - centerZ));
-        for (let i = 1; i < envPts.length; i++) {
-          soffitShape.lineTo(envPts[i][0] - centerX, -(envPts[i][1] - centerZ));
-        }
-        soffitShape.closePath();
-
-        const soffitGeo = new THREE.ShapeGeometry(soffitShape);
-        soffitGeo.rotateX(-Math.PI / 2);
-        const soffitMesh = new THREE.Mesh(soffitGeo, soffitMat);
-        soffitMesh.position.y = wallHeight - 0.005;
-        soffitMesh.userData = { isBuildingMesh: true, isRoofMesh: true };
-        roofGroup.add(soffitMesh);
-
-        if (roofStyle === 'pitched') {
-          // B1. Classic Sims Pitched Hipped Gable Roof
-          let cX = 0, cZ = 0;
-          bufferedPts.forEach(pt => { cX += pt[0]; cZ += pt[1]; });
-          cX /= bufferedPts.length;
-          cZ /= bufferedPts.length;
-
-          let maxR = 0;
-          bufferedPts.forEach(pt => {
-            const r = Math.hypot(pt[0] - cX, pt[1] - cZ);
-            if (r > maxR) maxR = r;
-          });
-
-          const pitchHeight = Math.min(2.5, Math.max(1.3, maxR * 0.35));
-          const apexY = wallHeight + pitchHeight;
-          const baseY = wallHeight;
-
-          const apexX = cX - centerX;
-          const apexZ = cZ - centerZ;
-
-          const positions = [];
-          const uvs = [];
-          const numPts = bufferedPts.length;
-
-          for (let i = 0; i < numPts; i++) {
-            const p1 = bufferedPts[i];
-            const p2 = bufferedPts[(i + 1) % numPts];
-            const x1 = p1[0] - centerX;
-            const z1 = p1[1] - centerZ;
-            const x2 = p2[0] - centerX;
-            const z2 = p2[1] - centerZ;
-
-            // Outer triangle face
-            positions.push(x1, baseY, z1);
-            positions.push(x2, baseY, z2);
-            positions.push(apexX, apexY, apexZ);
-            uvs.push(0, 0, 1, 0, 0.5, 1);
-
-            // Inward-facing backface
-            positions.push(apexX, apexY, apexZ);
-            positions.push(x2, baseY, z2);
-            positions.push(x1, baseY, z1);
-            uvs.push(0.5, 1, 1, 0, 0, 0);
-          }
-
-          const pitchedGeo = new THREE.BufferGeometry();
-          pitchedGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-          pitchedGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-          pitchedGeo.computeVertexNormals();
-
-          const pitchedMesh = new THREE.Mesh(pitchedGeo, pitchedRoofMat);
-          pitchedMesh.castShadow = (graphicsQuality === 'high');
-          pitchedMesh.receiveShadow = (graphicsQuality === 'high');
-          pitchedMesh.userData = { isBuildingMesh: true, isRoofMesh: true };
-          roofGroup.add(pitchedMesh);
-
-        } else {
-          // B2. Modern Architectural Slab Roof with Overhang Eaves & Fascia Trim
-          const roofShape = new THREE.Shape();
-          roofShape.moveTo(bufferedPts[0][0] - centerX, -(bufferedPts[0][1] - centerZ));
-          for (let i = 1; i < bufferedPts.length; i++) {
-            roofShape.lineTo(bufferedPts[i][0] - centerX, -(bufferedPts[i][1] - centerZ));
-          }
-          roofShape.closePath();
-
-          const fasciaThick = 0.22;
-          const roofGeo = new THREE.ExtrudeGeometry(roofShape, {
-            depth: fasciaThick,
-            bevelEnabled: true,
-            bevelThickness: 0.03,
-            bevelSize: 0.03,
-            bevelSegments: 2
-          });
-          roofGeo.rotateX(-Math.PI / 2);
-
-          const slabMesh = new THREE.Mesh(roofGeo, roofSlabMat);
-          slabMesh.position.y = wallHeight;
-          slabMesh.castShadow = (graphicsQuality === 'high');
-          slabMesh.receiveShadow = (graphicsQuality === 'high');
-          slabMesh.userData = { isBuildingMesh: true, isRoofMesh: true };
-          roofGroup.add(slabMesh);
-        }
+      const roofs = createRoofGeometries(layout, { centerX, centerZ, wallHeight, style: roofStyle });
+      roofs.forEach(({ geometry, footprint, fallback }, index) => {
+        const topMaterial = roofStyle === 'pitched' && !fallback ? pitchedRoofMat : roofSlabMat;
+        const roof = new THREE.Mesh(geometry, [topMaterial, soffitMat]);
+        roof.castShadow = graphicsQuality === 'high';
+        roof.receiveShadow = graphicsQuality === 'high';
+        roof.userData = { isRoofMesh: true, type: 'roof', style: roofStyle, component: index, footprint, fallback };
+        roofGroup.add(roof);
+        if (fallback) console.warn('Roof uses closed slab fallback:', fallback);
       });
 
       roofGroup.visible = showRoof;
     }
 
     // Default framing
-    const maxDim = Math.max(maxX - minX, maxZ - minZ) || 15;
     if (controlsRef.current && cameraRef.current && viewPreset === 'perspective') {
-      controlsRef.current.target.set(0, wallHeight / 3, 0);
-      cameraRef.current.position.set(maxDim * 1.15, maxDim * 1.35, maxDim * 1.35);
+      const camera = cameraRef.current;
+      const aspect = Math.max(0.1, containerRef.current.clientWidth / Math.max(1, containerRef.current.clientHeight));
+      camera.aspect = aspect;
+      camera.updateProjectionMatrix();
+      const roofBounds = new THREE.Box3().setFromObject(roofGroupRef.current);
+      const height = Math.max(wallHeight, Number.isFinite(roofBounds.max.y) ? roofBounds.max.y : 0);
+      const spanX = Number.isFinite(maxX - minX) ? maxX - minX : 8;
+      const spanZ = Number.isFinite(maxZ - minZ) ? maxZ - minZ : 8;
+      const radius = Math.hypot(spanX + 0.5, spanZ + 0.5, height) / 2;
+      const halfFov = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.min(1, aspect));
+      const distance = radius / Math.sin(halfFov) * 1.15;
+      const target = new THREE.Vector3(0, height / 2, 0);
+      controlsRef.current.target.copy(target);
+      camera.position.copy(new THREE.Vector3(1.15, 1.35, 1.35).normalize().multiplyScalar(distance).add(target));
       controlsRef.current.update();
     }
-  }, [layout, frontWallId, facadeTextureUrl, numFloors, wireframe, showFloors, selectedRoom, graphicsQuality, roofStyle]);
+  }, [layout, frontWallId, facadeTextureUrl, facadeData, numFloors, wireframe, showFloors, selectedRoom, graphicsQuality, roofStyle]);
 
   // Update 3D Furniture Assets when furnishingData changes
   useEffect(() => {
@@ -1429,29 +1224,13 @@ export default function Viewer3D({
     if (!targetWall || !targetWall.polygon_meters || targetWall.polygon_meters.length < 2) return;
 
     const { centerX = 0, centerZ = 0 } = centersRef.current || {};
-    const pts = targetWall.polygon_meters;
-    let wx = 0, wz = 0;
-    pts.forEach(([x, z]) => { wx += x; wz += z; });
-    wx /= pts.length;
-    wz /= pts.length;
-
-    const targetX = wx - centerX;
-    const targetZ = wz - centerZ;
-
-    // Outward normal computation
-    const p1 = pts[0];
-    const p2 = pts[1];
-    const dx = p2[0] - p1[0];
-    const dz = p2[1] - p1[1];
-    const len = Math.hypot(dx, dz) || 1;
-    let nx = -dz / len;
-    let nz = dx / len;
-
-    // Ensure normal points outward from center
-    if (nx * targetX + nz * targetZ < 0) {
-      nx = -nx;
-      nz = -nz;
-    }
+    const frame = (targetWall.id === frontWallId && facadeData?.facade_frame)
+      || targetWall.facade_texture?.facade_frame || wallFacadeFrame(targetWall);
+    if (!frame) return;
+    const len = frame.length_m;
+    const targetX = frame.origin[0] + frame.direction[0] * len / 2 - centerX;
+    const targetZ = frame.origin[1] + frame.direction[1] * len / 2 - centerZ;
+    const [nx, nz] = frame.outward;
 
     const camDist = Math.max(len * 1.3, 7.5);
     cameraRef.current.position.set(targetX + nx * camDist, (numFloors * 2.8) * 0.6, targetZ + nz * camDist);
@@ -1468,9 +1247,9 @@ export default function Viewer3D({
   }, [facadeFocusTrigger]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#f1ede4] relative overflow-hidden select-none font-mono">
+    <div className="flex-1 min-w-0 flex flex-col h-full bg-[#f1ede4] relative overflow-hidden select-none font-mono">
       {/* 3D Viewport Toolbar */}
-      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f] select-none">
+      <div className="h-12 shrink-0 overflow-x-auto border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f] select-none">
         <div className="flex items-center space-x-2.5 shrink-0">
           <Box className="w-3.5 h-3.5 text-[#b8452a] shrink-0" />
           <span className="font-semibold text-xs uppercase tracking-wider text-[#1d1d1f] whitespace-nowrap">
@@ -1487,7 +1266,7 @@ export default function Viewer3D({
         </div>
 
         {/* Viewport Control Buttons & Camera Presets */}
-        <div className="flex items-center space-x-1.5">
+        <div className="flex shrink-0 items-center space-x-1.5">
           {/* Real-time FPS Monitor */}
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[#1d1d1f]/5 border border-[#1d1d1f]/10 text-[9.5px] text-[#2a7a6e] font-semibold" title="Live rendering frame rate on local GPU">
             <Activity className="w-3 h-3 text-[#2a7a6e] animate-pulse" />

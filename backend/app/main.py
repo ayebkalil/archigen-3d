@@ -43,6 +43,29 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+import threading
+
+@app.on_event("startup")
+def preload_models():
+    """Pre-warm GPU neural models in a background daemon thread so user requests are instantaneous."""
+    def _warmup():
+        print("[STARTUP] Pre-warming GPU neural models in background...")
+        try:
+            from app.floorplan_engine import FloorplanPipeline
+            FloorplanPipeline.get_instance()
+            print("[STARTUP] FloorplanPipeline pre-warmed!")
+        except Exception as e:
+            print(f"[STARTUP] FloorplanPipeline warmup deferred: {e}")
+        try:
+            from src.furniture.image_to_3d import ImageTo3DGenerator
+            gen = ImageTo3DGenerator.get_instance()
+            print(f"[STARTUP] ImageTo3DGenerator pre-warmed on {gen.device_name}!")
+        except Exception as e:
+            print(f"[STARTUP] ImageTo3DGenerator warmup deferred: {e}")
+
+    threading.Thread(target=_warmup, daemon=True).start()
+
+
 # Enable CORS for React/Three.js frontend
 app.add_middleware(
     CORSMiddleware,
@@ -365,6 +388,8 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
             "wall_length_m": res["wall_length_m"],
             "wall_height_m": res["wall_height_m"],
             "uv_bounds": res["uv_bounds"],
+            "facade_frame": res["facade_frame"],
+            "openings": res["openings"],
             "texture_base64": f"data:image/png;base64,{photo_b64}",
             "sketch_base64": f"data:image/png;base64,{sketch_b64}",
             "device": bridge.device_name

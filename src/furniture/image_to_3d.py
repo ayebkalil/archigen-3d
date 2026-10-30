@@ -82,12 +82,18 @@ class ImageTo3DGenerator:
                     config_name="config.yaml",
                     weight_name="model.ckpt"
                 )
-                model.renderer.set_chunk_size(4096)
+                model.renderer.set_chunk_size(65536)
                 if self.device is not None:
                     model.to(self.device)
                 model.eval()
                 self.tsr_model = model
-                print("[IMAGE-TO-3D] TripoSR neural model active on GPU!")
+                try:
+                    import rembg
+                    if self.rembg_session is None:
+                        self.rembg_session = rembg.new_session("u2netp")
+                except Exception:
+                    pass
+                print("[IMAGE-TO-3D] TripoSR neural model active on GPU with chunk_size=65536!")
             else:
                 print("[IMAGE-TO-3D] High-precision Architectural Volumetric Synthesizer active.")
         except Exception as e:
@@ -423,45 +429,7 @@ class ImageTo3DGenerator:
                     scale_factor = t_h / max(curr_span[1], 0.01)
                     v_scaled *= scale_factor
 
-                    # Ground feet alignment (pitch correction for elevated camera in 2D photos)
-                    z_med = np.median(v_scaled[:, 2])
-                    front_mask = v_scaled[:, 2] > (z_med + 0.05)
-                    back_mask = v_scaled[:, 2] < (z_med - 0.05)
-                    if front_mask.any() and back_mask.any():
-                        front_min = np.percentile(v_scaled[front_mask, 1], 1)
-                        back_min = np.percentile(v_scaled[back_mask, 1], 1)
-                        front_z = np.median(v_scaled[front_mask & (v_scaled[:, 1] < front_min + 0.05), 2])
-                        back_z = np.median(v_scaled[back_mask & (v_scaled[:, 1] < back_min + 0.05), 2])
-                        delta_y = back_min - front_min
-                        delta_z = back_z - front_z
-                        if abs(delta_z) > 0.05:
-                            th_feet = -math.atan(delta_y / delta_z)
-                            th_feet = np.clip(th_feet, -math.radians(20.0), math.radians(20.0))
-                            cx, sx = math.cos(th_feet), math.sin(th_feet)
-                            Rx = np.array([[1.0, 0.0, 0.0], [0.0, cx, sx], [0.0, -sx, cx]])
-                            v_scaled = v_scaled @ Rx.T
-
-                    # Top surface leveling for tables/desks
-                    if "table" in category_clean or "desk" in category_clean:
-                        for _ in range(4):
-                            top_cutoff = v_scaled[:, 1].max() - 0.10 * (v_scaled[:, 1].max() - v_scaled[:, 1].min())
-                            top_idx = np.where(v_scaled[:, 1] > top_cutoff)[0]
-                            if len(top_idx) < 30:
-                                break
-                            top_pts = v_scaled[top_idx]
-                            A = np.column_stack([top_pts[:, 0], top_pts[:, 2], np.ones(len(top_pts))])
-                            a, b, _ = np.linalg.lstsq(A, top_pts[:, 1], rcond=None)[0]
-                            if math.hypot(a, b) < 0.005:
-                                break
-                            th_x = -math.atan(b)
-                            th_z = math.atan(a)
-                            cx, sx = math.cos(th_x), math.sin(th_x)
-                            cz, sz = math.cos(th_z), math.sin(th_z)
-                            Rx = np.array([[1.0, 0.0, 0.0], [0.0, cx, sx], [0.0, -sx, cx]])
-                            Rz = np.array([[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]])
-                            v_scaled = v_scaled @ (Rz @ Rx).T
-
-                    # Ground alignment: floor is Y = 0
+                    # Ground alignment: floor is Y = 0 (canonical upright orientation, perfectly level)
                     v_scaled[:, 1] -= v_scaled[:, 1].min()
 
                     # Firm floor contact: soft clamp for feet within 2.5cm of ground

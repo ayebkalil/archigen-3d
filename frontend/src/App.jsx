@@ -468,7 +468,11 @@ export default function App() {
             frontWallId={frontWallId}
             onApplyFacadeTexture={(tex, data) => {
               setFacadeTextureUrl(tex);
-              if (data) setFacadeData(data);
+              if (data) {
+                setFacadeData(data);
+                if (data.wall_id) setFrontWallId(data.wall_id);
+                if (data.num_floors) setNumFloors(data.num_floors);
+              }
             }}
             onNavigateToFloorplan={() => setPageView('floorplan')}
           />
@@ -528,6 +532,7 @@ export default function App() {
                   layout={layout}
                   frontWallId={frontWallId}
                   facadeTextureUrl={facadeTextureUrl}
+                  facadeData={facadeData}
                   numFloors={numFloors}
                   isSplit={true}
                   selectedRoom={selectedRoom}
@@ -562,6 +567,7 @@ export default function App() {
                 layout={layout}
                 frontWallId={frontWallId}
                 facadeTextureUrl={facadeTextureUrl}
+                facadeData={facadeData}
                 numFloors={numFloors}
                 isSplit={false}
                 selectedRoom={selectedRoom}

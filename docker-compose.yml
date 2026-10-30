@@ -16,7 +16,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    restart: unless-stopped
+    restart: "no"
 
   frontend:
     build:
@@ -27,4 +27,4 @@ services:
       - "3000:80"
     depends_on:
       - backend
-    restart: unless-stopped
+    restart: "no"
