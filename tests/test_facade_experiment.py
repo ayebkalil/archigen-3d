@@ -109,3 +109,18 @@ def test_missing_experiment_never_silently_loads_production(tmp_path, monkeypatc
     monkeypatch.setenv('ARCHIGEN_FACADE_EXPERIMENT', str(tmp_path/'missing.pth'))
     with pytest.raises(FileNotFoundError):
         FacadeBridge(prefer_cuda=False)
+
+
+def test_experimental_api_metadata_does_not_claim_legacy_styles(monkeypatch):
+    import asyncio
+    import importlib
+    from types import SimpleNamespace
+    from backend.app import main
+    production = importlib.import_module('app.floorplan_engine')
+    engine = SimpleNamespace(describe=lambda style: {'resolution': 512, 'supported_styles': []})
+    pipeline = SimpleNamespace(fallback_model=None, onnx_fallback=None,
+        checkpoint_hashes={'facade_experimental': True}, bridge=SimpleNamespace(inference_engine=engine))
+    monkeypatch.setattr(production.FloorplanPipeline, 'get_instance', lambda: pipeline)
+    response = asyncio.run(main.get_model_metadata())
+    assert response.target_resolution == [512, 512]
+    assert response.supported_styles == []

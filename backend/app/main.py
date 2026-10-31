@@ -167,12 +167,18 @@ async def get_model_metadata():
     fb_loaded = False
     fb_name = None
     chk_hashes = {}
+    resolution = 256
+    supported_styles = ["Modern Minimalist", "Mediterranean Stone", "Traditional Brick", "Lush Vegetation"]
     try:
         from app.floorplan_engine import FloorplanPipeline
         pipeline = FloorplanPipeline.get_instance()
         fb_loaded = (pipeline.fallback_model is not None) or (pipeline.onnx_fallback is not None)
         fb_name = getattr(pipeline, "fallback_model_name", None)
         chk_hashes = pipeline.checkpoint_hashes
+        if chk_hashes.get("facade_experimental"):
+            info = pipeline.bridge.inference_engine.describe("Modern Minimalist")
+            resolution = info["resolution"]
+            supported_styles = info["supported_styles"]
     except Exception:
         pass
 
@@ -181,8 +187,8 @@ async def get_model_metadata():
         major_axis="Axe 2 - Generative AI (Pix2Pix / cGAN)",
         upstream_axis="Axe 4 - Floorplan Segmentation (SegFormer)",
         framework="PyTorch + ONNX Runtime",
-        target_resolution=[256, 256],
-        supported_styles=["Modern Minimalist", "Mediterranean Stone", "Traditional Brick", "Lush Vegetation"],
+        target_resolution=[resolution, resolution],
+        supported_styles=supported_styles,
         metrics={"target_fid": 45.0, "target_lpips": 0.28, "target_miou": 0.78},
         fallback_router={
             "loaded": fb_loaded,

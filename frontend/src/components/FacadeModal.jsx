@@ -49,7 +49,8 @@ export default function FacadeModal({
     num_floors = 1,
     texture_base64,
     sketch_base64,
-    device = 'ONNX Runtime'
+    device = 'ONNX Runtime',
+    model_info
   } = facadeData;
 
   const handleDownload = () => {
@@ -85,7 +86,9 @@ export default function FacadeModal({
                 </span>
               </div>
               <p className="font-mono text-xs text-[#1d1d1f]/65">
-                Semantic layout sketch ("the scrap") translated into photorealistic architectural facade
+                {model_info?.model === 'facade_residual_film_512_v1'
+                  ? `Experimental 512 facade · ${model_info.effective_style}`
+                  : 'Semantic layout sketch translated into an architectural facade'}
               </p>
             </div>
           </div>
@@ -222,7 +225,7 @@ export default function FacadeModal({
                     </span>
                   </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#f0500f]/10 text-[#f0500f] font-bold">
-                    {style}
+                    {model_info?.effective_style || style}
                   </span>
                 </div>
 

@@ -21,5 +21,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
-      - run: pip install pytest numpy Pillow lpips scipy opencv-python-headless
+      - run: pip install pytest numpy Pillow lpips scipy opencv-python-headless fastapi python-multipart pydantic shapely trimesh onnxruntime
       - run: python -m pytest tests/test_facade_experiment.py tests/test_facade_alignment.py -q

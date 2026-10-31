@@ -454,6 +454,8 @@ export default function Viewer3D({
       texture.colorSpace = THREE.SRGBColorSpace;
       texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
       texture.repeat.set(1, 1);
+      // Preserve higher-resolution detail at oblique viewing angles; UVs remain normalized.
+      texture.anisotropy = Math.min(8, rendererRef.current?.capabilities.getMaxAnisotropy() || 1);
       const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.02, side: THREE.DoubleSide, wireframe });
       const geometry = createFacadeGeometry(frame, data.uv_bounds || facadeBounds(frame.length_m, wallHeight), wallHeight, centerX, centerZ);
       const skin = new THREE.Mesh(geometry, material);

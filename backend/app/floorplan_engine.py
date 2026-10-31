@@ -233,6 +233,12 @@ class FloorplanPipeline:
             pytorch_model_path=str(facade_pth),
             prefer_cuda=(self.device is not None and getattr(self.device, "type", None) == "cuda")
         )
+        facade_engine = self.bridge.inference_engine
+        if getattr(facade_engine, "neural_style", False):
+            self.checkpoint_hashes["facade_model"] = facade_engine.path.name
+            self.checkpoint_hashes["facade_sha256"] = file_sha256(facade_engine.path)
+            self.checkpoint_hashes["facade_resolution"] = facade_engine.resolution
+            self.checkpoint_hashes["facade_experimental"] = True
 
     @classmethod
     def get_instance(cls):
