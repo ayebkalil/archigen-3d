@@ -23,6 +23,7 @@ export default function ControlPanel({
   frontWallId,
   hasLayout,
   facadeTextureUrl,
+  facadeModelInfo,
   isCalibrating,
   setIsCalibrating,
   onOpenFacadeModal,
@@ -189,7 +190,8 @@ export default function ControlPanel({
               />
               <div className="text-[10px] font-mono leading-tight">
                 <span className="font-bold text-[#1d1d1f] block">Facade Ready</span>
-                <span className="text-[#f0500f]">{selectedStyle}</span>
+                <span className="text-[#f0500f]">{facadeModelInfo?.effective_style || selectedStyle}</span>
+                {facadeModelInfo?.resolution === 512 && <span className="block">512px experiment</span>}
               </div>
             </div>
             {onOpenFacadeModal && (

@@ -1,0 +1,25 @@
+name: Facade 512 experiment contracts
+on:
+  workflow_dispatch:
+  push:
+    branches: [experiment/facade-photorealism-512]
+    paths:
+      - 'src/models/**'
+      - 'src/bridge/**'
+      - 'src/data/facade_palette.py'
+      - 'tests/test_facade_experiment.py'
+      - '.github/workflows/facade512-experiment.yml'
+permissions:
+  contents: read
+jobs:
+  cpu-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install pytest numpy Pillow lpips scipy opencv-python-headless
+      - run: python -m pytest tests/test_facade_experiment.py tests/test_facade_alignment.py -q

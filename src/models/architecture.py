@@ -8,6 +8,8 @@ Features:
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 from torch.nn.utils import spectral_norm
 
 def weights_init_normal(m):
@@ -187,4 +189,101 @@ class PatchGANDiscriminator(nn.Module):
         f4 = self.stage4(f3)
         out = self.stage5(f4)
         return out, [f1, f2, f3, f4]
+
+
+# Keep the legacy architectures above checkpoint-compatible. The experiment is opt-in.
+FACADE_STYLES = ("Modern Minimalist", "Mediterranean Stone", "Traditional Brick", "Lush Vegetation")
+NEUTRAL_STYLE = 4  # Unlabelled CMP examples must not be assigned fabricated style labels.
+
+
+class FiLMBlock(nn.Module):
+    """Residual block with learned style-dependent scale and shift."""
+    def __init__(self, channels, embedding_dim=32):
+        super().__init__()
+        self.conv1 = nn.Conv2d(channels, channels, 3, padding=1)
+        self.conv2 = nn.Conv2d(channels, channels, 3, padding=1)
+        self.norm1 = nn.InstanceNorm2d(channels)
+        self.norm2 = nn.InstanceNorm2d(channels)
+        self.affine = nn.Linear(embedding_dim, channels * 4)
+        nn.init.normal_(self.affine.weight, std=0.01)
+        nn.init.zeros_(self.affine.bias)
+
+    def forward(self, x, embedding):
+        g1, b1, g2, b2 = self.affine(embedding).unsqueeze(-1).unsqueeze(-1).chunk(4, 1)
+        y = F.silu(self.norm1(self.conv1(x)) * (1 + g1) + b1)
+        y = self.norm2(self.conv2(y)) * (1 + g2) + b2
+        return F.silu(x + y)
+
+
+class FacadeGenerator512(nn.Module):
+    """Frozen learned 256 prior plus a trainable, style-conditioned 512 residual U-Net.
+
+    Zero-initialized output preserves the trained prior at step zero. The refiner
+    sees the native 512 semantic map, not just an interpolated generated image.
+    A fifth neutral embedding permits honest training on unlabelled CMP data.
+    """
+    def __init__(self, width=24, blocks=4, gradient_checkpointing=True):
+        super().__init__()
+        self.width, self.blocks = width, blocks
+        self.gradient_checkpointing = gradient_checkpointing
+        self.coarse = UNetGenerator()
+        self.coarse.requires_grad_(False).eval()
+        self.style_embedding = nn.Embedding(5, 32)
+        self.stem = nn.Conv2d(6, width, 3, padding=1)
+        self.down1 = nn.Conv2d(width, width * 2, 4, 2, 1)
+        self.down2 = nn.Conv2d(width * 2, width * 4, 4, 2, 1)
+        self.down3 = nn.Conv2d(width * 4, width * 8, 4, 2, 1)
+        self.residual = nn.ModuleList([FiLMBlock(width * 8) for _ in range(blocks)])
+        self.up3 = nn.Conv2d(width * 12, width * 4, 3, padding=1)
+        self.up2 = nn.Conv2d(width * 6, width * 2, 3, padding=1)
+        self.up1 = nn.Conv2d(width * 3, width, 3, padding=1)
+        self.film3, self.film2, self.film1 = FiLMBlock(width * 4), FiLMBlock(width * 2), FiLMBlock(width)
+        self.output = nn.Conv2d(width, 3, 3, padding=1)
+        nn.init.zeros_(self.output.weight)
+        nn.init.zeros_(self.output.bias)
+
+    def train(self, mode=True):
+        super().train(mode)
+        self.coarse.eval()  # Never enable dropout in the frozen teacher.
+        return self
+
+    def _block(self, module, *args):
+        if self.training and self.gradient_checkpointing and torch.is_grad_enabled():
+            return checkpoint(module, *args, use_reentrant=False)
+        return module(*args)
+
+    def forward(self, sketch, style_id):
+        with torch.no_grad():
+            coarse = self.coarse(F.interpolate(sketch, size=(256, 256), mode="nearest"))
+            coarse = F.interpolate(coarse, size=sketch.shape[-2:], mode="bilinear", align_corners=False)
+        embedding = self.style_embedding(style_id)
+        a = F.silu(self.stem(torch.cat((sketch, coarse), 1)))
+        b = F.silu(self.down1(a))
+        c = F.silu(self.down2(b))
+        x = F.silu(self.down3(c))
+        for block in self.residual:
+            x = self._block(block, x, embedding)
+        for skip, up, film in ((c, self.up3, self.film3), (b, self.up2, self.film2), (a, self.up1, self.film1)):
+            x = self._block(up, torch.cat((F.interpolate(x, size=skip.shape[-2:], mode="nearest"), skip), 1))
+            x = self._block(film, x, embedding)
+        return (coarse + 0.5 * torch.tanh(self.output(x))).clamp(-1, 1)
+
+
+class MultiScaleFacadeDiscriminator(nn.Module):
+    """Independent 512/256 PatchGANs, conditioned on semantics and style."""
+    def __init__(self, width=24):
+        super().__init__()
+        self.style_embedding = nn.Embedding(5, 4)
+        self.discriminators = nn.ModuleList([PatchGANDiscriminator(10, width) for _ in range(2)])
+
+    def forward(self, sketch, photo, style_id):
+        result = []
+        embedding = self.style_embedding(style_id)[:, :, None, None]
+        for scale, disc in enumerate(self.discriminators):
+            if scale:
+                sketch = F.avg_pool2d(sketch, 2)
+                photo = F.avg_pool2d(photo, 2)
+            condition = torch.cat((sketch, embedding.expand(-1, -1, *sketch.shape[-2:])), 1)
+            result.append(disc.forward_features(condition, photo))
+        return result
 

@@ -389,6 +389,7 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
             "wall_height_m": res["wall_height_m"],
             "uv_bounds": res["uv_bounds"],
             "facade_frame": res["facade_frame"],
+            "model_info": res.get("model_info"),
             "openings": res["openings"],
             "texture_base64": f"data:image/png;base64,{photo_b64}",
             "sketch_base64": f"data:image/png;base64,{sketch_b64}",

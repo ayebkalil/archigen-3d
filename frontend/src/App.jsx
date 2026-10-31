@@ -496,6 +496,7 @@ export default function App() {
           frontWallId={frontWallId}
           hasLayout={!!layout}
           facadeTextureUrl={facadeTextureUrl}
+          facadeModelInfo={facadeData?.model_info}
           isCalibrating={isCalibrating}
           setIsCalibrating={setIsCalibrating}
         />

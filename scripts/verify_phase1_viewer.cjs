@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 async function main() {
   const puppeteer = require('../frontend/node_modules/puppeteer-core');
   const viewerUrl = process.env.ARCHIGEN_VIEWER_URL || 'http://127.0.0.1:3000';
-  const out = path.resolve(__dirname, '../outputs/phase1');
+  const out = process.env.ARCHIGEN_VIEWER_OUTPUT ? path.resolve(process.env.ARCHIGEN_VIEWER_OUTPUT) : path.resolve(__dirname, '../outputs/phase1');
   fs.mkdirSync(out, { recursive: true });
   const shapes = {
     L: [[0, 0], [8, 0], [8, 3], [3, 3], [3, 8], [0, 8]],
@@ -26,12 +26,12 @@ async function main() {
       { id: 'window_1', type: 'window', position_meters: [3.7, 0], width_m: 1.2, height_m: 1.3, associated_wall: 'wall_0' },
     ],
   };
-  const res = await fetch('http://127.0.0.1:8000/facade/generate', {
+  const res = process.env.ARCHIGEN_FACADE_FIXTURE ? null : await fetch('http://127.0.0.1:8000/facade/generate', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ wall: frontWall, num_floors: 2, style: 'Modern Minimalist' }),
   });
-  assert.ok(res.ok, await res.clone().text());
-  const facade = await res.json();
+  if (res) assert.ok(res.ok, await res.clone().text());
+  const facade = res ? await res.json() : JSON.parse(fs.readFileSync(process.env.ARCHIGEN_FACADE_FIXTURE, 'utf8'));
   assert.ok(facade.facade_frame && facade.openings.length === 5);
   fs.writeFileSync(path.join(out, 'facade-metadata.json'), JSON.stringify({ ...facade, texture_base64: undefined, sketch_base64: undefined }, null, 2));
   const executablePath = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(p => fs.existsSync(p));
@@ -117,7 +117,8 @@ async function main() {
         camera.position.set(center.x - 13, 17, center.z - 17);
         camera.up.set(0, 1, 0); controls.target.copy(center); controls.update();
         renderer.render(scene, camera);
-        return { roofs, openings: openings.length, alignmentErrorPixels: maxError * 256, drawCalls: renderer.info.render.calls };
+        const resolution = skin.material.map.image.width;
+        return { roofs, openings: openings.length, textureResolution: resolution, alignmentErrorPixels: maxError * resolution, drawCalls: renderer.info.render.calls };
       });
       assert.equal(report.roofs.length, shapeName === 'detached' ? 2 : 1);
       assert.ok(report.roofs.every(r => r.fallback === null && r.style === 'pitched'));

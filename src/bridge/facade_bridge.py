@@ -19,6 +19,7 @@ from typing import Dict, Any, List, Tuple, Optional
 import io
 import math
 import base64
+import os
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 
@@ -162,6 +163,19 @@ class FacadeBridge:
         self._init_inference_engine()
 
     def _init_inference_engine(self):
+        # Explicit experiment switch. Never silently relabel a legacy model as 512.
+        experiment_path = os.environ.get("ARCHIGEN_FACADE_EXPERIMENT")
+        if experiment_path:
+            from src.bridge.facade_experimental import ExperimentalFacadeInference
+            device = "cpu"
+            if self.prefer_cuda:
+                import torch
+                if torch.cuda.is_available() and not experiment_path.endswith(".onnx"):
+                    device = "cuda"
+            self.inference_engine = ExperimentalFacadeInference(experiment_path, device)
+            self.enhance_textures = False
+            self.device_name = f"Experimental 512 ({device})"
+            return
         # 1. Try native PyTorch CUDA acceleration (<15ms per facade)
         if self.prefer_cuda:
             try:
@@ -238,12 +252,14 @@ class FacadeBridge:
         Geometry is derived from the rasterized rectangles (including pixel rounding),
         so a 3D frame projects onto precisely the semantic input given to the cGAN.
         """
+        from src.data.facade_palette import EXPERIMENT_CMP_PALETTE
+        palette = EXPERIMENT_CMP_PALETTE if getattr(getattr(self, "inference_engine", None), "neural_style", False) else CMP_PALETTE
         frame = self.facade_frame(wall)
         wall_len_m = frame["length_m"]
         total_height_m = num_floors * floor_height_m
 
         # Target dimensions inside 256x256 canvas with margins
-        margin_px = 12
+        margin_px = max(1, round(12 * target_size / 256))
         avail_w = target_size - 2 * margin_px
         avail_h = target_size - 2 * margin_px
 
@@ -268,7 +284,7 @@ class FacadeBridge:
         }
 
         # 1. Initialize Canvas with Sky/Background
-        canvas = Image.new("RGB", (target_size, target_size), CMP_PALETTE["background"])
+        canvas = Image.new("RGB", (target_size, target_size), palette["background"])
         draw = ImageDraw.Draw(canvas)
 
         def safe_rect(bx0, by0, bx1, by1, f_color):
@@ -282,19 +298,19 @@ class FacadeBridge:
         wall_y0 = offset_y
         wall_x1 = offset_x + draw_w
         wall_y1 = offset_y + draw_h
-        draw.rectangle([wall_x0, wall_y0, wall_x1, wall_y1], fill=CMP_PALETTE["facade"])
+        draw.rectangle([wall_x0, wall_y0, wall_x1, wall_y1], fill=palette["facade"])
 
         # 3. Architectural Trim: Cornice at top, Base at bottom, Corner Pilasters
         cornice_h = max(int(round(0.25 * scale_px_per_m)), 4)
         base_h = max(int(round(0.30 * scale_px_per_m)), 5)
-        draw.rectangle([wall_x0, wall_y0, wall_x1, wall_y0 + cornice_h], fill=CMP_PALETTE["cornice"])
-        draw.rectangle([wall_x0, wall_y1 - base_h, wall_x1, wall_y1], fill=CMP_PALETTE["base"])
+        draw.rectangle([wall_x0, wall_y0, wall_x1, wall_y0 + cornice_h], fill=palette["cornice"])
+        draw.rectangle([wall_x0, wall_y1 - base_h, wall_x1, wall_y1], fill=palette["base"])
 
         # Corner pilasters (architectural column framing on facade edges using CMP molding class)
         pillar_w = max(int(round(0.28 * scale_px_per_m)), 3)
         if draw_w > (pillar_w * 5):
-            safe_rect(wall_x0, wall_y0 + cornice_h, wall_x0 + pillar_w, wall_y1 - base_h, CMP_PALETTE["molding"])
-            safe_rect(wall_x1 - pillar_w, wall_y0 + cornice_h, wall_x1, wall_y1 - base_h, CMP_PALETTE["molding"])
+            safe_rect(wall_x0, wall_y0 + cornice_h, wall_x0 + pillar_w, wall_y1 - base_h, palette["molding"])
+            safe_rect(wall_x1 - pillar_w, wall_y0 + cornice_h, wall_x1, wall_y1 - base_h, palette["molding"])
 
         # Detected positions are projected onto the same finite wall face used
         # for UVs. Openings belonging to another side of a compound wall are excluded.
@@ -337,7 +353,7 @@ class FacadeBridge:
         for fl in range(num_floors):
             if fl > 0:
                 y = wall_y1 - fl * floor_height_m / total_height_m * draw_h
-                safe_rect(wall_x0, y - 2, wall_x1, y, CMP_PALETTE["molding"])
+                safe_rect(wall_x0, y - 2, wall_x1, y, palette["molding"])
             for op in templates:
                 if op["type"] == "door" and fl > 0:
                     continue
@@ -350,13 +366,13 @@ class FacadeBridge:
                 y0 = max(wall_y0 + 1, int(round(wall_y1 - (sill + op["height_m"]) / total_height_m * draw_h)))
                 if x1 <= x0 or y1 <= y0:
                     continue
-                trim = 2
-                safe_rect(x0 - trim, y0 - trim, x1 + trim, y0, CMP_PALETTE["deco"])
-                safe_rect(x0 - trim, y0, x0, y1, CMP_PALETTE["molding"])
-                safe_rect(x1, y0, x1 + trim, y1, CMP_PALETTE["molding"])
+                trim = max(1, round(2 * target_size / 256))
+                safe_rect(x0 - trim, y0 - trim, x1 + trim, y0, palette["deco"])
+                safe_rect(x0 - trim, y0, x0, y1, palette["molding"])
+                safe_rect(x1, y0, x1 + trim, y1, palette["molding"])
                 if op["type"] == "window":
-                    safe_rect(x0 - trim, y1, x1 + trim, y1 + 2, CMP_PALETTE["sill"])
-                safe_rect(x0, y0, x1, y1, CMP_PALETTE[op["type"]])
+                    safe_rect(x0 - trim, y1, x1 + trim, y1 + 2, palette["sill"])
+                safe_rect(x0, y0, x1, y1, palette[op["type"]])
                 rendered_openings.append({
                     **op, "floor_index": fl,
                     "position_along_wall_m": ((x0 + x1) / 2 - wall_x0) / draw_w * wall_len_m,
@@ -389,7 +405,8 @@ class FacadeBridge:
             wall=wall,
             num_floors=num_floors,
             floor_height_m=floor_height_m,
-            is_front=is_front
+            is_front=is_front,
+            target_size=getattr(self.inference_engine, "resolution", 256)
         )
 
         # Convert sketch to PNG bytes
@@ -399,7 +416,10 @@ class FacadeBridge:
 
         # Generate photorealistic texture
         if self.inference_engine is not None:
-            photo_bytes = self.inference_engine.generate(sketch_bytes)
+            if getattr(self.inference_engine, "neural_style", False):
+                photo_bytes = self.inference_engine.generate(sketch_bytes, style=style)
+            else:
+                photo_bytes = self.inference_engine.generate(sketch_bytes)
             photo_img = Image.open(io.BytesIO(photo_bytes))
             if self.enhance_textures and not isinstance(self.inference_engine, PyTorchFacadeInference):
                 photo_img = enhance_facade_details(photo_img)
@@ -408,7 +428,7 @@ class FacadeBridge:
             photo_img = sketch_img
 
         # Apply style-specific architectural color grading and material enhancements
-        if style:
+        if style and not getattr(self.inference_engine, "neural_style", False):
             photo_img = apply_facade_style(photo_img, style)
 
         buf_enh = io.BytesIO()
@@ -424,6 +444,7 @@ class FacadeBridge:
             "wall_id": wall.get("id", "unknown_wall"),
             "is_front": is_front,
             "style": style,
+            "model_info": self.inference_engine.describe(style) if hasattr(self.inference_engine, "describe") else {"model": "legacy_256", "resolution": 256, "style_conditioned": False},
             "sketch_image": sketch_img,
             "sketch_bytes": sketch_bytes,
             "photo_image": photo_img,
@@ -522,12 +543,12 @@ class FacadeBridge:
                 w_id = w.get("id")
                 is_front = (w_id == front_wall_id)
                 w["is_front"] = is_front
-                sketch_img, uv_bounds, frame, openings = self._build_facade_sketch(w, num_floors=num_floors, is_front=is_front)
+                sketch_img, uv_bounds, frame, openings = self._build_facade_sketch(w, num_floors=num_floors, is_front=is_front, target_size=getattr(self.inference_engine, "resolution", 256))
                 sketches.append(sketch_img)
                 wall_order.append((w, sketch_img, uv_bounds, frame, openings))
 
             if hasattr(self.inference_engine, "generate_batch"):
-                generated_imgs = self.inference_engine.generate_batch(sketches)
+                generated_imgs = self.inference_engine.generate_batch(sketches, style=style) if getattr(self.inference_engine, "neural_style", False) else self.inference_engine.generate_batch(sketches)
             else:
                 generated_imgs = []
                 for sketch in sketches:
@@ -542,7 +563,7 @@ class FacadeBridge:
 
             for idx, (w, s_img, uv_bounds, frame, openings) in enumerate(wall_order):
                 w_id = w.get("id")
-                g_img = apply_facade_style(generated_imgs[idx], style) if style else generated_imgs[idx]
+                g_img = apply_facade_style(generated_imgs[idx], style) if style and not getattr(self.inference_engine, "neural_style", False) else generated_imgs[idx]
                 buf = io.BytesIO()
                 g_img.save(buf, format="PNG")
                 photo_bytes = buf.getvalue()

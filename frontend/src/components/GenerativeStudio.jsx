@@ -1014,9 +1014,12 @@ export default function GenerativeStudio({
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-[#1d1d1f]/10 flex items-center justify-between text-xs font-mono text-[#1d1d1f]/60">
-                  <span>Aspect-Ratio Preserved (P95 &lt; 35ms)</span>
+                  <span>Aspect ratio preserved · {facadeResult?.model_info?.resolution || 256}px</span>
                   <span className="text-[#f0500f] font-semibold">{facadeResult?.device || 'ONNX CPU / PyTorch CUDA'}</span>
                 </div>
+                {facadeResult?.model_info?.model === 'facade_residual_film_512_v1' && !facadeResult.model_info.style_conditioned && (
+                  <p className="mt-2 text-xs text-amber-800">Experimental CMP model: neutral appearance. The selected architectural style has not been trained.</p>
+                )}
               </div>
 
             </div>

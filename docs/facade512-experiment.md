@@ -1,0 +1,112 @@
+# Facade 512 experiment
+
+Branch: `experiment/facade-photorealism-512`. Recovery checkpoint for the complete
+Phase 1 working state: `6a141f3`. Production checkpoints and default inference are
+unchanged. This experiment is **not promoted to production**.
+
+## Architecture and data
+
+The frozen, trained 256 generator supplies a coarse prior. A new residual U-Net
+reads the original 512 semantic map and the upsampled prior, with four residual
+bottleneck blocks and FiLM at the bottleneck and all decoder scales. Two independent
+style-conditioned discriminators operate at 512 and 256. A zero-initialized output
+head makes the initial prediction equal to the prior rather than random noise.
+
+The loss combines hinge GAN, L1 (5), discriminator feature matching (5), frozen
+ImageNet VGG-19 (1), and opening-region Sobel/Laplacian matching (2). VGG taps are
+relu1_2, relu2_2, relu3_2, relu4_2, relu5_2. Masks locate opening regions; real photo
+edges supervise details, so the loss does not invent mullions from rectangle masks.
+
+Original images and index annotations come from the [CMP authors](https://cmp.felk.cvut.cz/~tylecr1/facade/)
+under CC BY-SA. `scripts/prepare_cmp512.py` matches original photographs to the
+existing 400/100/106 train/validation/test split, requires unambiguous matches,
+and rejects source reuse. All 606 images matched; 440 have both axes >=512.
+The others have a narrower axis that is upsampled. Do not describe all targets as
+native 512x512. The original PNG display palette is **not** the Berkeley training
+palette. `src/data/facade_palette.py` records the training-derived encoding.
+
+The legacy bridge confused some semantic classes (cornice/background,
+sill/molding, decoration/blind). Only the experiment uses the corrected mapping.
+
+## Style limitations
+
+CMP supplies no labels for the four requested architectural styles. The user chose
+to use CMP and report this honestly. Training uses a fifth, neutral embedding.
+All four named embeddings exist and have gradient tests, but this checkpoint has
+`supported_style_ids: []`. Requests return `style_conditioned: false` and
+`effective_style: CMP neutral (unlabelled)`. No heuristic tint is applied. This is
+**not evidence of four learned styles**. Add reviewed style IDs (0..3) to training
+manifest rows and balanced real examples before training/advertising those styles.
+
+## Reproduce
+
+Install `requirements-facade512.txt` with the appropriate CUDA build of PyTorch.
+
+1. Extract both CMP author archives into `data/raw/cmp_original`.
+2. Run `python scripts/prepare_cmp512.py`.
+3. Run `python scripts/prepare_vgg19_features.py`. This fetches only the 80 MB
+   convolutional part of the timm mirror of torchvision VGG-19 ImageNet weights,
+   records the resolved source revision and SHA-256, and avoids an unused 494 MB
+   classifier download. An ordinary torchvision VGG-19 checkpoint also works.
+4. Ensure other GPU models are unloaded. Run:
+
+   ```powershell
+   python -m src.models.facade_experiment --epochs 10
+   ```
+
+   Physical batch 2, accumulation 4 (effective 8), FP16 autocast/GradScaler,
+   checkpointed residual/VGG layers, frozen coarse prior. Optimizer/scaler/RNG
+   state is saved in `outputs/phase2/training/last.pth`; resume with `--resume`.
+   `best.pth` is selected on validation VGG loss only. Test images never select
+   checkpoints. Memory smoke runs must use a separate output directory.
+
+5. `python scripts/evaluate_facade512.py` evaluates all 106 held-out test pairs,
+   saves per-image metrics, a paired bootstrap LPIPS interval, raw texture grids,
+   and a real-model viewer fixture. Both compared networks receive the same
+   semantic input; the 256 baseline is displayed/evaluated at 512 by interpolation.
+6. `python scripts/export_facade512.py` exports ONNX with `sketch` and `style_id`
+   inputs and checks parity for three style IDs. It never overwrites legacy ONNX.
+
+The allocator cap reserves context/driver headroom. Training checks total device
+usage and records allocated/reserved peaks; inference also checks the budget.
+These guards abort rather than silently reducing resolution. Total VRAM cannot
+be guaranteed against unrelated processes allocating memory between checks.
+
+## Opt-in viewer testing and rollback
+
+```powershell
+$env:ARCHIGEN_FACADE_EXPERIMENT = 'outputs/phase2/training/best.pth'
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+An ONNX path is also accepted; its adjacent JSON metadata must be present. An
+invalid experimental path fails explicitly instead of masquerading as a new model.
+The frontend uses the returned normalized UV rectangle at either resolution.
+Remove the environment variable and restart the backend to restore the production
+generator. Do not run GPU training alongside the backend's model warmup.
+
+For browser QA without loading unrelated backend models:
+
+```powershell
+$env:ARCHIGEN_FACADE_FIXTURE = 'outputs/phase2/viewer_fixture.json'
+$env:ARCHIGEN_VIEWER_OUTPUT = 'outputs/phase2/viewer'
+node scripts/verify_phase1_viewer.cjs
+```
+
+This exercises the actual React/Three.js viewer with a texture generated by the
+checkpoint; floorplan fixtures make roof/UV tests deterministic. It does not claim
+to exercise the entire segmentation/API pipeline.
+
+Validation commands:
+
+```powershell
+python -m pytest tests/ backend/tests/ -q
+cd frontend
+npm test
+npm run build
+```
+
+The dedicated GitHub workflow runs CPU architecture/loss/bridge contracts without
+large datasets or model downloads. Full GPU training and trained-weight metrics
+are local experiments. Dataset/weights remain outside Git; use existing DVC
+storage to share trained artifacts.
