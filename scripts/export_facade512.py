@@ -38,6 +38,6 @@ def export(checkpoint, output):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--checkpoint', default='outputs/phase2/training/best.pth')
+    parser.add_argument('--checkpoint', default='models/saved/facade512_experiment/generator.pth')
     parser.add_argument('--output', default='models/saved/facade512_experiment/generator.onnx')
     args = parser.parse_args(); export(args.checkpoint, args.output)

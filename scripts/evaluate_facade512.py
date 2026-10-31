@@ -5,7 +5,6 @@ import json
 import hashlib
 from pathlib import Path
 import sys
-import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import numpy as np
@@ -63,8 +62,7 @@ def evaluate(args):
             low = F.interpolate(x, (256, 256), mode='nearest')
             baseline = F.interpolate(production(low), (512, 512), mode='bilinear', align_corners=False)
             coarse_prior = F.interpolate(model.coarse(low), (512, 512), mode='bilinear', align_corners=False)
-            start = time.perf_counter(); enhanced = model(x, s); torch.cuda.synchronize()
-            elapsed = time.perf_counter()-start
+            enhanced = model(x, s)
         with torch.inference_mode():
             measures = {}
             features['real'].append(extract(y))
@@ -73,7 +71,7 @@ def evaluate(args):
                 measures[name] = {'lpips': metric(prediction, y).mean().item(),
                                   'ssim': compute_ssim(prediction, y), 'psnr': compute_psnr(prediction, y),
                                   'opening_edge_mae': sharpness(prediction, y, x).item()}
-        records.append({'id': batch['id'][0], **measures, 'inference_s': elapsed})
+        records.append({'id': batch['id'][0], **measures})
         if index < 8:
             grid([pil(x), pil(baseline), pil(enhanced), pil(y)],
                  ['Semantic input', 'Baseline 256 (displayed at 512)', 'Experimental 512', 'Original CMP target'], out/f'{args.split}_{index:03}.png')
@@ -133,7 +131,7 @@ def evaluate(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--checkpoint', default='outputs/phase2/training/best.pth')
+    parser.add_argument('--checkpoint', default='models/saved/facade512_experiment/generator.pth')
     parser.add_argument('--manifest', default='data/processed/cmp512/manifest.json')
     parser.add_argument('--production-baseline', default='models/saved/generator_perceptual_ema_best.pth')
     parser.add_argument('--split', choices=['val', 'test'], default='test')

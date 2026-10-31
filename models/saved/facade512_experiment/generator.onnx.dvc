@@ -1,0 +1,5 @@
+outs:
+- md5: 9b067930324826f39ee1f422309335ab
+  size: 171571099
+  hash: md5
+  path: generator.onnx

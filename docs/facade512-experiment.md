@@ -6,7 +6,9 @@ unchanged. This experiment is **not promoted to production**.
 
 ## Architecture and data
 
-The frozen, trained 256 generator supplies a coarse prior. A new residual U-Net
+The pretrained 256 generator supplies a coarse prior. Its encoder and global
+bottleneck remain frozen; the selected variant fine-tunes its late decoder.
+A new residual U-Net
 reads the original 512 semantic map and the upsampled prior, with four residual
 bottleneck blocks and FiLM at the bottleneck and all decoder scales. Two independent
 style-conditioned discriminators operate at 512 and 256. A zero-initialized output
@@ -52,11 +54,11 @@ Install `requirements-facade512.txt` with the appropriate CUDA build of PyTorch.
 4. Ensure other GPU models are unloaded. Run:
 
    ```powershell
-   python -m src.models.facade_experiment --epochs 10
+   python -m src.models.facade_experiment --epochs 4 --lambda-vgg 1 --lambda-edges 2
    ```
 
    Physical batch 2, accumulation 4 (effective 8), FP16 autocast/GradScaler,
-   checkpointed residual/VGG layers, frozen coarse prior. Optimizer/scaler/RNG
+   checkpointed residual/VGG layers, initially frozen coarse prior. Optimizer/scaler/RNG
    state is saved in `outputs/phase2/training/last.pth`; resume with `--resume`.
    `best.pth` is selected on validation VGG loss only. Test images never select
    checkpoints. Memory smoke runs must use a separate output directory.
@@ -79,6 +81,15 @@ Install `requirements-facade512.txt` with the appropriate CUDA build of PyTorch.
    This tests whether locking the old decoder preserves its grid artifacts.
    Every checkpoint records this option; the original production weights are never modified.
 
+   The selected third run is reproduced with:
+
+   ```powershell
+   python -m src.models.facade_experiment --epochs 10 --init-checkpoint outputs/phase2/training_vgg10/best.pth --output outputs/phase2/training_decoder --train-coarse-decoder
+   ```
+
+   It early-stopped after five epochs and selected its first epoch. Copy its
+   `best.pth` to `models/saved/facade512_experiment/generator.pth` before evaluation/export.
+
 5. `python scripts/evaluate_facade512.py` evaluates all 106 held-out test pairs,
    saves per-image metrics, a paired bootstrap LPIPS interval, raw texture grids,
    and a real-model viewer fixture. Both compared networks receive the same
@@ -94,7 +105,7 @@ be guaranteed against unrelated processes allocating memory between checks.
 ## Opt-in viewer testing and rollback
 
 ```powershell
-$env:ARCHIGEN_FACADE_EXPERIMENT = 'outputs/phase2/training/best.pth'
+$env:ARCHIGEN_FACADE_EXPERIMENT = 'models/saved/facade512_experiment/generator.pth'
 python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
@@ -129,3 +140,53 @@ The dedicated GitHub workflow runs CPU architecture/loss/bridge contracts withou
 large datasets or model downloads. Full GPU training and trained-weight metrics
 are local experiments. Dataset/weights remain outside Git; use existing DVC
 storage to share trained artifacts.
+
+## Measured outcome
+
+The checkpoint is **not photorealistic and is not promoted**. It shows modest
+held-out gains and fewer strong halos, but the actual viewer remains soft and
+retains grid artifacts. Four learned architectural styles are still unsupported.
+
+On all 106 held-out original CMP pairs, compared at 512 resolution with identical
+semantic inputs and the production EMA baseline bilinear-upsampled from 256:
+
+| Metric | Production EMA 256 | Experimental 512 |
+|---|---:|---:|
+| LPIPS ↓ | 0.49887 | 0.49241 |
+| SSIM ↑ | 0.33057 | 0.36176 |
+| PSNR ↑ | 13.069 dB | 13.329 dB |
+| Opening-edge MAE ↓ | 0.10771 | 0.09493 |
+| Torchvision Inception KID ×1000 ↓ | 69.944 | 69.616 |
+
+LPIPS improves 1.29%; paired bootstrap 95% interval for experimental-minus-baseline
+is [-0.01014, -0.00264]. Opening-edge error falls 11.86%. The small KID change is
+descriptive, not a claim of statistical significance. These scores use 512 targets
+and must not be compared directly with the repository's earlier 256 benchmark.
+
+79 Python tests passed (all previous 69 plus 10 new); 13 frontend geometry tests
+passed; Vite build passed with its existing bundle-size warning. The browser
+verified 512 textures, L/T/U/detached roofs, and <=0.01925 px **semantic frame/UV**
+alignment. This does not prove that synthesized window details align to that accuracy.
+ONNX/PyTorch maximum absolute error: 3.16e-6. The live API returned 512 images and
+honest neutral-style metadata. Maximum sampled training VRAM across all runs was
+2342 MiB; the selected decoder run peaked at 2081 MiB, below the 3500 MiB guard.
+
+![Actual Phase 1 and experimental viewer captures](assets/facade512/comparison_detail.png)
+
+The viewer comparison combines model changes with corrected semantic conditioning,
+removal of heuristic tint/sharpening, and anisotropic filtering. The held-out metric
+comparison isolates network predictions on the same input. No image was retouched.
+
+![Training and validation curves](assets/facade512/training_curves.png)
+
+Full configurations, checkpoint hashes, per-image metrics, and validation records
+are in `models/saved/facade512_experiment/experiment_results.json` and
+`test_metrics.json`. The selected PyTorch/ONNX weights and original/prepared data
+are DVC-tracked and pushed to the existing `onedrive_backup` remote. No heavy
+weights or raw images were added to Git. Retrieve weights with:
+
+```powershell
+python -m dvc pull models/saved/facade512_experiment/generator.pth.dvc models/saved/facade512_experiment/generator.onnx.dvc
+```
+
+`python scripts/report_facade512.py` regenerates the unretouched comparison and curves.

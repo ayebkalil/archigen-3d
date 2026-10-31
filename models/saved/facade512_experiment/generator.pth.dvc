@@ -1,0 +1,5 @@
+outs:
+- md5: 78691c443433935d9b0c26f9ab1ae481
+  size: 171472130
+  hash: md5
+  path: generator.pth

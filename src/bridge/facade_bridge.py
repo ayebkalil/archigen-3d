@@ -265,6 +265,7 @@ class FacadeBridge:
 
         # Uniform scale factor (pixels per meter)
         scale_px_per_m = min(avail_w / wall_len_m, avail_h / total_height_m)
+        detail_px = max(1, round(2 * target_size / 256))
         draw_w = int(round(wall_len_m * scale_px_per_m))
         draw_h = int(round(total_height_m * scale_px_per_m))
 
@@ -353,7 +354,7 @@ class FacadeBridge:
         for fl in range(num_floors):
             if fl > 0:
                 y = wall_y1 - fl * floor_height_m / total_height_m * draw_h
-                safe_rect(wall_x0, y - 2, wall_x1, y, palette["molding"])
+                safe_rect(wall_x0, y - detail_px, wall_x1, y, palette["molding"])
             for op in templates:
                 if op["type"] == "door" and fl > 0:
                     continue
@@ -366,12 +367,12 @@ class FacadeBridge:
                 y0 = max(wall_y0 + 1, int(round(wall_y1 - (sill + op["height_m"]) / total_height_m * draw_h)))
                 if x1 <= x0 or y1 <= y0:
                     continue
-                trim = max(1, round(2 * target_size / 256))
+                trim = detail_px
                 safe_rect(x0 - trim, y0 - trim, x1 + trim, y0, palette["deco"])
                 safe_rect(x0 - trim, y0, x0, y1, palette["molding"])
                 safe_rect(x1, y0, x1 + trim, y1, palette["molding"])
                 if op["type"] == "window":
-                    safe_rect(x0 - trim, y1, x1 + trim, y1 + 2, palette["sill"])
+                    safe_rect(x0 - trim, y1, x1 + trim, y1 + detail_px, palette["sill"])
                 safe_rect(x0, y0, x1, y1, palette[op["type"]])
                 rendered_openings.append({
                     **op, "floor_index": fl,
@@ -519,6 +520,9 @@ class FacadeBridge:
                         "texture_base64": f"data:image/png;base64,{b64_str}",
                         "sketch_base64": f"data:image/png;base64,{sketch_b64}",
                         "style": style,
+                        "model_info": res.get("model_info"),
+                        "wall_id": w_id,
+                        "num_floors": num_floors,
                         "uv_bounds": res["uv_bounds"],
                         "facade_frame": res["facade_frame"],
                         "openings": res["openings"],
@@ -576,6 +580,7 @@ class FacadeBridge:
                 b64_str = base64.b64encode(photo_bytes).decode("ascii")
                 res = {
                     "wall_id": w_id,
+                    "model_info": self.inference_engine.describe(style) if hasattr(self.inference_engine, "describe") else {"model": "legacy_256", "resolution": 256, "style_conditioned": False},
                     "is_front": (w_id == front_wall_id),
                     "sketch_image": s_img,
                     "photo_image": g_img,
@@ -590,6 +595,9 @@ class FacadeBridge:
                     "texture_file": f"{w_id}_facade.png",
                     "texture_path": tex_filepath,
                     "texture_base64": f"data:image/png;base64,{b64_str}",
+                    "model_info": res.get("model_info"),
+                    "wall_id": w_id,
+                    "num_floors": num_floors,
                     "uv_bounds": uv_bounds,
                     "facade_frame": frame,
                     "openings": openings,

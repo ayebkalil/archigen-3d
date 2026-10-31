@@ -1,0 +1,29 @@
+{
+  "architecture": "facade_residual_film_512_v1",
+  "resolution": 512,
+  "model_config": {
+    "width": 24,
+    "blocks": 4,
+    "gradient_checkpointing": true,
+    "train_coarse_decoder": true
+  },
+  "supported_style_ids": [],
+  "neutral_style_id": 4,
+  "baseline_sha256": "8bac2333cc5db48bf726b69a35e63b87a3be436d12fd079cdbdab9e2f6e95452",
+  "manifest_sha256": "952938f4832e29b62095e27e12d692ed0abbc005b1f9f637ea20626d89759ad9",
+  "loss_weights": {
+    "l1": 5.0,
+    "vgg": 10.0,
+    "feature_matching": 5.0,
+    "opening_edges": 5.0,
+    "gan": 1.0
+  },
+  "init_checkpoint_sha256": "4d02235fee8fc9c3f94b059f86a26e9d20b639e11ba120831075ac5340753d01",
+  "physical_batch": 2,
+  "accumulation": 4,
+  "seed": 42,
+  "decoder_lr_scale": 0.1,
+  "epoch": 1,
+  "val_vgg": 1.0588122242689133,
+  "onnx_max_abs_error": 3.159046173095703e-06
+}

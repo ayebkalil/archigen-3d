@@ -10,3 +10,4 @@ onnx>=1.15
 onnxruntime>=1.17
 requests>=2.31
 pytest>=8
+matplotlib>=3.8
