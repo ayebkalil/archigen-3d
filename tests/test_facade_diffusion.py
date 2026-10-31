@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from src.models.facade_diffusion import (
     ROOT, cached_models, cmp_control, fixture_control, prompt_for, resource_report, uv_box,
@@ -128,3 +129,23 @@ def test_range_download_rejects_full_wrong_or_truncated_responses(status, conten
         response.iter_content.return_value = [body]
         with pytest.raises(ValueError):
             fetch_range('https://example.invalid/model', 0, 3, 4)
+
+
+def test_material_composition_cannot_copy_hallucinated_openings_outside_known_masks():
+    from src.bridge.facade_materials import compose_material_facade
+    fixture = {'uv_bounds': {'u_min': .1, 'v_min': .1, 'u_max': .9, 'v_max': .9},
+               'wall_length_m': 8., 'wall_height_m': 8.,
+               'openings': [{'type': 'window', 'uv_rect': [.2, .2, .4, .4]}]}
+    # All red pixels outside the true opening represent hallucinated details.
+    material = Image.new('RGB', (64, 64), (10, 20, 30))
+    source = Image.new('RGB', (100, 100), (255, 0, 0))
+    result, mask = compose_material_facade(fixture, material, source)
+    pixels, inside = np.array(result), np.array(mask) > 0
+    assert np.all(pixels[inside] == (255, 0, 0))
+    assert not np.any(np.all(pixels[~inside] == (255, 0, 0), axis=-1))
+    assert tuple(pixels[50, 50]) == (10, 20, 30)
+    assert tuple(pixels[0, 0]) == (220, 220, 220)
+    assert inside[70, 30] and not inside[30, 30]
+    fixture['openings'].append(fixture['openings'][0].copy())
+    with pytest.raises(ValueError, match='Overlapping'):
+        compose_material_facade(fixture, material, source)

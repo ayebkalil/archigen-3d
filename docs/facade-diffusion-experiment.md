@@ -8,6 +8,17 @@ about 11.9%, but its facade textures remain soft. This experiment tests a pretra
 SDXL image prior before spending more time training the same GAN. A higher pixel
 count alone does not establish photorealism.
 
+**Current result:** a clearer 1024 hybrid brick prototype with exactly four windows
+and one door in the viewer. SDXL generates a material swatch and opening appearance;
+explicit masks and physical-scale tiling assemble the facade. This is not an
+end-to-end facade prediction, and it is not a general photorealism result.
+
+![Actual viewer comparison](assets/facade-diffusion/comparison_detail.png)
+
+The comparison changes both synthesis method and material style; it is a qualitative
+clarity demonstration, not a paired fidelity metric. Full portable run metadata,
+including rejected candidates, is in [facade-diffusion-results.json](facade-diffusion-results.json).
+
 ## Implementation
 
 - SDXL base 1.0, smaller SDXL Canny ControlNet, and FP16-compatible SDXL VAE.
@@ -16,6 +27,8 @@ count alone does not establish photorealism.
   are excluded. Upstream model licences apply (see source model cards below).
 - 1024 x 1024, one candidate at a time, 30 steps, guidance 5.0, control strength 1.0,
   CPU-seeded noise (42), FP16, sequential CPU or disk offload and tiled VAE decoding.
+  Strength 1.0 was the initial structural test; the model author's recommended 0.5
+  is also being evaluated. Prompts must fit both CLIP tokenizers (77 tokens each).
   This is native 1024 synthesis, not an upscale of the 256 GAN output.
 - Viewer controls use authoritative opening UV rectangles, converting bottom-origin
   UVs to top-origin image coordinates. CMP controls use original indexed class
@@ -26,6 +39,32 @@ count alone does not establish photorealism.
   Named-style accuracy remains unvalidated.
 - Optional generated viewer fixtures preserve the existing UV bounds, facade frame,
   dimensions and openings. Generation does not install a texture into the live app.
+- The hybrid compositor copies source-facade pixels only inside the authoritative
+  window/door masks. A separately reviewed neural material fills the wall. It mirrors
+  and tiles the swatch at a declared physical scale (1.4 m in the demonstrated brick
+  result). No heuristic style tinting is used. Repeated patterns and baked glass
+  reflections remain limitations; no learned normal/roughness maps are claimed.
+
+## Observed experiments
+
+| Experiment | Outcome | Total seconds |
+| --- | --- | ---: |
+| Neutral, control 1.0, architectural wording | Rejected: clay-like facade and empty recesses | 630 |
+| Neutral, control 1.0, photographic wording | Rejected: render-like materials; long prompt truncated | 445 |
+| Brick, control 0.5, shortened photographic prompt | Rejected as whole facade: two extra windows; brick mainly above wall | 428 |
+| Brick material only, no architectural control | Usable swatch prototype; dark mortar and irregular brick sizes remain | 428 |
+| CMP `val/1.jpg`, neutral, control 0.5 | Rejected for exact geometry: changed window heights and projecting details | 230 |
+
+All five runs completed with peak PyTorch allocation 997 MiB and reservation 1134 MiB.
+The largest sampled device usage was 839 MiB; sampling may miss peaks and is not
+interchangeable with allocator statistics. The hybrid composition retained five
+connected opening-mask regions and passed the real viewer checks.
+
+The single CMP pilot is enough to reject unrestricted diffusion as a geometry-safe
+replacement, not enough to characterize general quality. Four validation inputs were
+prepared; only `val/1.jpg` was generated. The other three and the held-out test set were
+not run for this rejected whole-facade approach. The selected material compositor
+still needs broader layout/material validation before production integration.
 
 ## Resource guards
 
@@ -95,8 +134,27 @@ it never overwrites an existing file that fails its checksum.
 For the prepared validation cases:
 
 ```powershell
-.\.venv-facade-diffusion\Scripts\python.exe -u scripts/facade_diffusion.py generate --case val_00 --style neutral --seed 42
+.\.venv-facade-diffusion\Scripts\python.exe -u scripts/facade_diffusion.py generate --offload disk --case val_00 --style neutral --seed 42 --control-scale 0.5
 ```
+
+To reproduce the demonstrated hybrid (starting from the existing Phase 2 fixture):
+
+```powershell
+python scripts/facade_diffusion.py prepare --output outputs/phase3/soft_control
+.\.venv-facade-diffusion\Scripts\python.exe -u scripts/facade_diffusion.py generate --output outputs/phase3/soft_control --offload disk --case viewer --style 'Traditional Brick' --seed 42 --control-scale 0.5
+.\.venv-facade-diffusion\Scripts\python.exe -u scripts/facade_diffusion.py generate --output outputs/phase3/soft_control --offload disk --style 'Traditional Brick' --seed 42 --material
+python scripts/compose_facade_materials.py --fixture outputs/phase2/viewer_fixture.json --material outputs/phase3/soft_control/material_3_42/facade.png --opening-source outputs/phase3/soft_control/viewer_3_42/facade.png --style 'Traditional Brick' --tile-meters 1.4 --output outputs/phase3/composite_brick
+$env:ARCHIGEN_FACADE_FIXTURE='outputs/phase3/composite_brick/viewer_fixture.json'
+$env:ARCHIGEN_VIEWER_OUTPUT='outputs/phase3/composite_brick/viewer'
+node scripts/verify_phase1_viewer.cjs
+python scripts/report_facade_diffusion.py
+```
+
+Review the material swatch before composition: it must contain no windows or other
+architectural objects. Mirroring removes discontinuous edge joins but can create
+visible repeated patterns. The viewer harness requires Vite at port 3000; fixture
+mode does not require the GPU backend. The existing app still uses its prior model;
+the hybrid is an offline experiment, not a replacement `/facade/generate` endpoint.
 
 ## Evaluation and acceptance
 
@@ -127,15 +185,31 @@ support is claimed by the prototype alone.
 
 ## Verification so far
 
-- Existing suite plus geometry/resource/downloader tests: **92 passed**, 20 existing warnings.
-- The subsequent disk-resource contract also passes (14 experiment tests in total).
+- `CUDA_VISIBLE_DEVICES=-1 python -m pytest tests/ backend/tests/ -q`: **94 passed**,
+  20 existing warnings. CUDA was hidden for this regression run to avoid competing
+  with real generation. Earlier 92-test regression run used normal CUDA availability.
+- All 15 experiment CPU contracts pass, including exclusion of source hallucinations
+  outside explicit opening masks. Shortened positive prompts use 58–62 tokens
+  across all five prompt choices; the negative prompt uses 67 in each tokenizer.
 - Isolated SDXL/ControlNet/VAE imports and CUDA Torch 2.6 verified.
 - Five 1024 control cases prepared; viewer opening control visually inspected.
 - All required weights downloaded with pinned SHA-256 verification.
 - Tiny random-weight SDXL CUDA smoke tests passed with CPU and disk offload, two steps
   each, 11.9 MiB peak allocated / 26 MiB reserved. These are API checks, not real model
   memory benchmarks or image quality evidence.
-- Full-size disk-offloaded inference initiated; output quality remains unverified.
+- The first full 1024 run finished in 630 seconds including initial disk preparation,
+  with 997 MiB peak allocated / 1134 MiB reserved, and 800 MiB peak sampled device
+  memory. Sampling and allocator statistics measure different things.
+- The first result was rejected for clay-like materials and empty window recesses.
+  A photographic prompt improved glass/door semantics but remained too render-like;
+  that longer prompt was truncated by CLIP. Both failures remain in the local results.
+- Actual viewer checks passed at 1024 on L/T/U/detached layouts with no JS/WebGL
+  errors and 0.0385-pixel geometric UV error. This checks frame/UV math, **not** the
+  generated image's window boundaries or photorealism.
+
+Next engineering work is an opt-in cached material adapter for arbitrary wall layouts,
+better material/PBR maps and repeat handling, and broader validation. Do not promote
+the unrestricted whole-facade model or claim four CMP-trained styles based on this demo.
 - Production frontend code unchanged; existing normalized UVs are resolution-independent.
 
 GitHub workflow runs the new CPU contracts without downloading weights or using a

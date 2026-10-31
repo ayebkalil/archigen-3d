@@ -25,18 +25,38 @@ STYLE_PROMPTS = {
     FACADE_STYLES[2]: "traditional red brick facade, crisp brick mortar, painted wood window frames",
     FACADE_STYLES[3]: "plaster facade with climbing vegetation between windows, visible window frames",
 }
+MATERIAL_PROMPTS = {
+    'neutral': 'off-white painted fine-grained stucco',
+    FACADE_STYLES[0]: 'clean white fine-grained stucco with subtle mineral texture',
+    FACADE_STYLES[1]: 'pale Mediterranean limestone blocks with fine joints and natural pores',
+    FACADE_STYLES[2]: 'red fired brick masonry with crisp mortar joints and irregular brick surfaces',
+    FACADE_STYLES[3]: 'green climbing ivy leaves densely covering a plaster surface',
+}
+MATERIAL_NEGATIVE = (
+    'windows, doors, buildings, roof, sky, ground, people, objects, text, watermark, '
+    'perspective, hard shadows, direct sunlight, painting, illustration, CGI, blurry'
+)
+
+
+def material_prompt_for(style):
+    return (
+        'Photographic material swatch, ' + MATERIAL_PROMPTS[style] +
+        '. Front-facing close-up, flat even illumination, detailed natural surface, '
+        'entire image filled with the material, seamless texture, no other objects.'
+    )
 NEGATIVE_PROMPT = (
     "perspective view, angled building, street, people, cars, text, watermark, "
-    "extra windows, extra doors, bent frames, warped walls, blurry, painting, illustration"
+    "extra windows, extra doors, bent frames, warped walls, blurry, painting, illustration, "
+    "3D render, CGI, clay model, cardboard model, architectural maquette, massing model, "
+    "empty window recesses, blocked windows, paper cutout"
 )
 
 
 def prompt_for(style):
     return (
-        "Straight-on orthographic architectural facade elevation, flat rectangular wall, "
-        "exact window and door arrangement from the outline, " + STYLE_PROMPTS[style] +
-        ", realistic material texture, crisp glass reflections, even diffuse daylight, "
-        "minimal baked shadows, no surrounding scene."
+        "DSLR photo of a finished house facade, straight-on view. " + STYLE_PROMPTS[style] +
+        ". Reflective glass windows, slim frames, mullions, curtains. Finished entrance door, "
+        "detailed wall texture, crisp lintels, overcast daylight. Openings follow the edges."
     )
 
 

@@ -17,7 +17,7 @@ import numpy as np
 
 from src.models.facade_diffusion import (
     STYLE_PROMPTS, NEGATIVE_PROMPT, cached_models, comparison, gpu_memory,
-    prepare_cases, prompt_for, resource_report, sha256,
+    prepare_cases, prompt_for, resource_report, sha256, material_prompt_for, MATERIAL_NEGATIVE,
 )
 
 
@@ -45,7 +45,7 @@ def generate(args, config, paths):
     os.environ['HF_HUB_OFFLINE'] = '1'
     os.environ['TRANSFORMERS_OFFLINE'] = '1'
     import torch
-    from src.models.facade_diffusion_runtime import load_pipeline
+    from src.models.facade_diffusion_runtime import load_pipeline, validate_prompt_lengths
 
     if not torch.cuda.is_available():
         raise RuntimeError('CUDA torch is required in the isolated diffusion environment')
@@ -57,28 +57,40 @@ def generate(args, config, paths):
     torch.cuda.set_per_process_memory_fraction(allocator_mib / initial['total_mib'], 0)
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
-    document = json.loads((args.output / 'cases.json').read_text())
-    case = next((c for c in document['cases'] if c['id'] == args.case), None)
-    if case is None:
-        raise ValueError(f'Unknown case {args.case}; prepare controls first')
-    control_path = args.output / case['control']
-    if sha256(control_path) != case['control_sha256']:
-        raise ValueError('Control image changed after case selection; re-prepare explicitly')
-    control = Image.open(control_path).convert('RGB')
+    if args.material:
+        case = None  # Material synthesis does not require CMP or a prepared facade.
+        control = Image.new('RGB', (1024, 1024))
+    else:
+        document = json.loads((args.output / 'cases.json').read_text())
+        case = next((c for c in document['cases'] if c['id'] == args.case), None)
+        if case is None:
+            raise ValueError(f'Unknown case {args.case}; prepare controls first')
+        control_path = args.output / case['control']
+        if sha256(control_path) != case['control_sha256']:
+            raise ValueError('Control image changed after case selection; re-prepare explicitly')
+        control = Image.open(control_path).convert('RGB')
     if control.size != (1024, 1024):
         raise ValueError('Expected 1024 x 1024 control image')
-    target = args.output / f"{args.case}_{list(STYLE_PROMPTS).index(args.style)}_{args.seed}"
+    positive = material_prompt_for(args.style) if args.material else prompt_for(args.style)
+    negative = MATERIAL_NEGATIVE if args.material else NEGATIVE_PROMPT
+    token_lengths = validate_prompt_lengths(paths['base'], positive, negative)
+    target = args.output / f"{'material' if args.material else args.case}_{list(STYLE_PROMPTS).index(args.style)}_{args.seed}"
     target.mkdir(exist_ok=False)  # Do not overwrite prior candidates or evidence.
+    control.save(target / 'control.png')
     metadata = {
         'status': 'running', 'case': case, 'seed': args.seed, 'style': args.style,
         'style_status': 'pretrained text guidance; not CMP-trained architectural style classes',
-        'prompt': prompt_for(args.style), 'negative_prompt': NEGATIVE_PROMPT,
-        'resolution': 1024, 'steps': args.steps, 'control_scale': args.control_scale,
+        'task': 'material_swatch' if args.material else 'facade',
+        'prompt': positive, 'negative_prompt': negative,
+        'prompt_token_lengths': token_lengths,
+        'resolution': 1024, 'steps': args.steps, 'control_scale': 0.0 if args.material else args.control_scale,
+        'control_image_sha256': sha256(target / 'control.png'),
         'guidance_scale': 5.0, 'models': config, 'initial_gpu': initial,
         'allocator_limit_mib': allocator_mib, 'sampled_peak_device_mib': initial['used_mib'],
         'offload': args.offload, 'disk_offload_dir': str(args.disk_dir) if args.offload == 'disk' else None,
         'memory_limit_note': 'Allocator cap plus step checks; external GPU allocations are not controlled',
-        'quality_review': 'pending; ControlNet does not guarantee opening alignment',
+        'quality_review': ('pending; inspect swatch for objects, lighting and tiling artifacts' if args.material
+                           else 'pending; ControlNet does not guarantee opening alignment'),
         'packages': {p: importlib.metadata.version(p) for p in
                      ('torch', 'diffusers', 'transformers', 'accelerate', 'huggingface-hub')},
     }
@@ -105,9 +117,9 @@ def generate(args, config, paths):
         check_memory()
         with torch.inference_mode(), torch.autocast('cuda', dtype=torch.float16):
             result = pipe(
-                prompt=metadata['prompt'], negative_prompt=NEGATIVE_PROMPT, image=control,
+                prompt=metadata['prompt'], negative_prompt=negative, image=control,
                 width=1024, height=1024, num_inference_steps=args.steps,
-                guidance_scale=5.0, controlnet_conditioning_scale=args.control_scale,
+                guidance_scale=5.0, controlnet_conditioning_scale=metadata['control_scale'],
                 generator=torch.Generator(device='cpu').manual_seed(args.seed),
                 callback_on_step_end=on_step,
             ).images[0]
@@ -115,11 +127,12 @@ def generate(args, config, paths):
         if result.size != (1024, 1024) or np.asarray(result).std() < 1:
             raise RuntimeError('Invalid or nearly constant output; no successful result recorded')
         result.save(target / 'facade.png')
-        reference_key = 'baseline' if 'baseline' in case else 'target'
-        with Image.open(args.output / case[reference_key]) as reference:
-            comparison(control, result, reference, target / 'comparison.png',
-                       'Previous 512 GAN' if reference_key == 'baseline' else 'CMP reference (not model output)')
-        if 'source_fixture' in case:
+        if not args.material:
+            reference_key = 'baseline' if 'baseline' in case else 'target'
+            with Image.open(args.output / case[reference_key]) as reference:
+                comparison(control, result, reference, target / 'comparison.png',
+                           'Previous 512 GAN' if reference_key == 'baseline' else 'CMP reference (not model output)')
+        if not args.material and 'source_fixture' in case:
             if sha256(case['source_fixture']) != case['source_sha256']:
                 raise ValueError('Source viewer geometry changed; re-prepare controls')
             fixture = json.loads(Path(case['source_fixture']).read_text())
@@ -161,6 +174,7 @@ def main():
     parser.add_argument('--manifest', type=Path, default=ROOT / 'data/processed/cmp512/manifest.json')
     parser.add_argument('--case', default='viewer')
     parser.add_argument('--style', choices=list(STYLE_PROMPTS), default='neutral')
+    parser.add_argument('--material', action='store_true', help='Generate only a material swatch; no architectural control or viewer fixture')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--steps', type=int, default=30)
     parser.add_argument('--control-scale', type=float, default=1.0)

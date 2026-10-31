@@ -74,6 +74,12 @@ async function main() {
     const ready = async () => {
       await page.goto(`${viewerUrl}/?phase1=${shapeName}&diagnostic=${diagnostic}#studio`, { waitUntil: 'networkidle0' });
       await page.waitForFunction(() => window.__ARCHIGEN_VIEWER__?.scene.children.some(o => o.userData.type === 'facade'));
+      if (process.env.ARCHIGEN_FACADE_FIXTURE && facade.style) {
+        await page.evaluate(style => {
+          const label = [...document.querySelectorAll('span')].find(el => el.textContent.trim() === style);
+          label?.closest('div.cursor-pointer')?.click();
+        }, facade.style);
+      }
       await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '3D PERSPECTIVE').click());
       await page.waitForFunction(() => window.__ARCHIGEN_VIEWER__?.renderer.domElement.isConnected && window.__ARCHIGEN_VIEWER__.scene.children.some(o => o.userData.type === 'facade'));
       await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '2 STOREYS').click());

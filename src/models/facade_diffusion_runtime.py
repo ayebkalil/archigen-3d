@@ -3,6 +3,18 @@ import gc
 from pathlib import Path
 
 
+def validate_prompt_lengths(base, prompt, negative_prompt):
+    from transformers import CLIPTokenizer
+    lengths = {}
+    for name in ('tokenizer', 'tokenizer_2'):
+        tokenizer = CLIPTokenizer.from_pretrained(Path(base) / name, local_files_only=True)
+        lengths[name] = {key: len(tokenizer(text)['input_ids'])
+                         for key, text in [('positive', prompt), ('negative', negative_prompt)]}
+        if max(lengths[name].values()) > tokenizer.model_max_length:
+            raise ValueError(f'{name} prompt exceeds {tokenizer.model_max_length} tokens: {lengths[name]}')
+    return lengths
+
+
 def load_pipeline(paths, *, disk_dir=None):
     import torch
     from accelerate import disk_offload

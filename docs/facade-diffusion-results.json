@@ -1,0 +1,371 @@
+{
+  "branch": "experiment/facade-diffusion-control",
+  "comparison": "Qualitative comparison of different materials; not a paired perceptual benchmark",
+  "models": {
+    "base": {
+      "repo": "stabilityai/stable-diffusion-xl-base-1.0",
+      "revision": "462165984030d82259a11f4367a4eed129e94a7b",
+      "files": [
+        "model_index.json",
+        "scheduler/scheduler_config.json",
+        "text_encoder/config.json",
+        "text_encoder/model.fp16.safetensors",
+        "text_encoder_2/config.json",
+        "text_encoder_2/model.fp16.safetensors",
+        "tokenizer/merges.txt",
+        "tokenizer/special_tokens_map.json",
+        "tokenizer/tokenizer_config.json",
+        "tokenizer/vocab.json",
+        "tokenizer_2/merges.txt",
+        "tokenizer_2/special_tokens_map.json",
+        "tokenizer_2/tokenizer_config.json",
+        "tokenizer_2/vocab.json",
+        "unet/config.json",
+        "unet/diffusion_pytorch_model.fp16.safetensors"
+      ],
+      "weights": {
+        "text_encoder/model.fp16.safetensors": {
+          "size": 246144152,
+          "sha256": "660c6f5b1abae9dc498ac2d21e1347d2abdb0cf6c0c0c8576cd796491d9a6cdd"
+        },
+        "text_encoder_2/model.fp16.safetensors": {
+          "size": 1389382176,
+          "sha256": "ec310df2af79c318e24d20511b601a591ca8cd4f1fce1d8dff822a356bcdb1f4"
+        },
+        "unet/diffusion_pytorch_model.fp16.safetensors": {
+          "size": 5135149760,
+          "sha256": "83e012a805b84c7ca28e5646747c90a243c65c8ba4f070e2d7ddc9d74661e139"
+        }
+      }
+    },
+    "controlnet": {
+      "repo": "diffusers/controlnet-canny-sdxl-1.0-small",
+      "revision": "edd85f64c5f87dfb6d73762949d9daca16389518",
+      "files": [
+        "config.json",
+        "diffusion_pytorch_model.fp16.safetensors"
+      ],
+      "weights": {
+        "diffusion_pytorch_model.fp16.safetensors": {
+          "size": 320237179,
+          "sha256": "fde4888a5f0a5648118991cc50e0ac4d60a2356dbaddf5e0649dd69c1119a2f9"
+        }
+      }
+    },
+    "vae": {
+      "repo": "madebyollin/sdxl-vae-fp16-fix",
+      "revision": "207b116dae70ace3637169f1ddd2434b91b3a8cd",
+      "files": [
+        "config.json",
+        "diffusion_pytorch_model.safetensors"
+      ],
+      "weights": {
+        "diffusion_pytorch_model.safetensors": {
+          "size": 334643238,
+          "sha256": "1b909373b28f2137098b0fd9dbc6f97f8410854f31f84ddc9fa04b077b0ace2c"
+        }
+      }
+    }
+  },
+  "runs": [
+    {
+      "artifact": "outputs/phase3/material_prompt/viewer_0_42",
+      "status": "reviewed_rejected",
+      "seed": 42,
+      "style": "neutral",
+      "style_status": "pretrained text guidance; not CMP-trained architectural style classes",
+      "prompt": "High-resolution DSLR photograph of a finished real residential building, straight-on front facade view. restrained architectural materials, painted plaster, clear glass. Real installed windows with slim frames, clear reflective glass panes, visible mullions, subtle sky reflections and interior curtains behind the glass. A finished entrance door at ground level. Fine-grained wall material, real construction details, crisp masonry and lintels, soft overcast daylight. Preserve the opening positions in the edge image.",
+      "negative_prompt": "perspective view, angled building, street, people, cars, text, watermark, extra windows, extra doors, bent frames, warped walls, blurry, painting, illustration, 3D render, CGI, clay model, cardboard model, architectural maquette, massing model, empty window recesses, blocked windows, paper cutout",
+      "prompt_truncation_observed": true,
+      "positive_tokens_before_truncation": 97,
+      "resolution": 1024,
+      "steps": 30,
+      "control_scale": 1.0,
+      "guidance_scale": 5.0,
+      "offload": "disk",
+      "quality_review": {
+        "decision": "reject_as_final",
+        "reason": "Better glass/door semantics, but still render-like, flat material detail and baked diagonal lighting."
+      },
+      "elapsed_seconds": 444.78100000007544,
+      "sampled_peak_device_mib": 795,
+      "peak_allocated_mib": 997.32177734375,
+      "peak_reserved_mib": 1134.0,
+      "output_sha256": "a7391020eeaa4a3985326dcebbae28aca20f6cc5e700741099396d7d831ff459",
+      "packages": {
+        "torch": "2.6.0+cu124",
+        "diffusers": "0.35.2",
+        "transformers": "4.46.3",
+        "accelerate": "1.12.0",
+        "huggingface-hub": "0.36.2"
+      },
+      "case": {
+        "id": "viewer",
+        "control_sha256": "7c432a1227b1f6394cf5095f03765522d5f66b1c32b42689bf7abc40cae1d0db"
+      }
+    },
+    {
+      "artifact": "outputs/phase3/soft_control/material_3_42",
+      "status": "reviewed_material_prototype",
+      "task": "material_swatch",
+      "seed": 42,
+      "style": "Traditional Brick",
+      "style_status": "pretrained text guidance; not CMP-trained architectural style classes",
+      "prompt": "Photographic material swatch, red fired brick masonry with crisp mortar joints and irregular brick surfaces. Front-facing close-up, flat even illumination, detailed natural surface, entire image filled with the material, seamless texture, no other objects.",
+      "negative_prompt": "windows, doors, buildings, roof, sky, ground, people, objects, text, watermark, perspective, hard shadows, direct sunlight, painting, illustration, CGI, blurry",
+      "prompt_token_lengths": {
+        "tokenizer": {
+          "positive": 48,
+          "negative": 38
+        },
+        "tokenizer_2": {
+          "positive": 48,
+          "negative": 38
+        }
+      },
+      "resolution": 1024,
+      "steps": 30,
+      "control_scale": 0.0,
+      "guidance_scale": 5.0,
+      "offload": "disk",
+      "quality_review": {
+        "decision": "usable_material_prototype",
+        "reason": "Only brick/mortar visible; detailed surface but dark joints and irregular brick sizes. Mirrored tiling requires review."
+      },
+      "elapsed_seconds": 427.655999999959,
+      "sampled_peak_device_mib": 824,
+      "peak_allocated_mib": 997.32177734375,
+      "peak_reserved_mib": 1134.0,
+      "output_sha256": "45181d30b3e2af7b70e85c49f33b75f6e1b88ff69323a0822f3e573aabca3460",
+      "control_image_sha256": "d69112264db6c2c1b6f6bc930b7d7cf38c27a4fead1b5000259265c5405c66ef",
+      "packages": {
+        "torch": "2.6.0+cu124",
+        "diffusers": "0.35.2",
+        "transformers": "4.46.3",
+        "accelerate": "1.12.0",
+        "huggingface-hub": "0.36.2"
+      },
+      "case": {
+        "id": "viewer",
+        "control_sha256": "7c432a1227b1f6394cf5095f03765522d5f66b1c32b42689bf7abc40cae1d0db"
+      }
+    },
+    {
+      "artifact": "outputs/phase3/soft_control/val_00_0_42",
+      "status": "reviewed_rejected",
+      "task": "facade",
+      "seed": 42,
+      "style": "neutral",
+      "style_status": "pretrained text guidance; not CMP-trained architectural style classes",
+      "prompt": "DSLR photo of a finished house facade, straight-on view. restrained architectural materials, painted plaster, clear glass. Reflective glass windows, slim frames, mullions, curtains. Finished entrance door, detailed wall texture, crisp lintels, overcast daylight. Openings follow the edges.",
+      "negative_prompt": "perspective view, angled building, street, people, cars, text, watermark, extra windows, extra doors, bent frames, warped walls, blurry, painting, illustration, 3D render, CGI, clay model, cardboard model, architectural maquette, massing model, empty window recesses, blocked windows, paper cutout",
+      "prompt_token_lengths": {
+        "tokenizer": {
+          "positive": 58,
+          "negative": 67
+        },
+        "tokenizer_2": {
+          "positive": 58,
+          "negative": 67
+        }
+      },
+      "resolution": 1024,
+      "steps": 30,
+      "control_scale": 0.5,
+      "guidance_scale": 5.0,
+      "offload": "disk",
+      "quality_review": {
+        "decision": "reject_exact_geometry",
+        "reason": "CMP val/1.jpg pilot: lower windows extended beyond the prescribed height and sill/molding regions became large projecting forms. Appearance is an alternative neutral style, not a reconstruction of the reference."
+      },
+      "elapsed_seconds": 229.7970000000205,
+      "sampled_peak_device_mib": 623,
+      "peak_allocated_mib": 997.32177734375,
+      "peak_reserved_mib": 1134.0,
+      "output_sha256": "2eb21b275e1364ca2107bb15a792c8db4b44b12d2938ad3fe9ef75bc3ebc26db",
+      "control_image_sha256": "c9e44428ea2b60473faeb808f406ae78ee4ca9da9a47efe58ef5aac656eb3b43",
+      "packages": {
+        "torch": "2.6.0+cu124",
+        "diffusers": "0.35.2",
+        "transformers": "4.46.3",
+        "accelerate": "1.12.0",
+        "huggingface-hub": "0.36.2"
+      },
+      "case": {
+        "id": "val_00",
+        "cmp_id": "val/1.jpg",
+        "split": "val",
+        "control_sha256": "c9e44428ea2b60473faeb808f406ae78ee4ca9da9a47efe58ef5aac656eb3b43"
+      }
+    },
+    {
+      "artifact": "outputs/phase3/soft_control/viewer_3_42",
+      "status": "reviewed_rejected",
+      "seed": 42,
+      "style": "Traditional Brick",
+      "style_status": "pretrained text guidance; not CMP-trained architectural style classes",
+      "prompt": "DSLR photo of a finished house facade, straight-on view. traditional red brick facade, crisp brick mortar, painted wood window frames. Reflective glass windows, slim frames, mullions, curtains. Finished entrance door, detailed wall texture, crisp lintels, overcast daylight. Openings follow the edges.",
+      "negative_prompt": "perspective view, angled building, street, people, cars, text, watermark, extra windows, extra doors, bent frames, warped walls, blurry, painting, illustration, 3D render, CGI, clay model, cardboard model, architectural maquette, massing model, empty window recesses, blocked windows, paper cutout",
+      "prompt_token_lengths": {
+        "tokenizer": {
+          "positive": 61,
+          "negative": 67
+        },
+        "tokenizer_2": {
+          "positive": 61,
+          "negative": 67
+        }
+      },
+      "resolution": 1024,
+      "steps": 30,
+      "control_scale": 0.5,
+      "guidance_scale": 5.0,
+      "offload": "disk",
+      "quality_review": {
+        "decision": "reject_whole_facade",
+        "reason": "More photographic, but two unwanted windows inside the wall region and brick material mostly outside the intended wall; only known opening patches may be reused."
+      },
+      "elapsed_seconds": 428.23399999993853,
+      "sampled_peak_device_mib": 839,
+      "peak_allocated_mib": 997.32177734375,
+      "peak_reserved_mib": 1134.0,
+      "output_sha256": "ec2d2ba68ddced3ef7612594c59d8226693e3575d28beb822b9b289cc8a31c94",
+      "packages": {
+        "torch": "2.6.0+cu124",
+        "diffusers": "0.35.2",
+        "transformers": "4.46.3",
+        "accelerate": "1.12.0",
+        "huggingface-hub": "0.36.2"
+      },
+      "case": {
+        "id": "viewer",
+        "control_sha256": "7c432a1227b1f6394cf5095f03765522d5f66b1c32b42689bf7abc40cae1d0db"
+      }
+    },
+    {
+      "artifact": "outputs/phase3/viewer_0_42",
+      "status": "reviewed_rejected",
+      "seed": 42,
+      "style": "neutral",
+      "style_status": "pretrained text guidance; not CMP-trained architectural style classes",
+      "prompt": "Straight-on orthographic architectural facade elevation, flat rectangular wall, exact window and door arrangement from the outline, restrained architectural materials, painted plaster, clear glass, realistic material texture, crisp glass reflections, even diffuse daylight, minimal baked shadows, no surrounding scene.",
+      "negative_prompt": "perspective view, angled building, street, people, cars, text, watermark, extra windows, extra doors, bent frames, warped walls, blurry, painting, illustration",
+      "resolution": 1024,
+      "steps": 30,
+      "control_scale": 1.0,
+      "guidance_scale": 5.0,
+      "offload": "disk",
+      "quality_review": {
+        "decision": "reject",
+        "reason": "Clay-like render, empty window recesses and protruding door slab; insufficient material realism despite broadly correct layout."
+      },
+      "elapsed_seconds": 629.9689999999246,
+      "sampled_peak_device_mib": 800,
+      "peak_allocated_mib": 997.32177734375,
+      "peak_reserved_mib": 1134.0,
+      "output_sha256": "d046964d1d0420a9e0cfc63329f313c53da0bea9b25d372b75c46527e524c7a1",
+      "packages": {
+        "torch": "2.6.0+cu124",
+        "diffusers": "0.35.2",
+        "transformers": "4.46.3",
+        "accelerate": "1.12.0",
+        "huggingface-hub": "0.36.2"
+      },
+      "case": {
+        "id": "viewer",
+        "control_sha256": "7c432a1227b1f6394cf5095f03765522d5f66b1c32b42689bf7abc40cae1d0db"
+      }
+    }
+  ],
+  "composition": {
+    "kind": "hybrid_neural_material_composite",
+    "status": "reviewed_prototype_not_production",
+    "style": "Traditional Brick",
+    "tile_meters": 1.4,
+    "opening_count": 5,
+    "resolution": [
+      1024,
+      1024
+    ],
+    "output_sha256": "c585efbf6fb1626c3ba5bce0c8fee9496cb4755ee418e95cfc6be4204d4a52a8",
+    "material_sha256": "45181d30b3e2af7b70e85c49f33b75f6e1b88ff69323a0822f3e573aabca3460",
+    "opening_source_sha256": "ec2d2ba68ddced3ef7612594c59d8226693e3575d28beb822b9b289cc8a31c94",
+    "fixture_sha256": "9ae22d9c21ae08c6aae4e7f3069e8b663764b2b68ca24b44f0d3445e539acabf",
+    "limitations": [
+      "Material swatch requires visual review for objects and tiling artifacts",
+      "Opening interiors remain synthesized, not metrically reconstructed",
+      "Mirrored tiling and rectangular masking are deterministic graphics operations",
+      "No learned normal/roughness maps or CMP style labels"
+    ],
+    "opening_mask_components": 5,
+    "quality_review": "Sharper wall and glass detail than the 512 GAN; all five prescribed openings retained. Mirrored repetition, dark mortar and image-based glass remain visible limitations; not a claim of general photorealism."
+  },
+  "viewer": {
+    "device": "Neural material + geometry-locked composition (experimental)",
+    "errors": [],
+    "reports": [
+      {
+        "shape": "L",
+        "roofs": [
+          {
+            "style": "pitched",
+            "fallback": null,
+            "triangles": 26
+          }
+        ],
+        "openings": 5,
+        "textureResolution": 1024,
+        "alignmentErrorPixels": 0.03849223181089201,
+        "drawCalls": 123
+      },
+      {
+        "shape": "T",
+        "roofs": [
+          {
+            "style": "pitched",
+            "fallback": null,
+            "triangles": 36
+          }
+        ],
+        "openings": 5,
+        "textureResolution": 1024,
+        "alignmentErrorPixels": 0.03849223181089201,
+        "drawCalls": 131
+      },
+      {
+        "shape": "U",
+        "roofs": [
+          {
+            "style": "pitched",
+            "fallback": null,
+            "triangles": 40
+          }
+        ],
+        "openings": 5,
+        "textureResolution": 1024,
+        "alignmentErrorPixels": 0.03849223181089201,
+        "drawCalls": 131
+      },
+      {
+        "shape": "detached",
+        "roofs": [
+          {
+            "style": "pitched",
+            "fallback": null,
+            "triangles": 16
+          },
+          {
+            "style": "pitched",
+            "fallback": null,
+            "triangles": 16
+          }
+        ],
+        "openings": 5,
+        "textureResolution": 1024,
+        "alignmentErrorPixels": 0.03849223181089201,
+        "drawCalls": 137
+      }
+    ]
+  },
+  "scope": "One CMP validation pilot run; no new held-out benchmark or four-style training claim"
+}
