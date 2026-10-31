@@ -1,0 +1,66 @@
+{
+  "base": {
+    "repo": "stabilityai/stable-diffusion-xl-base-1.0",
+    "revision": "462165984030d82259a11f4367a4eed129e94a7b",
+    "files": [
+      "model_index.json",
+      "scheduler/scheduler_config.json",
+      "text_encoder/config.json",
+      "text_encoder/model.fp16.safetensors",
+      "text_encoder_2/config.json",
+      "text_encoder_2/model.fp16.safetensors",
+      "tokenizer/merges.txt",
+      "tokenizer/special_tokens_map.json",
+      "tokenizer/tokenizer_config.json",
+      "tokenizer/vocab.json",
+      "tokenizer_2/merges.txt",
+      "tokenizer_2/special_tokens_map.json",
+      "tokenizer_2/tokenizer_config.json",
+      "tokenizer_2/vocab.json",
+      "unet/config.json",
+      "unet/diffusion_pytorch_model.fp16.safetensors"
+    ],
+    "weights": {
+      "text_encoder/model.fp16.safetensors": {
+        "size": 246144152,
+        "sha256": "660c6f5b1abae9dc498ac2d21e1347d2abdb0cf6c0c0c8576cd796491d9a6cdd"
+      },
+      "text_encoder_2/model.fp16.safetensors": {
+        "size": 1389382176,
+        "sha256": "ec310df2af79c318e24d20511b601a591ca8cd4f1fce1d8dff822a356bcdb1f4"
+      },
+      "unet/diffusion_pytorch_model.fp16.safetensors": {
+        "size": 5135149760,
+        "sha256": "83e012a805b84c7ca28e5646747c90a243c65c8ba4f070e2d7ddc9d74661e139"
+      }
+    }
+  },
+  "controlnet": {
+    "repo": "diffusers/controlnet-canny-sdxl-1.0-small",
+    "revision": "edd85f64c5f87dfb6d73762949d9daca16389518",
+    "files": [
+      "config.json",
+      "diffusion_pytorch_model.fp16.safetensors"
+    ],
+    "weights": {
+      "diffusion_pytorch_model.fp16.safetensors": {
+        "size": 320237179,
+        "sha256": "fde4888a5f0a5648118991cc50e0ac4d60a2356dbaddf5e0649dd69c1119a2f9"
+      }
+    }
+  },
+  "vae": {
+    "repo": "madebyollin/sdxl-vae-fp16-fix",
+    "revision": "207b116dae70ace3637169f1ddd2434b91b3a8cd",
+    "files": [
+      "config.json",
+      "diffusion_pytorch_model.safetensors"
+    ],
+    "weights": {
+      "diffusion_pytorch_model.safetensors": {
+        "size": 334643238,
+        "sha256": "1b909373b28f2137098b0fd9dbc6f97f8410854f31f84ddc9fa04b077b0ace2c"
+      }
+    }
+  }
+}

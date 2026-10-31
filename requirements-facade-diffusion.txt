@@ -1,0 +1,8 @@
+# Install only in .venv-facade-diffusion, reusing the existing CUDA torch 2.6.
+# Do not install this file into the production environment.
+diffusers==0.35.2
+transformers==4.46.3
+accelerate==1.12.0
+huggingface-hub==0.36.2
+safetensors==0.8.0
+psutil==7.2.2

@@ -73,6 +73,7 @@ wheels/
 # Virtual Environments
 venv/
 .venv/
+.venv-facade-diffusion/
 env/
 ENV/
 env.bak/
