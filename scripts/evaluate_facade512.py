@@ -49,7 +49,7 @@ def evaluate(args):
     sharpness = OpeningSharpnessLoss().cuda()
     inception = inception_v3(weights=Inception_V3_Weights.DEFAULT, transform_input=False).cuda().eval()
     inception.fc = torch.nn.Identity()
-    features = {'real': [], 'baseline': [], 'coarse_prior': [], 'experimental': []}
+    features = {'real': [], 'baseline': [], 'coarse_path': [], 'experimental': []}
     mean = torch.tensor([.485, .456, .406], device='cuda')[None, :, None, None]
     std = torch.tensor([.229, .224, .225], device='cuda')[None, :, None, None]
     def extract(tensor):
@@ -68,7 +68,7 @@ def evaluate(args):
         with torch.inference_mode():
             measures = {}
             features['real'].append(extract(y))
-            for name, prediction in [('baseline', baseline.float()), ('coarse_prior', coarse_prior.float()), ('experimental', enhanced.float())]:
+            for name, prediction in [('baseline', baseline.float()), ('coarse_path', coarse_prior.float()), ('experimental', enhanced.float())]:
                 features[name].append(extract(prediction))
                 measures[name] = {'lpips': metric(prediction, y).mean().item(),
                                   'ssim': compute_ssim(prediction, y), 'psnr': compute_psnr(prediction, y),
@@ -79,7 +79,7 @@ def evaluate(args):
                  ['Semantic input', 'Baseline 256 (displayed at 512)', 'Experimental 512', 'Original CMP target'], out/f'{args.split}_{index:03}.png')
         if index % 20 == 0: print(f'{args.split}: {index+1}/{len(data)}', flush=True)
     means = {model_name: {key: float(np.mean([r[model_name][key] for r in records]))
-                         for key in records[0][model_name]} for model_name in ('baseline', 'coarse_prior', 'experimental')}
+                         for key in records[0][model_name]} for model_name in ('baseline', 'coarse_path', 'experimental')}
     # Unbiased full-set polynomial MMD on torchvision Inception pool3 features.
     # Report extractor explicitly; this is not interchangeable with TF-FID KID.
     real_features = np.concatenate(features['real']).astype(np.float64)

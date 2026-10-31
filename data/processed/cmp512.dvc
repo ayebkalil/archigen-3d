@@ -1,0 +1,6 @@
+outs:
+- md5: f7bec5c32cc381878b73a3bd4a338fe5.dir
+  size: 3132795
+  nfiles: 607
+  hash: md5
+  path: cmp512

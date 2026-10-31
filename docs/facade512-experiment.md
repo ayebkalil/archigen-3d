@@ -13,7 +13,7 @@ style-conditioned discriminators operate at 512 and 256. A zero-initialized outp
 head makes the initial prediction equal to the prior rather than random noise.
 
 The loss combines hinge GAN, L1 (5), discriminator feature matching (5), frozen
-ImageNet VGG-19 (1), and opening-region Sobel/Laplacian matching (2). VGG taps are
+ImageNet VGG-19 (10), and opening-region Sobel/Laplacian matching (5). VGG taps are
 relu1_2, relu2_2, relu3_2, relu4_2, relu5_2. Masks locate opening regions; real photo
 edges supervise details, so the loss does not invent mullions from rectangle masks.
 
@@ -27,6 +27,7 @@ palette. `src/data/facade_palette.py` records the training-derived encoding.
 
 The legacy bridge confused some semantic classes (cornice/background,
 sill/molding, decoration/blind). Only the experiment uses the corrected mapping.
+The experimental letterbox uses the real background class outside the wall.
 
 ## Style limitations
 
@@ -59,6 +60,24 @@ Install `requirements-facade512.txt` with the appropriate CUDA build of PyTorch.
    state is saved in `outputs/phase2/training/last.pth`; resume with `--resume`.
    `best.pth` is selected on validation VGG loss only. Test images never select
    checkpoints. Memory smoke runs must use a separate output directory.
+
+   The initial controlled run used VGG=1 and edges=2. It was stopped after three
+   consecutive validation regressions (four completed epochs; best epoch 1).
+   The stronger perceptual run initializes from that best checkpoint with fresh
+   discriminator/optimizers, and uses a distinct output folder:
+
+   ```powershell
+   python -m src.models.facade_experiment --epochs 10 --init-checkpoint outputs/phase2/training/best.pth --output outputs/phase2/training_vgg10
+   ```
+
+   Early stopping uses four non-improving validation epochs. Loss weights are
+   configurable, recorded in every checkpoint, and must match when resuming.
+
+   `--train-coarse-decoder` optionally fine-tunes up4..up7 and the final convolution
+   at one tenth the refiner learning rate. The encoder, global bottleneck, and
+   early decoder remain frozen; dropout remains disabled in the pretrained path.
+   This tests whether locking the old decoder preserves its grid artifacts.
+   Every checkpoint records this option; the original production weights are never modified.
 
 5. `python scripts/evaluate_facade512.py` evaluates all 106 held-out test pairs,
    saves per-image metrics, a paired bootstrap LPIPS interval, raw texture grids,

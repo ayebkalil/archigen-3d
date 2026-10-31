@@ -87,35 +87,54 @@ def train(args):
     data = ExperimentDataset(args.manifest, 'train', augment=True)
     val = ExperimentDataset(args.manifest, 'val')
     loader = DataLoader(data, batch_size=2, shuffle=True, num_workers=0, drop_last=True)
-    config = {'width': args.width, 'blocks': args.blocks, 'gradient_checkpointing': True}
+    config = {'width': args.width, 'blocks': args.blocks, 'gradient_checkpointing': True,
+              'train_coarse_decoder': args.train_coarse_decoder}
     generator = FacadeGenerator512(**config)
     generator.coarse.load_state_dict(torch.load(args.baseline, map_location='cpu', weights_only=True))
+    if args.init_checkpoint:
+        initial = torch.load(args.init_checkpoint, map_location='cpu', weights_only=True)
+        if any(initial['model_config'][key] != config[key] for key in ('width', 'blocks')):
+            raise ValueError('Initialization configuration differs')
+        generator.load_state_dict(initial['generator'])
     generator = generator.cuda()
     discriminator = MultiScaleFacadeDiscriminator(width=16).cuda()
     vgg = VGG19PerceptualLoss().cuda()
     edge = OpeningSharpnessLoss().cuda()
-    opt_g = torch.optim.Adam([p for p in generator.parameters() if p.requires_grad], lr=args.lr, betas=(.5, .999))
+    refiner_parameters = [p for name, p in generator.named_parameters() if p.requires_grad and not name.startswith('coarse.')]
+    groups = [{'params': refiner_parameters, 'lr': args.lr}]
+    if args.train_coarse_decoder:
+        groups.append({'params': [p for p in generator.coarse.parameters() if p.requires_grad], 'lr': args.lr * .1})
+    opt_g = torch.optim.Adam(groups, lr=args.lr, betas=(.5, .999))
     opt_d = torch.optim.Adam(discriminator.parameters(), lr=args.lr, betas=(.5, .999))
     scaler = torch.amp.GradScaler('cuda')
-    start_epoch, best, step = 0, float('inf'), 0
+    start_epoch, best, step, stale_epochs = 0, float('inf'), 0, 0
+    loss_weights = {'l1': args.lambda_l1, 'vgg': args.lambda_vgg,
+                    'feature_matching': args.lambda_fm, 'opening_edges': args.lambda_edges, 'gan': args.lambda_gan}
     if args.resume:
         state = torch.load(args.resume, map_location='cpu', weights_only=True)
-        if state['model_config'] != config:
+        if {**{'train_coarse_decoder': False}, **state['model_config']} != config:
             raise ValueError('Resume configuration differs')
+        if state['loss_weights'] != loss_weights:
+            raise ValueError('Resume loss weights differ; use --init-checkpoint for a new controlled run')
+        if state['manifest_sha256'] != hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest():
+            raise ValueError('Resume dataset manifest differs')
         generator.load_state_dict(state['generator']); discriminator.load_state_dict(state['discriminator'])
         opt_g.load_state_dict(state['optimizer_g']); opt_d.load_state_dict(state['optimizer_d'])
         scaler.load_state_dict(state['scaler'])
         start_epoch, best, step = state['epoch'], state['best_val'], state['step']
+        stale_epochs = state.get('stale_epochs', 0)
         random.setstate(state['python_rng']); torch.set_rng_state(state['torch_rng'])
         torch.cuda.set_rng_state_all(state['cuda_rng'])
     start = time.monotonic()
     supported = sorted({int(r.get('style_id', NEUTRAL_STYLE)) for r in data.rows} - {NEUTRAL_STYLE})
     metadata = {'architecture': 'facade_residual_film_512_v1', 'resolution': 512, 'model_config': config,
                 'supported_style_ids': supported, 'neutral_style_id': NEUTRAL_STYLE,
-                'baseline_sha256': hashlib.sha256(Path(args.baseline).read_bytes()).hexdigest(),
+                'baseline_sha256': initial['baseline_sha256'] if args.init_checkpoint else hashlib.sha256(Path(args.baseline).read_bytes()).hexdigest(),
                 'manifest_sha256': hashlib.sha256(Path(args.manifest).read_bytes()).hexdigest(),
-                'loss_weights': {'l1': 5., 'vgg': 1., 'feature_matching': 5., 'opening_edges': 2., 'gan': 1.},
-                'physical_batch': 2, 'accumulation': 4, 'seed': args.seed}
+                'loss_weights': loss_weights,
+                'init_checkpoint_sha256': hashlib.sha256(Path(args.init_checkpoint).read_bytes()).hexdigest() if args.init_checkpoint else None,
+                'physical_batch': 2, 'accumulation': 4, 'seed': args.seed,
+                'decoder_lr_scale': .1 if args.train_coarse_decoder else None}
     (out/'config.json').write_text(json.dumps({**metadata, 'arguments': vars(args)}, indent=2))
     for epoch in range(start_epoch, args.epochs):
         generator.train(); discriminator.train()
@@ -148,7 +167,7 @@ def train(args):
                 perceptual = sum(vgg(fake[j:j+1], photo[j:j+1]) for j in range(len(fake))) / len(fake)
                 sharpness = edge(fake, photo, sketch)
                 l1 = F.l1_loss(fake.float(), photo.float())
-                loss_g = gan + 5 * fm + perceptual + 2 * sharpness + 5 * l1
+                loss_g = args.lambda_gan * gan + args.lambda_fm * fm + args.lambda_vgg * perceptual + args.lambda_edges * sharpness + args.lambda_l1 * l1
             if not torch.isfinite(loss_g + loss_d): raise FloatingPointError('Nonfinite GAN loss')
             scaler.scale(loss_g / divisor).backward()
             if (i + 1) % 4 == 0 or i + 1 == count:
@@ -172,6 +191,7 @@ def train(args):
                 values.append(vgg(pred, y).item())
         metric = float(np.mean(values))
         improved = metric < best
+        stale_epochs = 0 if improved else stale_epochs + 1
         best = min(best, metric)
         record = {'epoch': epoch+1, 'steps': step, 'train_losses_g_d_l1_vgg_edges': np.mean(totals, 0).tolist(),
                   'val_vgg': metric, 'best_val_vgg': best, 'elapsed_s': time.monotonic()-start, **budget.check()}
@@ -179,13 +199,17 @@ def train(args):
         with (out/'history.jsonl').open('a') as f: f.write(json.dumps(record)+'\n')
         state = {**metadata, 'generator': generator.state_dict(), 'discriminator': discriminator.state_dict(),
                  'optimizer_g': opt_g.state_dict(), 'optimizer_d': opt_d.state_dict(), 'scaler': scaler.state_dict(),
-                 'epoch': epoch+1, 'step': step, 'best_val': best, 'python_rng': random.getstate(),
+                 'epoch': epoch+1, 'step': step, 'best_val': best, 'stale_epochs': stale_epochs, 'python_rng': random.getstate(),
                  'torch_rng': torch.get_rng_state(), 'cuda_rng': torch.cuda.get_rng_state_all()}
         temporary = out/'last.tmp'
         torch.save(state, temporary); temporary.replace(out/'last.pth')
         if improved:
-            torch.save({**metadata, 'generator': generator.state_dict(), 'epoch': epoch+1, 'val_vgg': metric}, out/'best.pth')
+            torch.save({**metadata, 'generator': generator.state_dict(), 'epoch': epoch+1, 'val_vgg': metric}, out/'best.tmp')
+            (out/'best.tmp').replace(out/'best.pth')
         torch.cuda.empty_cache()
+        if stale_epochs >= args.patience:
+            print(f'Early stop: validation did not improve for {stale_epochs} epochs.', flush=True)
+            break
 
 
 if __name__ == '__main__':
@@ -201,4 +225,12 @@ if __name__ == '__main__':
     parser.add_argument('--memory-mib', type=int, default=3500)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--resume')
+    parser.add_argument('--init-checkpoint')
+    parser.add_argument('--lambda-l1', type=float, default=5.)
+    parser.add_argument('--lambda-vgg', type=float, default=10.)
+    parser.add_argument('--lambda-fm', type=float, default=5.)
+    parser.add_argument('--lambda-edges', type=float, default=5.)
+    parser.add_argument('--lambda-gan', type=float, default=1.)
+    parser.add_argument('--patience', type=int, default=4)
+    parser.add_argument('--train-coarse-decoder', action='store_true')
     train(parser.parse_args())

@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
+from src.data.facade_palette import FACADE_STYLES, NEUTRAL_STYLE
 from torch.nn.utils import spectral_norm
 
 def weights_init_normal(m):
@@ -192,10 +193,6 @@ class PatchGANDiscriminator(nn.Module):
 
 
 # Keep the legacy architectures above checkpoint-compatible. The experiment is opt-in.
-FACADE_STYLES = ("Modern Minimalist", "Mediterranean Stone", "Traditional Brick", "Lush Vegetation")
-NEUTRAL_STYLE = 4  # Unlabelled CMP examples must not be assigned fabricated style labels.
-
-
 class FiLMBlock(nn.Module):
     """Residual block with learned style-dependent scale and shift."""
     def __init__(self, channels, embedding_dim=32):
@@ -222,12 +219,17 @@ class FacadeGenerator512(nn.Module):
     sees the native 512 semantic map, not just an interpolated generated image.
     A fifth neutral embedding permits honest training on unlabelled CMP data.
     """
-    def __init__(self, width=24, blocks=4, gradient_checkpointing=True):
+    def __init__(self, width=24, blocks=4, gradient_checkpointing=True, train_coarse_decoder=False):
         super().__init__()
         self.width, self.blocks = width, blocks
         self.gradient_checkpointing = gradient_checkpointing
+        self.train_coarse_decoder = train_coarse_decoder
         self.coarse = UNetGenerator()
         self.coarse.requires_grad_(False).eval()
+        if train_coarse_decoder:
+            # Adapt only the late pretrained decoder, keeping encoder/global prior frozen.
+            for name in ('up4', 'up5', 'up6', 'up7', 'final'):
+                getattr(self.coarse, name).requires_grad_(True)
         self.style_embedding = nn.Embedding(5, 32)
         self.stem = nn.Conv2d(6, width, 3, padding=1)
         self.down1 = nn.Conv2d(width, width * 2, 4, 2, 1)
@@ -253,7 +255,7 @@ class FacadeGenerator512(nn.Module):
         return module(*args)
 
     def forward(self, sketch, style_id):
-        with torch.no_grad():
+        with torch.set_grad_enabled(torch.is_grad_enabled() and self.training and self.train_coarse_decoder):
             coarse = self.coarse(F.interpolate(sketch, size=(256, 256), mode="nearest"))
             coarse = F.interpolate(coarse, size=sketch.shape[-2:], mode="bilinear", align_corners=False)
         embedding = self.style_embedding(style_id)

@@ -124,3 +124,21 @@ def test_experimental_api_metadata_does_not_claim_legacy_styles(monkeypatch):
     response = asyncio.run(main.get_model_metadata())
     assert response.target_resolution == [512, 512]
     assert response.supported_styles == []
+
+
+def test_onnx_adapter_import_does_not_require_pytorch():
+    import subprocess
+    import sys
+    result = subprocess.run([sys.executable, '-c',
+        "import sys; sys.modules['torch'] = None; from src.bridge.facade_experimental import ExperimentalFacadeInference"],
+        capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_optional_decoder_finetuning_preserves_frozen_encoder():
+    model = FacadeGenerator512(width=4, blocks=1, train_coarse_decoder=True).train()
+    x = torch.randn(1, 3, 64, 64)
+    model(x, torch.tensor([NEUTRAL_STYLE])).mean().backward()
+    assert model.coarse.down1.model[0].weight.grad is None
+    assert model.coarse.final[1].weight.grad.abs().sum() > 0
+    assert not model.coarse.training  # frozen dropout remains disabled

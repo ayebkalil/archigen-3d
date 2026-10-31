@@ -168,9 +168,9 @@ class FacadeBridge:
         if experiment_path:
             from src.bridge.facade_experimental import ExperimentalFacadeInference
             device = "cpu"
-            if self.prefer_cuda:
+            if self.prefer_cuda and not experiment_path.lower().endswith(".onnx"):
                 import torch
-                if torch.cuda.is_available() and not experiment_path.endswith(".onnx"):
+                if torch.cuda.is_available():
                     device = "cuda"
             self.inference_engine = ExperimentalFacadeInference(experiment_path, device)
             self.enhance_textures = False

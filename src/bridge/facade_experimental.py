@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from src.models.architecture import FACADE_STYLES, NEUTRAL_STYLE
+from src.data.facade_palette import FACADE_STYLES, NEUTRAL_STYLE
 
 
 class ExperimentalFacadeInference:
