@@ -471,7 +471,8 @@ async def generate_furniture_3d_endpoint(request: FurnitureGenerateRequest):
             "engine": res["engine"],
             "device": res["device"],
             "model_glb_base64": res["glb_base64"],
-            "preview_image_base64": res["preview_image_base64"]
+            "preview_image_base64": res["preview_image_base64"],
+            "quality": res.get("quality")
         }
     except Exception as e:
         import traceback

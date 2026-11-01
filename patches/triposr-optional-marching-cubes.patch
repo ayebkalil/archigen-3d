@@ -1,0 +1,17 @@
+diff --git a/tsr/models/isosurface.py b/tsr/models/isosurface.py
+--- a/tsr/models/isosurface.py
++++ b/tsr/models/isosurface.py
+@@ -3,7 +3,12 @@
+ import numpy as np
+ import torch
+ import torch.nn as nn
+-from torchmcubes import marching_cubes
++try:
++    from torchmcubes import marching_cubes
++except ImportError:
++    def marching_cubes(*args, **kwargs):
++        raise RuntimeError("torchmcubes is unavailable; use ArchiGen quality extraction "
++                           "or install torchmcubes for the upstream extractor")
+ 
+ 
+ class IsosurfaceHelper(nn.Module):

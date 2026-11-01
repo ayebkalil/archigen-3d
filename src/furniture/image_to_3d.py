@@ -15,6 +15,8 @@ import io
 import math
 import uuid
 import base64
+import os
+import threading
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -37,12 +39,20 @@ CATEGORY_DIMENSIONS = {
 
 class ImageTo3DGenerator:
     _instance = None
+    _instance_lock = threading.Lock()
 
     def __init__(self, use_gpu: bool = True):
         self.use_gpu = use_gpu
         self.tsr_model = None
         self.device_name = "CPU"
         self.rembg_session = None
+        self._quality_engine = None
+        if os.environ.get('ARCHIGEN_FURNITURE_QUALITY') == '1':
+            from .quality_engine import QualityFurnitureEngine
+            self._quality_engine = QualityFurnitureEngine(use_gpu=use_gpu)
+            self.device = self._quality_engine.device
+            self.device_name = self._quality_engine.device_name
+            return
 
         # 1. Initialize GPU if available
         try:
@@ -341,6 +351,9 @@ class ImageTo3DGenerator:
         Executes end-to-end 2D-to-3D generation.
         Returns GLB bytes, base64 payload, and catalog placement metadata.
         """
+        if getattr(self, '_quality_engine', None) is not None:
+            return self._quality_engine.generate_from_image(
+                image, name=name, category=category, remove_bg=remove_bg, target_height_m=target_height_m)
         category_clean = category.lower().strip()
         base_dims = CATEGORY_DIMENSIONS.get(category_clean, [0.60, 0.60, 0.85]).copy()
         if target_height_m and target_height_m > 0.2:
@@ -512,6 +525,7 @@ class ImageTo3DGenerator:
 
     @classmethod
     def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = cls()
+        with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = cls()
         return cls._instance

@@ -74,6 +74,7 @@ wheels/
 venv/
 .venv/
 .venv-facade-diffusion/
+.venv-furniture-quality/
 env/
 ENV/
 env.bak/

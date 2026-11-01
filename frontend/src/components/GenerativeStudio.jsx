@@ -23,39 +23,15 @@ import {
   Info
 } from 'lucide-react';
 
-// Preset sample furniture images (Data URI high-quality synthetic silhouettes)
+// A real reference image supplies depth and material cues that flat icons lack.
 const FURNITURE_PRESETS = [
   {
     id: 'preset_chair_1',
-    name: 'Modern Accent Armchair',
+    name: 'Upholstered Dining Chair',
     category: 'chair',
-    desc: 'Sculptural curved lounge chair with warm terracotta fabric',
+    desc: 'TripoSR example; assumed height, replace with a measured value',
     height_m: 0.85,
-    preview_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f7f4ed"/><rect x="55" y="35" width="90" height="85" rx="15" fill="%23c85a2b"/><rect x="40" y="105" width="120" height="28" rx="8" fill="%23b8452a"/><rect x="52" y="133" width="12" height="48" rx="4" fill="%232b2b2b"/><rect x="136" y="133" width="12" height="48" rx="4" fill="%232b2b2b"/></svg>'
-  },
-  {
-    id: 'preset_table_1',
-    name: 'Scandinavian Dining Table',
-    category: 'table',
-    desc: 'Minimalist solid oak dining table with rounded beveled edges',
-    height_m: 0.75,
-    preview_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f7f4ed"/><rect x="25" y="60" width="150" height="24" rx="6" fill="%23b38054"/><rect x="38" y="84" width="14" height="88" rx="3" fill="%238a5b32"/><rect x="148" y="84" width="14" height="88" rx="3" fill="%238a5b32"/></svg>'
-  },
-  {
-    id: 'preset_sofa_1',
-    name: 'Tufted Velvet Sofa',
-    category: 'sofa',
-    desc: 'Deep olive green 3-seater contemporary living room sofa',
-    height_m: 0.80,
-    preview_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f7f4ed"/><rect x="20" y="55" width="160" height="60" rx="12" fill="%233b5a45"/><rect x="20" y="100" width="160" height="35" rx="6" fill="%232e4836"/><rect x="30" y="135" width="12" height="30" rx="3" fill="%231a1a1a"/><rect x="158" y="135" width="12" height="30" rx="3" fill="%231a1a1a"/></svg>'
-  },
-  {
-    id: 'preset_bed_1',
-    name: 'Minimalist Platform Bed',
-    category: 'bed',
-    desc: 'Low-profile upholstered king platform bed with integrated headboard',
-    height_m: 0.65,
-    preview_url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23f7f4ed"/><rect x="25" y="45" width="150" height="55" rx="8" fill="%23485563"/><rect x="30" y="95" width="140" height="45" rx="6" fill="%23e8e4db"/><rect x="35" y="140" width="130" height="18" rx="4" fill="%232d3436"/></svg>'
+    preview_url: '/samples/furniture/chair.png'
   }
 ];
 
@@ -244,30 +220,38 @@ export default function GenerativeStudio({
     if (!modelGroup || !generatedModel?.model_glb_base64) return;
 
     modelGroup.clear();
+    let cancelled = false;
+    let loadedScene = null;
+    const disposeModel = (root) => root.traverse((child) => {
+      if (!child.isMesh) return;
+      child.geometry?.dispose();
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) {
+        if (!material) continue;
+        for (const value of Object.values(material)) {
+          if (value?.isTexture) value.dispose();
+        }
+        material.dispose();
+      }
+    });
 
     const loader = new GLTFLoader();
     loader.load(
       generatedModel.model_glb_base64,
       (gltf) => {
         const scene = gltf.scene;
+        if (cancelled) { disposeModel(scene); return; }
+        loadedScene = scene;
         scene.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
-            if (child.geometry) {
+            if (child.geometry && !child.geometry.attributes.normal) {
               child.geometry.computeVertexNormals();
             }
             if (child.material) {
-              child.material.side = THREE.DoubleSide;
-              child.material.color.set(0xffffff);
-              const hasVertexColors = Boolean(child.geometry && child.geometry.attributes && child.geometry.attributes.color);
-              child.material.vertexColors = hasVertexColors;
-              child.material.roughness = generatedModel.roughness !== undefined ? generatedModel.roughness : 0.35;
-              child.material.metalness = 0.05;
-              child.material.flatShading = false;
-              if (wireframe3D) {
-                child.material.wireframe = true;
-              }
+              // Preserve baked colors, smooth seam normals and exported PBR factors.
+              child.material.wireframe = wireframe3D;
               if (child.material.map) {
                 if (THREE.SRGBColorSpace) {
                   child.material.map.colorSpace = THREE.SRGBColorSpace;
@@ -299,20 +283,31 @@ export default function GenerativeStudio({
       undefined,
       (err) => console.error('GLB preview load error:', err)
     );
-  }, [generatedModel, wireframe3D]);
+    return () => {
+      cancelled = true;
+      if (loadedScene) {
+        modelGroup.remove(loadedScene);
+        disposeModel(loadedScene);
+      }
+    };
+  }, [generatedModel, wireframe3D, studioTab]);
 
   // Handle Preset Selection
   const handleSelectPreset = (preset) => {
+    setGeneratedModel(null);
+    setSaveSuccessMsg(null);
     setFurnitureImageBase64(preset.preview_url);
     setFurnitureName(preset.name);
     setFurnitureCategory(preset.category);
     setTargetHeightM(preset.height_m);
   };
 
-  // Handle Image Upload with client-side downscaling (max 512px) for instant, responsive processing
+  // Keep detail for foreground cropping; the neural encoder resizes after cropping.
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setGeneratedModel(null);
+    setSaveSuccessMsg(null);
 
     const reader = new FileReader();
     reader.onload = (uploadEvt) => {
@@ -320,11 +315,11 @@ export default function GenerativeStudio({
       const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
       setFurnitureName(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
 
-      // Downscale to max 512x512 to prevent browser freezing and GPU memory bloat
+      // Bound upload size without shrinking thin parts before background removal.
       const img = new Image();
       img.onload = () => {
         try {
-          const maxDim = 512;
+          const maxDim = 2048;
           let w = img.width;
           let h = img.height;
           if (w > maxDim || h > maxDim) {
@@ -362,8 +357,20 @@ export default function GenerativeStudio({
     setIsGenerating3D(true);
     setSaveSuccessMsg(null);
     try {
+      let inputData = furnitureImageBase64;
+      if (!inputData.startsWith('data:')) {
+        const response = await fetch(inputData);
+        if (!response.ok) throw new Error('Could not load the reference image');
+        const blob = await response.blob();
+        inputData = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
       const payload = {
-        image_base64: furnitureImageBase64,
+        image_base64: inputData,
         name: furnitureName,
         category: furnitureCategory,
         remove_bg: removeBg,
@@ -547,7 +554,7 @@ export default function GenerativeStudio({
                     />
                     {generatedModel?.preview_image_base64 && (
                       <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-emerald-700/90 text-white text-[9px] font-mono font-bold tracking-wider">
-                        AI ISOLATED (BG REMOVED)
+                        MODEL INPUT PREVIEW
                       </span>
                     )}
                   </div>
@@ -569,12 +576,16 @@ export default function GenerativeStudio({
                 onChange={handleImageUpload}
                 className="hidden"
               />
+              <p className="text-[11px] text-[#1d1d1f]/70 mt-2">
+                Use a sharp photo of one complete item, ideally from a three-quarter angle.
+                Keep legs visible and enter its measured height. Hidden surfaces are inferred.
+              </p>
             </div>
 
             {/* Quick Test Preset Templates */}
             <div>
               <span className="text-[10px] font-bold text-[#1d1d1f]/60 uppercase tracking-wider block mb-1.5">
-                Or Pick a Curated Preset Template:
+                Try a reference image (TripoSR, MIT license):
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {FURNITURE_PRESETS.map((p) => (
@@ -743,7 +754,7 @@ export default function GenerativeStudio({
                     SYNTHESIZING 3D GEOMETRY...
                   </h3>
                   <p className="font-mono text-xs text-[#1d1d1f]/60 max-w-sm text-center">
-                    Extracting alpha mask with u2netp, building volumetric boundary hull, and generating textured GLB mesh.
+                    Preparing the image, reconstructing its surface, and baking a textured GLB mesh.
                   </p>
                 </div>
               )}
@@ -770,7 +781,9 @@ export default function GenerativeStudio({
                   <div>
                     <span className="text-[#1d1d1f]/50 block text-[9px] uppercase">Surface Texture</span>
                     <span className="font-bold text-[#1d1d1f]">
-                      {generatedModel.roughness !== undefined 
+                      {generatedModel.quality
+                        ? `${generatedModel.quality.texture_resolution}px neural atlas · roughness preset`
+                        : generatedModel.roughness !== undefined
                         ? (generatedModel.roughness < 0.40 ? `Smooth Polished (${generatedModel.roughness})` : `Matte Textured (${generatedModel.roughness})`)
                         : 'Auto PBR'}
                     </span>

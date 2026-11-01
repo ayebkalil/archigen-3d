@@ -1,0 +1,4 @@
+# Isolated venv with --system-site-packages reuses existing CUDA Torch 2.6.
+transformers==4.46.3
+huggingface-hub==0.36.2
+xatlas==0.0.11
