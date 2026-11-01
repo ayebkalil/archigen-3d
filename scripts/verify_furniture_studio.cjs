@@ -24,7 +24,7 @@ async function main() {
     await clickText('AI Generative Studio');
     await clickText('Rotate: ON');
     const pending=page.waitForResponse(r=>r.url().includes('/furniture/generate-3d'),{timeout:600000});
-    await clickText('SYNTHESIZE 3D MODEL');
+    await page.click('[data-testid=generate-furniture]');
     const response=await pending;
     const result=await response.json();assert.equal(response.status(),200,JSON.stringify(result));
     assert.equal(result.quality.checkpoint_loading,'strict');

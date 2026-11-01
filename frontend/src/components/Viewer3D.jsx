@@ -1249,28 +1249,15 @@ export default function Viewer3D({
   }, [facadeFocusTrigger]);
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col h-full bg-[#f1ede4] relative overflow-hidden select-none font-mono">
+    <div className="viewer-panel viewport-panel flex-1 min-w-0 flex flex-col h-full bg-[#f1ede4] relative overflow-hidden select-none font-mono" aria-label="3D house viewer">
       {/* 3D Viewport Toolbar */}
-      <div className="h-12 shrink-0 overflow-x-auto border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f] select-none">
-        <div className="flex items-center space-x-2.5 shrink-0">
-          <Box className="w-3.5 h-3.5 text-[#b8452a] shrink-0" />
-          <span className="font-semibold text-xs uppercase tracking-wider text-[#1d1d1f] whitespace-nowrap">
-            3D PBR STUDIO
-          </span>
-          <span className="text-[#1d1d1f]/20">|</span>
-          <div className="flex items-center gap-1.5 text-[9.5px] text-[#1d1d1f]/80 uppercase tracking-wider">
-            <span>HDRI Environment</span>
-            <span>&bull;</span>
-            <span>Soft Shadows (PCF)</span>
-            <span>&bull;</span>
-            <span>ACES Tone Mapping</span>
-          </div>
-        </div>
+      <div className="viewer-toolbar viewport-toolbar h-12 shrink-0 overflow-x-auto border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f] select-none">
+        <div className="viewport-title"><Box size={16} /><strong>3D house</strong><span>Orbit · zoom · inspect</span></div>
 
         {/* Viewport Control Buttons & Camera Presets */}
-        <div className="flex shrink-0 items-center space-x-1.5">
+        <div className="viewer-tools flex shrink-0 items-center space-x-1.5">
           {/* Real-time FPS Monitor */}
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[#1d1d1f]/5 border border-[#1d1d1f]/10 text-[9.5px] text-[#2a7a6e] font-semibold" title="Live rendering frame rate on local GPU">
+          <div className="viewer-fps flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[#1d1d1f]/5 border border-[#1d1d1f]/10 text-[9.5px] text-[#2a7a6e] font-semibold" title="Live rendering frame rate on local GPU">
             <Activity className="w-3 h-3 text-[#2a7a6e] animate-pulse" />
             <span>{currentFps} FPS</span>
           </div>

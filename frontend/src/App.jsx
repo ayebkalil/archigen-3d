@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Navbar from './components/Navbar';
+import WorkspaceHeading from './components/WorkspaceHeading';
 import ControlPanel from './components/ControlPanel';
 import Floorplan2DCanvas from './components/Floorplan2DCanvas';
 import Viewer3D from './components/Viewer3D';
@@ -446,7 +447,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#efebe2] text-[#1d1d1f] font-sans selection:bg-[#b8452a]/20 selection:text-[#b8452a]">
+    <div className="design-app flex flex-col h-screen w-screen overflow-hidden bg-[#efebe2] text-[#1d1d1f] font-sans selection:bg-[#b8452a]/20 selection:text-[#b8452a]">
       {renderTransitionOverlay()}
 
       {/* 1. Header */}
@@ -478,9 +479,14 @@ export default function App() {
           />
         </ErrorBoundary>
       ) : (
-      <div className="flex-1 flex overflow-hidden relative">
+      <section className="workspace-page">
+      <WorkspaceHeading activeTab={activeTab} setActiveTab={setActiveTab} isAnalyzing={isAnalyzing} hasLayout={!!layout} />
+      <div className="floorplan-shell flex-1 flex overflow-hidden relative">
         {/* Left Sidebar Controls */}
         <ControlPanel
+          fileName={file?.name}
+          imageUrl={imageUrl}
+          onOpenGenerativeStudio={() => setPageView('generative_studio')}
           onFileUpload={handleFileUpload}
           onRunAnalysis={() => executeAnalysis(file, scale, numFloors, frontWallId)}
           onGenerateFacade={handleGenerateFacade}
@@ -502,7 +508,7 @@ export default function App() {
         />
 
         {/* Center Viewport Area */}
-        <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#efebe2] drafting-grid">
+        <main className="floorplan-main flex-1 flex flex-col h-full overflow-hidden bg-[#efebe2] drafting-grid">
           {errorMsg && (
             <div className="bg-[#b8452a]/10 border-b border-[#b8452a]/30 px-6 py-2.5 font-mono text-xs text-[#b8452a] flex justify-between items-center z-20">
               <span className="font-medium tracking-wide">Notice: {errorMsg}</span>
@@ -512,7 +518,7 @@ export default function App() {
             </div>
           )}
 
-          <div className="flex-1 flex overflow-hidden relative">
+          <div className={`viewport-deck ${activeTab === 'split' ? 'is-split' : ''} flex-1 flex overflow-hidden relative`}>
             {/* Split View: 2D Canvas + 3D Viewer */}
             {activeTab === 'split' && (
               <>
@@ -595,9 +601,10 @@ export default function App() {
           </div>
 
           {/* Bottom Summary Bar */}
-          <MetricsSummary layout={layout} frontWallId={frontWallId} />
+          <MetricsSummary layout={layout} frontWallId={frontWallId} selectedRoom={selectedRoom} onSelectRoom={handleSelectRoom} />
         </main>
       </div>
+      </section>
       )}
 
       {/* Facade Synthesis Studio Modal */}

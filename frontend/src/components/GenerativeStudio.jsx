@@ -78,6 +78,7 @@ export default function GenerativeStudio({
   const [isGeneratingFacade, setIsGeneratingFacade] = useState(false);
   const [facadeResult, setFacadeResult] = useState(null);
   const [appliedNotice, setAppliedNotice] = useState(false);
+  const [studioError, setStudioError] = useState(null);
 
   const fileInputRef = useRef(null);
   const canvas3DRef = useRef(null);
@@ -203,10 +204,13 @@ export default function GenerativeStudio({
       renderer.setSize(w, h);
     };
     window.addEventListener('resize', handleResize);
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
 
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       if (renderer.domElement && renderer.domElement.parentNode === container) {
         container.removeChild(renderer.domElement);
       }
@@ -355,6 +359,7 @@ export default function GenerativeStudio({
   const handleGenerate3DFurniture = async () => {
     if (!furnitureImageBase64) return;
     setIsGenerating3D(true);
+    setStudioError(null);
     setSaveSuccessMsg(null);
     try {
       let inputData = furnitureImageBase64;
@@ -383,7 +388,7 @@ export default function GenerativeStudio({
       }
     } catch (err) {
       console.error('Furniture generation error:', err);
-      alert(err.response?.data?.detail || '3D generation failed. Please try another image.');
+      setStudioError(err.response?.data?.detail || '3D generation failed. Please try another image.');
     } finally {
       setIsGenerating3D(false);
     }
@@ -409,7 +414,7 @@ export default function GenerativeStudio({
       }
     } catch (err) {
       console.error('Save error:', err);
-      alert('Failed to save model to catalog.');
+      setStudioError('Could not save this model. Please try again.');
     }
   };
 
@@ -428,6 +433,7 @@ export default function GenerativeStudio({
   const handleGenerateFacade = async (overrideStyle = null) => {
     const targetStyle = overrideStyle || selectedStyle;
     setIsGeneratingFacade(true);
+    setStudioError(null);
     setAppliedNotice(false);
     try {
       const payload = {
@@ -443,7 +449,7 @@ export default function GenerativeStudio({
       }
     } catch (err) {
       console.error('Facade generation error:', err);
-      alert(err.response?.data?.detail || 'Facade generation failed.');
+      setStudioError(err.response?.data?.detail || 'Facade generation failed. Please try again.');
     } finally {
       setIsGeneratingFacade(false);
     }
@@ -459,89 +465,35 @@ export default function GenerativeStudio({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#efebe2] overflow-hidden select-none font-mono text-[#1d1d1f]">
+    <div className="generative-page flex-1 flex flex-col h-full bg-[#efebe2] overflow-hidden select-none font-mono text-[#1d1d1f]">
       
-      {/* Studio Header & Tab Navigation */}
-      <div className="h-14 border-b border-[#1d1d1f]/15 bg-[#e5e0d4]/90 backdrop-blur-md px-6 flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-[#f0500f] text-white flex items-center justify-center shadow-sm">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-stencil text-sm uppercase tracking-wider text-[#1d1d1f]">
-                GENERATIVE AI STUDIO
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-[#f0500f]/15 text-[#f0500f] border border-[#f0500f]/30">
-                RTX 3050 CUDA
-              </span>
-            </div>
-            <p className="text-[10px] text-[#1d1d1f]/60 tracking-wider">
-              2D Image-to-3D Furniture Synthesizer & Conditional GAN Facade Engine
-            </p>
-          </div>
+      <div className="workspace-heading generative-heading">
+        <div><div className="workspace-eyebrow">OBJECTS & MATERIALS / WORKSPACE 02</div><h1>Generative studio<span>.</span></h1><p>Bring your references to life, one detail at a time.</p></div>
+        <div className="studio-mode-switch" aria-label="Generation workspace">
+          <button data-testid="studio-furniture" aria-pressed={studioTab === 'furniture'} onClick={() => setStudioTab('furniture')}><Box size={17} /><span>Furniture<small>Image to 3D</small></span></button>
+          <button data-testid="studio-facade" aria-pressed={studioTab === 'facade'} onClick={() => setStudioTab('facade')}><Building2 size={17} /><span>Facades<small>Material exploration</small></span></button>
         </div>
-
-        {/* Sub-Studio Switcher */}
-        <div className="flex items-center p-1 rounded-full border border-[#1d1d1f]/20 bg-white/60">
-          <button
-            onClick={() => setStudioTab('furniture')}
-            className={`flex items-center space-x-1.5 h-8 px-4 rounded-full font-stencil text-xs uppercase tracking-wider transition-all ${
-              studioTab === 'furniture'
-                ? 'bg-[#1d1d1f] text-[#efebe2] shadow-sm'
-                : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
-            }`}
-          >
-            <Box className="w-3.5 h-3.5 text-[#f0500f]" />
-            <span>2D-to-3D Furniture</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setStudioTab('facade');
-              if (!facadeResult) {
-                handleGenerateFacade();
-              }
-            }}
-            className={`flex items-center space-x-1.5 h-8 px-4 rounded-full font-stencil text-xs uppercase tracking-wider transition-all ${
-              studioTab === 'facade'
-                ? 'bg-[#1d1d1f] text-[#efebe2] shadow-sm'
-                : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f] hover:bg-black/5'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5 text-[#f0500f]" />
-            <span>Neural Facade Studio</span>
-          </button>
-        </div>
-
-        {/* Action: Return to Floorplan */}
-        {onNavigateToFloorplan && (
-          <button
-            onClick={onNavigateToFloorplan}
-            className="flex items-center space-x-1.5 h-8 px-3.5 rounded-full border border-[#1d1d1f]/30 bg-white hover:bg-[#1d1d1f] hover:text-[#efebe2] transition-all font-stencil text-xs uppercase tracking-wider shadow-xs"
-          >
-            <Eye className="w-3.5 h-3.5 text-[#f0500f]" />
-            <span>VIEW 3D FLOORPLAN</span>
-          </button>
-        )}
       </div>
+
+      {studioError && <div className="studio-error" role="alert"><Info size={16} /><span>{studioError}</span><button onClick={() => setStudioError(null)} aria-label="Dismiss error">Dismiss</button></div>}
 
       {/* =========================================================================
           TAB 1: 2D-TO-3D FURNITURE SYNTHESIZER
          ========================================================================= */}
       {studioTab === 'furniture' && (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="generation-shell flex-1 flex overflow-hidden">
           
           {/* Left Controls & Image Upload */}
-          <aside className="w-96 border-r border-[#1d1d1f]/15 bg-[#efebe2] p-5 flex flex-col space-y-4 overflow-y-auto shrink-0">
+          <aside className="generation-sidebar w-96 border-r border-[#1d1d1f]/15 bg-[#efebe2] p-5 flex flex-col space-y-4 overflow-y-auto shrink-0">
             
             <div>
               <label className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] block mb-2">
-                01 // FURNITURE IMAGE INPUT
+                01 / Reference image
               </label>
 
               {/* Upload Dropzone */}
-              <div
+              <div role="button" tabIndex={0} aria-label="Choose furniture image"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full h-44 rounded-xl border-2 border-dashed border-[#1d1d1f]/30 hover:border-[#f0500f] bg-white/70 hover:bg-white transition-all cursor-pointer flex flex-col items-center justify-center p-3 relative overflow-hidden group shadow-xs"
               >
@@ -585,7 +537,7 @@ export default function GenerativeStudio({
             {/* Quick Test Preset Templates */}
             <div>
               <span className="text-[10px] font-bold text-[#1d1d1f]/60 uppercase tracking-wider block mb-1.5">
-                Try a reference image (TripoSR, MIT license):
+                Or start with a reference
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {FURNITURE_PRESETS.map((p) => (
@@ -611,8 +563,9 @@ export default function GenerativeStudio({
             {/* Metadata Parameters */}
             <div className="space-y-3 bg-[#e5e0d4]/50 p-3.5 rounded-xl border border-[#1d1d1f]/15 text-xs">
               <div>
-                <label className="text-[10px] text-[#1d1d1f]/70 uppercase block mb-1">Furniture Name</label>
+                  <label htmlFor="furniture-name" className="text-[10px] text-[#1d1d1f]/70 uppercase block mb-1">Furniture name</label>
                 <input
+                    id="furniture-name"
                   type="text"
                   value={furnitureName}
                   onChange={(e) => setFurnitureName(e.target.value)}
@@ -622,25 +575,27 @@ export default function GenerativeStudio({
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="text-[10px] text-[#1d1d1f]/70 uppercase block mb-1">Category</label>
+                  <label htmlFor="furniture-category" className="text-[10px] text-[#1d1d1f]/70 uppercase block mb-1">Category</label>
                   <select
+                    id="furniture-category"
                     value={furnitureCategory}
                     onChange={(e) => setFurnitureCategory(e.target.value)}
                     className="w-full h-8 px-2 rounded bg-white border border-[#1d1d1f]/20 text-[#1d1d1f] font-mono text-xs"
                   >
-                    <option value="chair">Chair / Armchair</option>
-                    <option value="table">Table / Desk</option>
-                    <option value="sofa">Sofa / Couch</option>
+                    <option value="chair">Chair</option>
+                    <option value="table">Table / desk</option>
+                    <option value="sofa">Sofa</option>
                     <option value="bed">Bed</option>
-                    <option value="storage">Cabinet / Wardrobe</option>
-                    <option value="decor">Decor / Plant</option>
-                    <option value="lighting">Floor Lamp</option>
+                    <option value="storage">Storage</option>
+                    <option value="decor">Decor</option>
+                    <option value="lighting">Lighting</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-[#1d1d1f]/70 uppercase block mb-1">Height (m)</label>
+                  <label htmlFor="furniture-height" className="text-[10px] text-[#1d1d1f]/70 uppercase block mb-1">Height (m)</label>
                   <input
+                    id="furniture-height" min="0.05" max="10"
                     type="number"
                     step="0.05"
                     value={targetHeightM}
@@ -657,12 +612,13 @@ export default function GenerativeStudio({
                   onChange={(e) => setRemoveBg(e.target.checked)}
                   className="rounded text-[#f0500f] focus:ring-[#f0500f]"
                 />
-                <span className="text-[11px] text-[#1d1d1f]/80">AI Background Removal (u2netp)</span>
+                <span className="text-[11px] text-[#1d1d1f]/80">Remove image background</span>
               </label>
             </div>
 
             {/* Synthesize Button */}
             <button
+              data-testid="generate-furniture"
               onClick={handleGenerate3DFurniture}
               disabled={isGenerating3D}
               className="w-full h-11 px-5 rounded-full bg-[#f0500f] hover:bg-[#d8450a] text-white font-stencil text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#f0500f]/20 disabled:opacity-50 mt-auto"
@@ -670,26 +626,26 @@ export default function GenerativeStudio({
               {isGenerating3D ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>SYNTHESIZING 3D MODEL...</span>
+                  <span>Generating model…</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>SYNTHESIZE 3D MODEL →</span>
+                  <span>Generate 3D model</span>
                 </>
               )}
             </button>
           </aside>
 
           {/* Center 3D Viewport & Model Inspector */}
-          <main className="flex-1 flex flex-col h-full bg-[#f1ede4] relative">
+          <main className="furniture-stage flex-1 flex flex-col h-full bg-[#f1ede4] relative">
             
             {/* Viewport Top Toolbar */}
-            <div className="h-10 border-b border-[#1d1d1f]/10 bg-[#f7f4ed]/80 backdrop-blur-sm px-4 flex items-center justify-between z-10 text-xs">
+            <div className="furniture-toolbar h-10 border-b border-[#1d1d1f]/10 bg-[#f7f4ed]/80 backdrop-blur-sm px-4 flex items-center justify-between z-10 text-xs">
               <div className="flex items-center space-x-2">
                 <Box className="w-3.5 h-3.5 text-[#f0500f]" />
                 <span className="font-semibold text-xs uppercase tracking-wider text-[#1d1d1f]">
-                  3D MODEL ORBIT VIEWPORT
+                  Furniture preview
                 </span>
                 {generatedModel && (
                   <span className="px-2 py-0.5 rounded text-[10px] bg-[#f0500f]/10 text-[#f0500f] font-bold">
@@ -736,10 +692,10 @@ export default function GenerativeStudio({
                     <Box className="w-8 h-8 text-[#f0500f]" />
                   </div>
                   <h3 className="font-stencil text-base uppercase text-[#1d1d1f] tracking-wider mb-1">
-                    READY FOR 3D SYNTHESIS
+                    Your next piece starts here.
                   </h3>
                   <p className="font-mono text-xs text-[#1d1d1f]/60 max-w-sm">
-                    Choose a preset furniture piece on the left or upload your own 2D photo, then click "SYNTHESIZE 3D MODEL".
+                    Upload a furniture photo or try the chair reference. Generate a model, then rotate it to explore every side.
                   </p>
                 </div>
               )}
@@ -751,7 +707,7 @@ export default function GenerativeStudio({
                     <RefreshCw className="w-8 h-8 text-[#f0500f] animate-spin" />
                   </div>
                   <h3 className="font-stencil text-base uppercase text-[#1d1d1f] tracking-wider mb-2">
-                    SYNTHESIZING 3D GEOMETRY...
+                    Building your model…
                   </h3>
                   <p className="font-mono text-xs text-[#1d1d1f]/60 max-w-sm text-center">
                     Preparing the image, reconstructing its surface, and baking a textured GLB mesh.
@@ -762,7 +718,7 @@ export default function GenerativeStudio({
 
             {/* Model Action & Telemetry Floating Bar */}
             {generatedModel && (
-              <div className="p-4 bg-white/95 border-t border-[#1d1d1f]/15 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+              <div className="model-result-bar p-4 bg-white/95 border-t border-[#1d1d1f]/15 flex flex-wrap items-center justify-between gap-3 shadow-lg">
                 <div className="flex items-center space-x-4 text-xs font-mono">
                   <div>
                     <span className="text-[#1d1d1f]/50 block text-[9px] uppercase">Dimensions (W×D×H)</span>
@@ -808,7 +764,7 @@ export default function GenerativeStudio({
                     className="h-9 px-4 rounded-full bg-[#1d1d1f] hover:bg-black text-[#efebe2] font-stencil text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all shadow-sm"
                   >
                     <BookmarkCheck className="w-3.5 h-3.5 text-[#f0500f]" />
-                    <span>SAVE TO ROOM DESIGN LIBRARY</span>
+                    <span>Save to room library</span>
                   </button>
 
                   <button
@@ -816,7 +772,7 @@ export default function GenerativeStudio({
                     className="h-9 px-4 rounded-full bg-white hover:bg-[#efebe2] border border-[#1d1d1f]/30 text-[#1d1d1f] font-stencil text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all shadow-xs"
                   >
                     <Download className="w-3.5 h-3.5 text-[#f0500f]" />
-                    <span>DOWNLOAD .GLB</span>
+                    <span>Download GLB</span>
                   </button>
                 </div>
               </div>
@@ -850,14 +806,14 @@ export default function GenerativeStudio({
           TAB 2: NEURAL FACADE SYNTHESIS STUDIO
          ========================================================================= */}
       {studioTab === 'facade' && (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="generation-shell flex-1 flex overflow-hidden">
           
           {/* Left: Facade Style & Wall Selection Controls */}
-          <aside className="w-96 border-r border-[#1d1d1f]/15 bg-[#efebe2] p-5 flex flex-col space-y-5 overflow-y-auto shrink-0">
+          <aside className="generation-sidebar w-96 border-r border-[#1d1d1f]/15 bg-[#efebe2] p-5 flex flex-col space-y-5 overflow-y-auto shrink-0">
             <div>
               <label className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-1.5 mb-1.5">
                 <Building2 className="w-3.5 h-3.5 text-[#f0500f]" />
-                <span>01 // TARGET WALL SPECS</span>
+                <span>01 / Building details</span>
               </label>
               <div className="p-3 bg-white rounded-xl border border-[#1d1d1f]/15 space-y-2 text-xs">
                 <div className="flex justify-between">
@@ -865,7 +821,7 @@ export default function GenerativeStudio({
                   <span className="font-bold">{frontWallId || 'Exterior Front Wall'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#1d1d1f]/60">Floor Stories:</span>
+                  <span className="text-[#1d1d1f]/60">Storeys</span>
                   <div className="flex items-center space-x-1">
                     {[1, 2, 3].map(fl => (
                       <button
@@ -887,35 +843,36 @@ export default function GenerativeStudio({
             <div className="space-y-2">
               <label className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-1.5">
                 <Palette className="w-3.5 h-3.5 text-[#f0500f]" />
-                <span>02 // ARCHITECTURAL STYLE</span>
+                <span>02 / Material direction</span>
               </label>
 
               <div className="space-y-2">
                 {FACADE_STYLES.map(st => (
-                  <div
+                  <button type="button" aria-pressed={selectedStyle === st.id} disabled={isGeneratingFacade}
                     key={st.id}
                     onClick={() => {
                       setSelectedStyle(st.id);
-                      handleGenerateFacade(st.id);
                     }}
-                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                    className={`studio-style-card p-3 rounded-xl border cursor-pointer transition-all ${
                       selectedStyle === st.id
                         ? 'bg-white border-[#f0500f] shadow-sm ring-1 ring-[#f0500f]'
                         : 'bg-white/50 border-[#1d1d1f]/15 hover:bg-white hover:border-[#1d1d1f]/40'
                     }`}
                   >
+                    <span className={`material-swatch ${['modern', 'stone', 'brick', 'green'][FACADE_STYLES.indexOf(st)]}`} />
                     <div className="flex items-center justify-between">
                       <span className="font-stencil text-xs tracking-wider uppercase text-[#1d1d1f]">{st.label}</span>
                       {selectedStyle === st.id && <Check className="w-3.5 h-3.5 text-[#f0500f]" />}
                     </div>
                     <p className="font-mono text-[9.5px] text-[#1d1d1f]/60 mt-0.5 leading-tight">{st.desc}</p>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
 
             {/* Generate Button */}
             <button
+              data-testid="generate-facade"
               onClick={() => handleGenerateFacade(selectedStyle)}
               disabled={isGeneratingFacade}
               className="w-full h-11 px-5 rounded-full bg-[#f0500f] hover:bg-[#d8450a] text-white font-stencil text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#f0500f]/20 disabled:opacity-50 mt-auto"
@@ -923,36 +880,36 @@ export default function GenerativeStudio({
               {isGeneratingFacade ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>SYNTHESIZING cGAN TEXTURE...</span>
+                  <span>Generating facade…</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>RE-GENERATE FACADE TEXTURE →</span>
+                  <span>Generate facade</span>
                 </>
               )}
             </button>
           </aside>
 
           {/* Center: Side-by-Side Semantic Sketch vs Realistic Output */}
-          <main className="flex-1 flex flex-col h-full bg-[#f6f3eb] p-6 overflow-y-auto">
+          <main className="facade-stage flex-1 flex flex-col h-full bg-[#f6f3eb] p-6 overflow-y-auto">
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[460px]">
+            <div className="facade-comparison grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[460px]">
               
               {/* LEFT: Input Semantic Layout Scrap */}
-              <div className="bg-white rounded-2xl border border-[#1d1d1f]/20 p-5 shadow-sm flex flex-col">
+              <div className="facade-preview-card bg-white rounded-2xl border border-[#1d1d1f]/20 p-5 shadow-sm flex flex-col">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#0030ff]" />
                     <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">
-                      01 // INPUT SEMANTIC SKETCH ("THE SCRAP")
+                      01 / Opening layout
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-[#1d1d1f]/50">CMP 12-Class Palette</span>
+                  <span className="text-[10px] font-mono text-[#1d1d1f]/50">Structure guide</span>
                 </div>
 
                 <p className="text-[11px] text-[#1d1d1f]/70 mb-3 font-mono">
-                  Procedural architectural scrap automatically projected from the exterior wall, doors, and window geometry.
+                  Your wall layout keeps doors and windows in place.
                 </p>
 
                 <div className="flex-1 w-full bg-[#0030ff]/10 rounded-xl overflow-hidden border border-[#1d1d1f]/10 flex items-center justify-center p-3 min-h-[280px]">
@@ -965,7 +922,7 @@ export default function GenerativeStudio({
                     />
                   ) : (
                     <div className="text-xs text-[#1d1d1f]/50 font-mono text-center">
-                      Click "RE-GENERATE FACADE TEXTURE" to synthesize
+                      Generate a facade to preview the wall layout.
                     </div>
                   )}
                 </div>
@@ -973,7 +930,7 @@ export default function GenerativeStudio({
                 {/* CMP Color Palette Legend */}
                 <div className="mt-4 pt-3 border-t border-[#1d1d1f]/10">
                   <span className="font-mono text-[10px] font-bold text-[#1d1d1f]/60 uppercase tracking-wider block mb-1.5">
-                    CMP Semantic Colormap Legend:
+                    Layout key
                   </span>
                   <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono">
                     {CMP_LEGEND.map(item => (
@@ -990,21 +947,21 @@ export default function GenerativeStudio({
               </div>
 
               {/* RIGHT: Synthesized Realistic Facade */}
-              <div className="bg-white rounded-2xl border border-[#1d1d1f]/20 p-5 shadow-sm flex flex-col">
+              <div className="facade-preview-card bg-white rounded-2xl border border-[#1d1d1f]/20 p-5 shadow-sm flex flex-col">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#f0500f] animate-pulse" />
                     <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">
-                      02 // SYNTHESIZED REALISTIC FACADE (cGAN)
+                      02 / Material preview
                     </span>
                   </div>
                   <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#f0500f]/10 text-[#f0500f]">
-                    {selectedStyle}
+                    {facadeResult?.model_info?.effective_style || facadeResult?.style || selectedStyle}
                   </span>
                 </div>
 
                 <p className="text-[11px] text-[#1d1d1f]/70 mb-3 font-mono">
-                  Photorealistic building materials synthesized by Pix2Pix conditional GAN with architectural enhancements.
+                  Explore a generated finish before applying it to your building.
                 </p>
 
                 <div className="flex-1 w-full bg-[#1d1d1f]/5 rounded-xl overflow-hidden border border-[#1d1d1f]/10 flex items-center justify-center p-3 min-h-[280px]">
@@ -1021,14 +978,14 @@ export default function GenerativeStudio({
                     />
                   ) : (
                     <div className="text-xs text-[#1d1d1f]/50 font-mono text-center">
-                      No texture generated yet
+                      Your facade preview will appear here.
                     </div>
                   )}
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-[#1d1d1f]/10 flex items-center justify-between text-xs font-mono text-[#1d1d1f]/60">
-                  <span>Aspect ratio preserved · {facadeResult?.model_info?.resolution || 256}px</span>
-                  <span className="text-[#f0500f] font-semibold">{facadeResult?.device || 'ONNX CPU / PyTorch CUDA'}</span>
+                  <span>{facadeResult ? `Aspect ratio preserved · ${facadeResult.model_info?.resolution || 256}px` : 'Ready to generate'}</span>
+                  {facadeResult && <span className="text-[#f0500f] font-semibold">Texture preview</span>}
                 </div>
                 {facadeResult?.model_info?.model === 'facade_residual_film_512_v1' && !facadeResult.model_info.style_conditioned && (
                   <p className="mt-2 text-xs text-amber-800">Experimental CMP model: neutral appearance. The selected architectural style has not been trained.</p>
@@ -1038,10 +995,10 @@ export default function GenerativeStudio({
             </div>
 
             {/* Facade Action Bar */}
-            <div className="mt-6 p-4 bg-white rounded-2xl border border-[#1d1d1f]/15 flex flex-wrap items-center justify-between gap-3 shadow-md">
+            <div className="facade-result-bar mt-6 p-4 bg-white rounded-2xl border border-[#1d1d1f]/15 flex flex-wrap items-center justify-between gap-3 shadow-md">
               <div className="flex items-center space-x-2 text-xs font-mono text-[#1d1d1f]/70">
                 <Info className="w-4 h-4 text-[#f0500f]" />
-                <span>Apply this synthesized texture directly to the exterior walls of your 3D building floorplan.</span>
+                <span>{layout ? 'Review the finish, then apply it to your 3D house.' : 'Create a floorplan to apply this finish to a house.'}</span>
               </div>
 
               <div className="flex items-center space-x-3">
@@ -1054,11 +1011,12 @@ export default function GenerativeStudio({
 
                 <button
                   onClick={handleApplyFacadeTo3D}
-                  disabled={!facadeResult?.texture_base64}
+                  data-testid="apply-facade"
+                  disabled={!facadeResult?.texture_base64 || !layout || isGeneratingFacade}
                   className="h-10 px-5 rounded-full bg-[#1d1d1f] hover:bg-black text-[#efebe2] font-stencil text-xs uppercase tracking-wider flex items-center space-x-2 transition-all shadow-sm disabled:opacity-40"
                 >
                   <Eye className="w-3.5 h-3.5 text-[#f0500f]" />
-                  <span>APPLY TO 3D BUILDING</span>
+                  <span>Apply to house</span>
                 </button>
 
                 {facadeResult?.texture_base64 && (
@@ -1068,7 +1026,7 @@ export default function GenerativeStudio({
                     className="h-10 px-4 rounded-full bg-white hover:bg-[#efebe2] border border-[#1d1d1f]/30 font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-1.5 transition-all shadow-xs"
                   >
                     <Download className="w-3.5 h-3.5 text-[#f0500f]" />
-                    <span>DOWNLOAD PNG</span>
+                    <span>Download texture</span>
                   </a>
                 )}
               </div>

@@ -1,0 +1,68 @@
+{
+  "errors": [],
+  "reports": [
+    {
+      "name": "floorplan-desktop",
+      "viewport": 1600,
+      "document": 1600,
+      "bodyOverflow": "hidden"
+    },
+    {
+      "name": "facade-1366",
+      "viewport": 1366,
+      "document": 1366,
+      "bodyOverflow": "hidden"
+    },
+    {
+      "name": "furniture-1366",
+      "viewport": 1366,
+      "document": 1366,
+      "bodyOverflow": "hidden"
+    },
+    {
+      "name": "floorplan-1366",
+      "viewport": 1366,
+      "document": 1366,
+      "bodyOverflow": "hidden"
+    },
+    {
+      "name": "facade-768",
+      "viewport": 768,
+      "document": 768,
+      "bodyOverflow": "auto"
+    },
+    {
+      "name": "furniture-768",
+      "viewport": 768,
+      "document": 768,
+      "bodyOverflow": "auto"
+    },
+    {
+      "name": "floorplan-768",
+      "viewport": 768,
+      "document": 768,
+      "bodyOverflow": "auto"
+    },
+    {
+      "name": "facade-390",
+      "viewport": 390,
+      "document": 390,
+      "bodyOverflow": "auto"
+    },
+    {
+      "name": "furniture-390",
+      "viewport": 390,
+      "document": 390,
+      "bodyOverflow": "auto"
+    },
+    {
+      "name": "floorplan-390",
+      "viewport": 390,
+      "document": 390,
+      "bodyOverflow": "auto"
+    }
+  ],
+  "furnitureRequests": 4,
+  "facadeRequests": 3,
+  "source": "Live floorplan detection; recorded furniture/facade assets for preview UI"
+}

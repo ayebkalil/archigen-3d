@@ -305,13 +305,13 @@ export default function Floorplan2DCanvas({
   else if (activeTool === 'relabel') canvasCursor = 'cursor-pointer';
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden border-r border-[#1d1d1f]/15 drafting-grid">
+    <div className="plan-panel viewport-panel flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden border-r border-[#1d1d1f]/15 drafting-grid" aria-label="2D floorplan editor">
       {/* Top Drafting Toolbar */}
-      <div className="h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-10 select-none overflow-x-auto">
+      <div className="plan-toolbar viewport-toolbar h-12 border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-10 select-none overflow-x-auto">
         {/* Left: Title & Elements count */}
-        <div className="flex items-center space-x-2.5 text-[#1d1d1f] shrink-0 mr-3">
+        <div className="viewport-title flex items-center space-x-2.5 text-[#1d1d1f] shrink-0 mr-3">
           <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] whitespace-nowrap">
-            2D BLUEPRINT
+            2D floorplan
           </span>
           <span className="text-[#1d1d1f]/20">|</span>
           <span className="font-mono text-[9.5px] text-[#1d1d1f]/70 uppercase tracking-wider whitespace-nowrap">
@@ -320,7 +320,7 @@ export default function Floorplan2DCanvas({
         </div>
 
         {/* Center: CAD Interactive Edit Tools */}
-        <div className="flex items-center bg-white/80 border border-[#1d1d1f]/20 rounded-full p-1 space-x-1 shadow-sm shrink-0">
+        <div className="plan-tools flex items-center bg-white/80 border border-[#1d1d1f]/20 rounded-full p-1 space-x-1 shadow-sm shrink-0">
           <button
             onClick={() => { setActiveTool('select'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Inspect / Select Front Wall"
@@ -331,7 +331,7 @@ export default function Floorplan2DCanvas({
             }`}
           >
             <MousePointer className="w-3.5 h-3.5 shrink-0" />
-            <span>SELECT</span>
+            <span>Select</span>
           </button>
 
           <button
@@ -344,7 +344,7 @@ export default function Floorplan2DCanvas({
             }`}
           >
             <PlusCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>+ DOOR</span>
+            <span>Door</span>
           </button>
 
           <button
@@ -357,7 +357,7 @@ export default function Floorplan2DCanvas({
             }`}
           >
             <Trash2 className="w-3.5 h-3.5 shrink-0" />
-            <span>DELETE</span>
+            <span>Delete</span>
           </button>
 
           <button
@@ -370,7 +370,7 @@ export default function Floorplan2DCanvas({
             }`}
           >
             <Tag className="w-3.5 h-3.5 shrink-0" />
-            <span>RELABEL</span>
+            <span>Label</span>
           </button>
 
           <button
@@ -388,7 +388,7 @@ export default function Floorplan2DCanvas({
             }`}
           >
             <Ruler className="w-3.5 h-3.5 shrink-0" />
-            <span>SCALE</span>
+            <span>Scale</span>
           </button>
 
           {/* Zoom Controls */}

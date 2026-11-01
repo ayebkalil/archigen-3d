@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ShieldCheck, Maximize2, LayoutGrid, CheckCircle, AlertTriangle } from 'lucide-react';
+import { LayoutGrid, AlertTriangle } from 'lucide-react';
 
 function checkRoomPlausibility(room) {
   const t = (room.room_type || '').toLowerCase();
@@ -17,110 +17,58 @@ function checkRoomPlausibility(room) {
   return { flag: false, warning: null };
 }
 
-export default function MetricsSummary({ layout, frontWallId }) {
-  if (!layout) return null;
-
-  const metadata = layout.metadata || {};
+export default function MetricsSummary({ layout, frontWallId, selectedRoom, onSelectRoom }) {
+  if (!layout)
+    return (
+      <footer className="room-summary empty-summary">
+        <LayoutGrid size={16} />
+        Room measurements will appear here after detection.
+      </footer>
+    );
   const rooms = layout.rooms || [];
-  const walls = layout.walls || [];
-  const totalArea = metadata.total_surface_m2 || 0;
-  const isShellValid = metadata.is_building_shell_valid ?? true;
-
-  // Run architectural plausibility checks
-  const plausibilityResults = rooms.map((r) => ({
-    ...r,
-    ...checkRoomPlausibility(r),
-  }));
-  const warningsCount = plausibilityResults.filter((r) => r.flag).length;
-
+  const metadata = layout.metadata || {};
+  const area =
+    metadata.total_surface_m2 ||
+    layout.total_area_m2 ||
+    rooms.reduce((sum, room) => sum + (room.surface_m2 || 0), 0);
   return (
-    <footer className="h-40 border-t border-[#1d1d1f]/20 bg-[#efebe2]/95 backdrop-blur-md px-6 py-2.5 flex items-center space-x-6 overflow-x-auto z-20 select-none text-[#1d1d1f]">
-      {/* 1. Key Metrics Titleblock Grid */}
-      <div className="flex items-stretch border border-[#1d1d1f] rounded-lg overflow-hidden bg-white/70 shadow-sm shrink-0">
-        {/* Total Area */}
-        <div className="px-4 py-2 border-r border-[#1d1d1f] flex flex-col justify-between min-w-[130px]">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            TOTAL LIVING AREA
-          </span>
-          <p className="font-stencil text-xl text-[#1d1d1f] mt-0.5 leading-none">
-            {totalArea} <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase">m²</span>
-          </p>
+    <footer className="room-summary">
+      <div className="summary-metrics">
+        <div>
+          <small>Total area</small>
+          <strong>
+            {Number(area).toFixed(1)} <span>m²</span>
+          </strong>
         </div>
-
-        {/* Room Count */}
-        <div className="px-4 py-2 border-r border-[#1d1d1f] flex flex-col justify-between min-w-[110px]">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            ROOMS PARTITIONED
-          </span>
-          <p className="font-stencil text-xl text-[#1d1d1f] mt-0.5 leading-none">
-            {rooms.length} <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase">SPACES</span>
-          </p>
-        </div>
-
-        {/* Exterior Shell */}
-        <div className="px-4 py-2 border-r border-[#1d1d1f] flex flex-col justify-between min-w-[130px]">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            BUILDING ENVELOPE
-          </span>
-          <p className="font-stencil text-xl text-[#1d1d1f] mt-0.5 leading-none">
-            {metadata.building_perimeter_m || 0} <span className="font-mono text-[10px] text-[#1d1d1f]/60 uppercase">m</span>
-          </p>
-        </div>
-
-        {/* Architectural Plausibility Status */}
-        <div className="px-4 py-2 flex flex-col justify-between min-w-[160px] bg-[#efebe2]/50">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-[#1d1d1f]/60">
-            PLAUSIBILITY GATE
-          </span>
-          <div className="flex items-center space-x-1.5 mt-0.5">
-            {warningsCount === 0 ? (
-              <>
-                <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
-                <span className="font-stencil text-xs text-emerald-800 uppercase tracking-wider">
-                  BIM VALIDATED
-                </span>
-              </>
-            ) : (
-              <>
-                <AlertTriangle className="w-3.5 h-3.5 text-[#f0500f]" />
-                <span className="font-stencil text-xs text-[#f0500f] uppercase tracking-wider">
-                  {warningsCount} AREA {warningsCount === 1 ? 'NOTICE' : 'NOTICES'}
-                </span>
-              </>
-            )}
-          </div>
+        <div>
+          <small>Detected rooms</small>
+          <strong>{rooms.length}</strong>
         </div>
       </div>
-
-      {/* 2. Room Breakdown Chips (Drafting Badges) */}
-      <div className="flex-1 flex flex-col justify-center space-y-1.5 min-w-[280px]">
-        <div className="flex items-center justify-between">
-          <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">
-            EXTRACTED SPATIAL REGISTRY ({rooms.length})
-          </span>
-          {frontWallId && (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-[#b8452a]">
-              Active Facade: Wall #{frontWallId}
-            </span>
-          )}
+      <div className="room-list">
+        <div className="room-list-heading">
+          <span>YOUR SPACES</span>
+          <small>Click a room to furnish it</small>
         </div>
-
-        <div className="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-thin">
-          {plausibilityResults.map((r, i) => (
-            <div
-              key={r.id || i}
-              className={`shrink-0 px-2.5 py-1 rounded border text-[10px] font-mono uppercase tracking-wider flex items-center space-x-1.5 transition-all ${
-                r.flag
-                  ? 'bg-[#b8452a]/10 border-[#b8452a]/40 text-[#b8452a]'
-                  : 'bg-white/80 border-[#1d1d1f]/20 text-[#1d1d1f]'
-              }`}
-              title={r.warning || `${r.room_type} (${r.surface_m2} m²)`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#1d1d1f]/40"></span>
-              <span className="font-semibold">{r.room_type}</span>
-              <span className="text-[#1d1d1f]/60 font-normal">{r.surface_m2}m²</span>
-            </div>
-          ))}
+        <div className="room-chips">
+          {rooms.map((room, index) => {
+            const check = checkRoomPlausibility(room);
+            return (
+              <button
+                key={room.id || index}
+                aria-pressed={selectedRoom?.id === room.id}
+                onClick={() => onSelectRoom?.(room)}
+                title={check.warning || `Design ${room.room_type}`}
+              >
+                <i
+                  style={{ background: ['#d4a76e', '#86a89c', '#8d9eb9', '#b798ad'][index % 4] }}
+                />
+                <span>{room.room_type}</span>
+                <small>{Number(room.surface_m2 || 0).toFixed(1)} m²</small>
+                {check.flag && <AlertTriangle size={12} />}
+              </button>
+            );
+          })}
         </div>
       </div>
     </footer>

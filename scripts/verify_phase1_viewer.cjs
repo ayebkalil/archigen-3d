@@ -72,17 +72,17 @@ async function main() {
       await page.click(`button[title="${title}"]`);
     };
     const ready = async () => {
-      await page.goto(`${viewerUrl}/?phase1=${shapeName}&diagnostic=${diagnostic}#studio`, { waitUntil: 'networkidle0' });
+      await page.goto(`${viewerUrl}/?phase1=${shapeName}&diagnostic=${diagnostic}#studio`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => window.__ARCHIGEN_VIEWER__?.scene.children.some(o => o.userData.type === 'facade'));
       if (process.env.ARCHIGEN_FACADE_FIXTURE && facade.style) {
         await page.evaluate(style => {
-          const label = [...document.querySelectorAll('span')].find(el => el.textContent.trim() === style);
-          label?.closest('div.cursor-pointer')?.click();
+          const label = [...document.querySelectorAll('button.material-option strong')].find(el => el.textContent.trim() === style);
+          label?.closest('button.material-option')?.click();
         }, facade.style);
       }
-      await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '3D PERSPECTIVE').click());
+      await page.click('[data-testid=view-3d]');
       await page.waitForFunction(() => window.__ARCHIGEN_VIEWER__?.renderer.domElement.isConnected && window.__ARCHIGEN_VIEWER__.scene.children.some(o => o.userData.type === 'facade'));
-      await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === '2 STOREYS').click());
+      await page.click('.storey-options button:nth-child(2)');
       await page.waitForFunction(() => {
         const skin = window.__ARCHIGEN_VIEWER__.scene.children.find(o => o.userData.type === 'facade');
         return skin && Math.abs(skin.geometry.attributes.position.getY(2) - 5.6) < 0.01;

@@ -111,7 +111,7 @@ export default function RoomDesignPanel({
   };
 
   return (
-    <div className="absolute top-4 right-4 z-30 w-84 bg-[#efebe2]/95 backdrop-blur-md border border-[#1d1d1f]/30 shadow-2xl rounded-sm font-mono text-xs overflow-hidden flex flex-col">
+    <div className="room-design-panel absolute top-4 right-4 z-30 w-84 bg-[#efebe2]/95 backdrop-blur-md border border-[#1d1d1f]/30 shadow-2xl rounded-sm font-mono text-xs overflow-hidden flex flex-col">
       {/* Header */}
       <div className="bg-[#1d1d1f] text-[#efebe2] px-3 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
