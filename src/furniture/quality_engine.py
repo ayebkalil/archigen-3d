@@ -57,12 +57,13 @@ class QualityFurnitureEngine:
                                '.venv-furniture-quality environment and requirements-furniture-quality.txt') from exc
         del state
         gc.collect()
-        self.model.eval().to(self.device)
+        self.model.eval()
         if self.device.type == 'cuda':
             # Keep the large image encoder/transformer weights in FP16 as well as
             # their activations. Density/color decoding stays FP32 for stability.
             self.model.half()
             self.model.decoder.float()
+        self.model.to(self.device)
         self.model.renderer.set_chunk_size(self.chunk_size)
         self.check_budget()
 

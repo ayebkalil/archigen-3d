@@ -50,7 +50,7 @@ the `stabilityai/TripoSR` config/model checkpoint. The tested checkpoint SHA256 
 `429e2c6b22a0923967459de24d67f05962b235f79cde6b032aa7ed2ffcd970ee`.
 Upstream imports torchmcubes even when its extractor is unused. If torchmcubes is
 unavailable, apply the tracked import-only patch to a clean upstream checkout:
-`git -C TripoSR apply ../patches/triposr-optional-marching-cubes.patch`.
+`git -C TripoSR apply --unidiff-zero --ignore-space-change ../patches/triposr-optional-marching-cubes.patch`.
 The existing local vendor tree already has a compatible import fallback; do not
 apply the patch on top of it. Quality mode bypasses the vendor extractor and its
 modified `from_pretrained`, so neither implementation controls geometry or loading.
@@ -107,3 +107,24 @@ https://github.com/microsoft/TRELLIS.2.
 studio/API smoke test (`node scripts/verify_furniture_studio.cjs`). GitHub Actions
 checks analytic geometry, coordinate/catalog contracts and the frontend without
 requiring model weights or a GPU. It does not evaluate learned reconstruction quality.
+
+## Verified final result
+
+The actual studio request returned a watertight, one-component chair with 189,116
+triangles and a 2048 px texture. Generation took 282.7 seconds; the sampled total
+GPU peak was 1,659 MiB, PyTorch peak allocated memory 1,453.6 MiB, and peak reserved
+memory 1,564 MiB with the floorplan models resident. Export size: 8,176,096 bytes.
+The height is 0.85 m and inferred footprint approximately 0.452 x 0.473 m.
+
+All 104 Python tests, 13 frontend tests, the production frontend build, actual
+studio/API generation and four-view GLB rendering passed. GitHub contracts passed
+for commit `8afdae7`. The build retains the existing large-JavaScript-chunk warning.
+
+![Same-camera before and after](assets/furniture-quality/comparison.png)
+
+[Four-view comparison](assets/furniture-quality/multiview.png) and
+[machine-readable evidence](furniture-quality-results.json).
+
+The final small follow-up moves FP16 casting onto the CPU before GPU transfer to
+avoid a transient FP32 weight allocation. It does not change the selected precision
+or checkpoint. GPU inference evidence above is from commit `8afdae7`.
