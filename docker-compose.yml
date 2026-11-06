@@ -16,6 +16,12 @@ services:
       - MKL_NUM_THREADS=2
     volumes:
       - furniture_library:/app/library
+      - type: bind
+        source: ./models/saved
+        target: /app/models/saved
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
       interval: 30s

@@ -266,6 +266,9 @@ existants. La bibliothèque de mobilier est conservée dans le volume Compose
 `furniture_library`. Les ports hôte sont configurables avec `ARCHIGEN_WEB_PORT`
 et `ARCHIGEN_API_PORT` si une instance native utilise déjà les ports 3000 et 8000.
 
+Le service backend monte les poids DVC de `models/saved` en lecture seule. Récupérez
+ces fichiers avant le démarrage et conservez-les dans ce dossier.
+
 Le conteneur utilise ONNX Runtime CPU pour le plan et la façade 512, et le mode
 volumétrique CPU pour le mobilier. Pour TripoSR CUDA, voir
 [l'environnement natif du mobilier](docs/furniture-quality-experiment.md).

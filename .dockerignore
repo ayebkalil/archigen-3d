@@ -1,6 +1,7 @@
 **
 !backend/
 !backend/Dockerfile
+!backend/docker-entrypoint.sh
 !backend/requirements.txt
 !backend/requirements-docker.txt
 !backend/app/
@@ -10,14 +11,5 @@
 !models/
 !models/benchmarks/
 !models/benchmarks/**
-!models/saved/
-!models/saved/floorplan_unetpp/
-!models/saved/floorplan_unetpp/floorplan_multitask.onnx
-!models/saved/floorplan_unetpp/floorplan_fallback.onnx
-!models/saved/generator_perceptual_ema.onnx
-!models/saved/facade_authoritative_metrics.json
-!models/saved/facade512_experiment/
-!models/saved/facade512_experiment/generator.onnx
-!models/saved/facade512_experiment/generator.json
 **/__pycache__
 **/*.pyc
