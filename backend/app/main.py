@@ -1,5 +1,6 @@
 import time
 import sys
+import os
 from pathlib import Path
 
 # Ensure backend and project root are in sys.path
@@ -355,8 +356,9 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
             if request.wall_id:
                 wall = next((w for w in walls if w.get("id") == request.wall_id), None)
             if wall is None:
-                exterior_walls = [w for w in walls if w.get("is_exterior", False)]
-                wall = exterior_walls[0] if exterior_walls else (walls[0] if walls else None)
+                wall = bridge.select_front_wall(walls) or (walls[0] if walls else None)
+            if wall is not None:
+                wall = {**wall, "geometry_fixed": True}
 
         if wall is None:
             # Fallback to standard architectural front facade wall (8.5m x 2.8m with entrance door & windows)
@@ -372,7 +374,7 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
                 ]
             }
 
-        num_floors = request.num_floors or 1
+        num_floors = 1 if wall.get("level_id") else request.num_floors or 1
         style = request.style or "Modern Minimalist"
 
         res = bridge.render_wall_facade(
@@ -424,10 +426,13 @@ class FurnitureSaveRequest(BaseModel):
     bounds: Dict[str, Any]
     glb_base64: str
 
-CUSTOM_FURNITURE_DIR = PROJECT_ROOT / "frontend" / "public" / "models" / "custom"
+CUSTOM_LIBRARY = os.getenv("ARCHIGEN_CUSTOM_LIBRARY")
+CUSTOM_FURNITURE_DIR = (Path(CUSTOM_LIBRARY) if CUSTOM_LIBRARY else PROJECT_ROOT / "frontend" / "public" / "models") / "custom"
 try:
     CUSTOM_FURNITURE_DIR.mkdir(parents=True, exist_ok=True)
-except Exception:
+except OSError:
+    if CUSTOM_LIBRARY:
+        raise
     CUSTOM_FURNITURE_DIR = Path("/tmp/custom_furniture")
     CUSTOM_FURNITURE_DIR.mkdir(parents=True, exist_ok=True)
 CUSTOM_CATALOG_FILE = CUSTOM_FURNITURE_DIR.parent / "custom_furniture.json"
@@ -598,14 +603,7 @@ if not furniture_dir.exists():
 if furniture_dir.exists():
     app.mount("/models/furniture", StaticFiles(directory=str(furniture_dir)), name="furniture_models")
 
-custom_furniture_mount = PROJECT_ROOT / "frontend" / "public" / "models" / "custom"
-if not custom_furniture_mount.exists():
-    custom_furniture_mount = PROJECT_ROOT / "models" / "custom"
-try:
-    custom_furniture_mount.mkdir(parents=True, exist_ok=True)
-    app.mount("/models/custom", StaticFiles(directory=str(custom_furniture_mount)), name="custom_furniture_models")
-except Exception:
-    pass
+app.mount("/models/custom", StaticFiles(directory=str(CUSTOM_FURNITURE_DIR)), name="custom_furniture_models")
 
 # Mount frontend/dist for 1-click single-port full-stack serving
 frontend_dist = PROJECT_ROOT / "frontend" / "dist"

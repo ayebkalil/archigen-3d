@@ -10,7 +10,10 @@ from src.data.dataset import FacadesDataset
 
 @pytest.fixture
 def dataset_root():
-    return "data/raw/facades"
+    root = Path("data/raw/facades")
+    if not all(any((root / split).glob("*.jpg")) for split in ("train", "val")):
+        pytest.skip("CMP Facades dataset is available separately through DVC")
+    return root
 
 def test_dataset_train_split_loading(dataset_root):
     """Verify that train split loads and produces valid tensors."""

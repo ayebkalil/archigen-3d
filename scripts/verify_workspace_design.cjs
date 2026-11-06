@@ -26,7 +26,7 @@ async function main() {
     ),
   };
   const browser = await puppeteer.launch({
-    executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    executablePath: process.env.CHROME_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     headless: true,
     args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
@@ -83,7 +83,7 @@ async function main() {
       );
       reports.push({ name, ...result });
     };
-    await page.goto('http://127.0.0.1:3000/#studio', { waitUntil: 'domcontentloaded' });
+    await page.goto('http://127.0.0.1:3000/?sample=detected#studio', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelectorAll('.room-chips button').length > 0, {
       timeout: 120000,
     });

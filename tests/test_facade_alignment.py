@@ -58,3 +58,17 @@ def test_onnx_facade_all_walls_executes_inference_and_keeps_projection():
     for wall in walls:
         assert wall["facade_texture"]["facade_frame"]["length_m"] == 6
         assert "openings" in wall["facade_texture"]
+def test_auto_facade_selection_prefers_an_elevation_to_a_short_door_fragment():
+    from src.bridge.facade_bridge import FacadeBridge
+
+    stub = {"id": "stub", "is_exterior": True, "polygon_meters": [[0, 0], [.55, 0], [.55, .2], [0, .2]],
+            "openings": [{"type": "door"}]}
+    elevation = {"id": "elevation", "is_exterior": True, "polygon_meters": [[0, 2], [8, 2], [8, 2.2], [0, 2.2]]}
+    assert FacadeBridge.select_front_wall([stub, elevation]) is elevation
+
+
+def test_blank_structural_wall_remains_blank_in_facade_sketch():
+    bridge = FacadeBridge.__new__(FacadeBridge)
+    wall = {"geometry_fixed": True, "polygon_meters": [[0, 0], [8, 0], [8, .2], [0, .2]], "openings": []}
+    _, _, _, openings = bridge._build_facade_sketch(wall, is_front=True)
+    assert openings == []

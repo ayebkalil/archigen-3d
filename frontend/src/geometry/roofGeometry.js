@@ -37,8 +37,14 @@ export function roofFootprints(layout) {
     ...(layout.rooms || []).map(r => r.polygon_meters),
     ...(layout.walls || []).map(w => w.polygon_meters),
   ];
-  const paths = rings.map(r => cleanRing(r)).filter(r => r.length >= 3).map(toPath);
-  paths.forEach(p => { if (!ClipperLib.Clipper.Orientation(p)) p.reverse(); });
+  const path = (ring, outside) => {
+    const p = toPath(cleanRing(ring));
+    if (ClipperLib.Clipper.Orientation(p) !== outside) p.reverse();
+    return p;
+  };
+  const paths = rings.flatMap(r => Array.isArray(r) ? [path(r, true)] : [
+    path(r.outer, true), ...(r.holes || []).map(hole => path(hole, false)),
+  ]).filter(p => p.length >= 3);
   const clipper = new ClipperLib.Clipper();
   clipper.AddPaths(paths, ClipperLib.PolyType.ptSubject, true);
   const tree = new ClipperLib.PolyTree();

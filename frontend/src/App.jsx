@@ -5,6 +5,7 @@ import WorkspaceHeading from './components/WorkspaceHeading';
 import ControlPanel from './components/ControlPanel';
 import Floorplan2DCanvas from './components/Floorplan2DCanvas';
 import Viewer3D from './components/Viewer3D';
+import { createSampleHouse, rescaleSampleHouse, SAMPLE_FRONT_WALL } from './geometry/sampleHousePlan';
 import MetricsSummary from './components/MetricsSummary';
 import RoomDesignPanel from './components/RoomDesignPanel';
 import FacadeModal from './components/FacadeModal';
@@ -114,7 +115,7 @@ export default function App() {
     // Automatically analyze default sample floorplan on initial startup
     loadDefaultSample();
 
-    // Listen for cross-frame messages from the Casa Serra Hero Showcase
+    // Listen for cross-frame messages from the ARCHIGEN by KKM Hero Showcase
     const handleHash = () => {
       const nextView = window.location.hash === '#studio' ? 'studio' : 'showcase';
       if (nextView !== currentView) {
@@ -160,12 +161,26 @@ export default function App() {
       const sampleFile = new File([blob], samplePath.replace('/', ''), { type: sampleMime });
       setFile(sampleFile);
       setImageUrl(samplePath);
-      await executeAnalysis(sampleFile, scale, numFloors, null);
+      if (samplePath === '/sample_floorplan.png' && sampleParam !== 'detected') {
+        showSampleReference(scale);
+      } else {
+        await executeAnalysis(sampleFile, scale, numFloors, null);
+      }
     } catch (err) {
       console.error('Failed to load default sample:', err);
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const showSampleReference = (sampleScale) => {
+    setLayout(createSampleHouse(sampleScale));
+    setFrontWallId(SAMPLE_FRONT_WALL);
+    setFacadeTextureUrl(null);
+    setFacadeData(null);
+    setSelectedRoom(null);
+    setFurnishingData({});
+    setErrorMsg(null);
   };
 
   const handleFileUpload = (uploadedFile) => {
@@ -235,13 +250,9 @@ export default function App() {
 
       // Find Front Wall & its Facade Texture
       const frontWall = data.walls.find((w) => w.is_front) || data.walls.find((w) => w.is_exterior);
-      if (frontWall) {
-        setFrontWallId(frontWall.id);
-        if (frontWall.facade_texture?.texture_base64) {
-          setFacadeTextureUrl(frontWall.facade_texture.texture_base64);
-          setFacadeData(frontWall.facade_texture);
-        }
-      }
+      setFrontWallId(frontWall?.id || null);
+      setFacadeTextureUrl(frontWall?.facade_texture?.texture_base64 || null);
+      setFacadeData(frontWall?.facade_texture?.texture_base64 ? frontWall.facade_texture : null);
     } catch (err) {
       console.error('Inference error:', err);
       setErrorMsg(err.response?.data?.detail || 'Floorplan analysis failed.');
@@ -251,17 +262,33 @@ export default function App() {
   };
 
   const handleSelectFrontWall = (newWallId) => {
+    const wall = layout?.walls.find(item => item.id === newWallId);
+    if (!wall?.is_exterior) return;
     setFrontWallId(newWallId);
-    if (file) {
-      executeAnalysis(file, scale, numFloors, newWallId);
-    }
+    setFacadeTextureUrl(wall.facade_texture?.texture_base64 || null);
+    setFacadeData(wall.facade_texture?.texture_base64 ? wall.facade_texture : null);
   };
 
   const handleCalibrateScale = (newScale) => {
     setScale(newScale);
-    if (file) {
+    if (layout?.metadata.source === 'sample_reference') {
+      setLayout(rescaleSampleHouse(layout, newScale));
+      setFacadeTextureUrl(null);
+      setFacadeData(null);
+      setSelectedRoom(null);
+      setFurnishingData({});
+    } else if (file) {
       executeAnalysis(file, newScale, numFloors, frontWallId);
     }
+  };
+
+  const handleLayoutEdit = (next) => {
+    setLayout({ ...next, walls: next.walls.map(wall => ({ ...wall, facade_texture: undefined,
+      openings: [...next.doors, ...next.windows].filter(opening => opening.associated_wall === wall.id) })) });
+    setFacadeTextureUrl(null);
+    setFacadeData(null);
+    setSelectedRoom(room => next.rooms.find(item => item.id === room?.id) || null);
+    if (!next.walls.some(wall => wall.id === frontWallId)) setFrontWallId(null);
   };
 
   const handleGenerateFacade = async (overrideStyle = null) => {
@@ -484,6 +511,9 @@ export default function App() {
       <div className="floorplan-shell flex-1 flex overflow-hidden relative">
         {/* Left Sidebar Controls */}
         <ControlPanel
+          referenceLevels={layout?.storeys}
+          isTracedSample={layout?.metadata.source === 'sample_reference'}
+          onShowReference={imageUrl === '/sample_floorplan.png' && layout?.metadata.source !== 'sample_reference' ? () => showSampleReference(scale) : null}
           fileName={file?.name}
           imageUrl={imageUrl}
           onOpenGenerativeStudio={() => setPageView('generative_studio')}
@@ -530,7 +560,7 @@ export default function App() {
                   onCalibrateScale={handleCalibrateScale}
                   isCalibrating={isCalibrating}
                   setIsCalibrating={setIsCalibrating}
-                  onUpdateLayout={setLayout}
+                  onUpdateLayout={handleLayoutEdit}
                   isSplit={true}
                   selectedRoom={selectedRoom}
                   onSelectRoom={handleSelectRoom}
@@ -561,7 +591,7 @@ export default function App() {
                 onCalibrateScale={handleCalibrateScale}
                 isCalibrating={isCalibrating}
                 setIsCalibrating={setIsCalibrating}
-                onUpdateLayout={setLayout}
+                onUpdateLayout={handleLayoutEdit}
                 isSplit={false}
                 selectedRoom={selectedRoom}
                 onSelectRoom={handleSelectRoom}

@@ -39,6 +39,9 @@ export default function ControlPanel({
   onOpenGenerativeStudio,
   fileName,
   imageUrl,
+  referenceLevels,
+  isTracedSample,
+  onShowReference,
 }) {
   const input = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -90,6 +93,8 @@ export default function ControlPanel({
           <span className="file-type">PNG / JPG</span>
         </div>
         <p className="field-help">Drop a drawing here, or click to browse.</p>
+        {referenceLevels?.length > 0 && <p className="field-help">{isTracedSample ? 'Traced sample · ' : ''}{referenceLevels.length} aligned levels</p>}
+        {onShowReference && <button className="secondary-action full-width mt-2" onClick={onShowReference}>Show traced sample</button>}
       </section>
       <section className="control-section">
         <h2>
@@ -119,17 +124,19 @@ export default function ControlPanel({
           <Ruler size={15} />
           {isCalibrating ? 'Cancel measurement' : 'Calibrate with two points'}
         </button>
-        <div className="field-row storey-label">
-          <span>Building storeys</span>
-          <small>{(numFloors * 2.8).toFixed(1)} m high</small>
-        </div>
-        <div className="storey-options" aria-label="Building storeys">
-          {[1, 2, 3].map((f) => (
-            <button key={f} aria-pressed={numFloors === f} onClick={() => setNumFloors(f)}>
-              {f} {f === 1 ? 'storey' : 'storeys'}
-            </button>
-          ))}
-        </div>
+        {referenceLevels?.length ? <p className="field-help mt-3">Inspect each storey with the level selector in the 3D view.</p> : <>
+          <div className="field-row storey-label">
+            <span>Repeat this level</span>
+            <small>{(numFloors * 2.8).toFixed(1)} m high</small>
+          </div>
+          <div className="storey-options" aria-label="Building storeys">
+            {[1, 2, 3].map((f) => (
+              <button key={f} aria-pressed={numFloors === f} onClick={() => setNumFloors(f)}>
+                {f} {f === 1 ? 'storey' : 'storeys'}
+              </button>
+            ))}
+          </div>
+        </>}
         <button
           className="primary-action full-width analyze-action"
           onClick={onRunAnalysis}

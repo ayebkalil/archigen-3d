@@ -225,6 +225,18 @@ class FacadeBridge:
     @staticmethod
     def facade_frame(wall: Dict[str, Any]) -> Dict[str, Any]:
         """Canonical physical exterior face, shared by sketch, UVs and frames."""
+        supplied = wall.get("facade_frame")
+        if isinstance(supplied, dict):
+            try:
+                origin, direction, outward = (list(map(float, supplied[key])) for key in ("origin", "direction", "outward"))
+                length = float(supplied["length_m"])
+                if (all(len(vector) == 2 for vector in (origin, direction, outward))
+                        and all(math.isfinite(v) for v in origin + direction + outward + [length])
+                        and length > .01 and abs(math.hypot(*direction) - 1) < .001
+                        and math.dist(outward, [-direction[1], direction[0]]) < .001):
+                    return {"origin": origin, "direction": direction, "outward": outward, "length_m": length}
+            except (KeyError, TypeError, ValueError):
+                pass
         pts = wall.get("polygon_meters", [])
         if len(pts) < 2:
             pts = [[0.0, 0.0], [4.0, 0.0]]
@@ -241,6 +253,17 @@ class FacadeBridge:
     @staticmethod
     def calculate_wall_length_m(wall: Dict[str, Any]) -> float:
         return FacadeBridge.facade_frame(wall)["length_m"]
+
+    @classmethod
+    def select_front_wall(cls, walls: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        candidates = [wall for wall in walls if wall.get("is_exterior") and len(wall.get("polygon_meters", [])) >= 3]
+        if not candidates:
+            return None
+        longest = max(candidates, key=cls.calculate_wall_length_m)
+        minimum = max(1.8, cls.calculate_wall_length_m(longest) * .65)
+        entrances = [wall for wall in candidates if cls.calculate_wall_length_m(wall) >= minimum
+                     and any(op.get("type") == "door" for op in wall.get("openings", []))]
+        return max(entrances, key=cls.calculate_wall_length_m) if entrances else longest
 
     def synthesize_facade_sketch(self, wall, num_floors=1, floor_height_m=2.8, is_front=False, target_size=256):
         image, bounds, _, _ = self._build_facade_sketch(wall, num_floors, floor_height_m, is_front, target_size)
@@ -340,7 +363,7 @@ class FacadeBridge:
                 "sill_m": float(op.get("sill_m", 0.0 if kind == "door" else 0.90)),
             })
         # Procedural preview only when no measured openings were supplied.
-        if not attached:
+        if not attached and not wall.get("geometry_fixed"):
             if is_front:
                 templates.append({"id": "facade_door", "type": "door", "position_along_wall_m": wall_len_m / 2, "width_m": 1.15, "height_m": 2.1, "sill_m": 0.0})
             bays = max(int(round(wall_len_m / 2.8)), 1)
@@ -485,14 +508,9 @@ class FacadeBridge:
         walls = layout.get("walls", [])
         exterior_walls = [w for w in walls if w.get("is_exterior", False)]
 
-        # If no front wall specified, pick the longest exterior wall or the first with a door
-        if front_wall_id is None and len(exterior_walls) > 0:
-            # Prefer wall with attached doors
-            walls_with_doors = [w for w in exterior_walls if any(op.get("type") == "door" for op in w.get("openings", []))]
-            if walls_with_doors:
-                front_wall_id = walls_with_doors[0]["id"]
-            else:
-                front_wall_id = max(exterior_walls, key=self.calculate_wall_length_m)["id"]
+        if not any(w.get("id") == front_wall_id for w in exterior_walls):
+            front = self.select_front_wall(exterior_walls)
+            front_wall_id = front.get("id") if front else None
 
         results = {}
 
@@ -506,7 +524,7 @@ class FacadeBridge:
                 if is_front:
                     tex_filepath = str(out_path / f"{w_id}_facade.png") if out_path else None
                     res = self.render_wall_facade(
-                        wall=w,
+                        wall={**w, "geometry_fixed": True},
                         num_floors=num_floors,
                         is_front=True,
                         style=style,
@@ -547,7 +565,7 @@ class FacadeBridge:
                 w_id = w.get("id")
                 is_front = (w_id == front_wall_id)
                 w["is_front"] = is_front
-                sketch_img, uv_bounds, frame, openings = self._build_facade_sketch(w, num_floors=num_floors, is_front=is_front, target_size=getattr(self.inference_engine, "resolution", 256))
+                sketch_img, uv_bounds, frame, openings = self._build_facade_sketch({**w, "geometry_fixed": True}, num_floors=num_floors, is_front=is_front, target_size=getattr(self.inference_engine, "resolution", 256))
                 sketches.append(sketch_img)
                 wall_order.append((w, sketch_img, uv_bounds, frame, openings))
 

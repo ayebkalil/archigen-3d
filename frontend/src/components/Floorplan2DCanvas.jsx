@@ -17,6 +17,7 @@ import {
   GripVertical,
   HelpCircle
 } from 'lucide-react';
+import { alignDrawingLevels, drawingLevelAt, separateDrawingLevels, wallStrip } from '../geometry/houseGeometry.js';
 
 const ROOM_COLORS = {
   'Living Room': { fill: 'rgba(28, 78, 128, 0.20)', stroke: '#1c4e80' },
@@ -148,6 +149,11 @@ export default function Floorplan2DCanvas({
   // 2-Point Calibration State
   const [calibPointA, setCalibPointA] = useState(null);
   const [calibPointB, setCalibPointB] = useState(null);
+  const [wallStart, setWallStart] = useState(null);
+  const [drawExterior, setDrawExterior] = useState(false);
+  const [levelAnchor, setLevelAnchor] = useState(null);
+  const canAlignLevels = layout?.envelope?.length === 2 && !layout.storeys?.length;
+  const hasAlignedLevels = layout?.storeys?.length > 0 && layout.metadata?.source !== 'sample_reference';
   const [knownDistanceM, setKnownDistanceM] = useState('0.90');
 
   const canvasSize = layout?.metadata?.canvas_size || [512, 512];
@@ -161,11 +167,13 @@ export default function Floorplan2DCanvas({
     setTimeout(() => setEditFeedback(null), 2500);
   };
 
-  const handleCanvasClick = (e) => {
+  const handleCanvasClick = (e, clickedWall = null) => {
     if (isPanning) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.round((e.clientX - rect.left) * (canvasSize[0] / rect.width));
-    const y = Math.round((e.clientY - rect.top) * (canvasSize[1] / rect.height));
+    const svg = e.currentTarget.ownerSVGElement || e.currentTarget;
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return;
+    const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(matrix.inverse());
+    const x = Math.round(point.x), y = Math.round(point.y);
 
     // 1. Calibration Tool
     if (isCalibrating) {
@@ -180,6 +188,56 @@ export default function Floorplan2DCanvas({
       return;
     }
 
+    if (activeTool === 'align_levels' && onUpdateLayout && canAlignLevels) {
+      const scale = layout.metadata?.scale_meters_per_pixel || .03;
+      const anchor = [x * scale, y * scale];
+      if (!levelAnchor) { setLevelAnchor(anchor); return; }
+      try {
+        onUpdateLayout(alignDrawingLevels(layout, levelAnchor, anchor));
+        setActiveTool('select');
+        triggerFeedback('Ground and upper floors aligned.');
+      } catch (error) {
+        triggerFeedback(error.message);
+      }
+      setLevelAnchor(null);
+      return;
+    }
+
+    if (activeTool === 'draw_wall' && onUpdateLayout && layout) {
+      const scale = layout.metadata?.scale_meters_per_pixel || .03;
+      let end = [x * scale, y * scale];
+      const anchors = walls.flatMap(wall => wall.axis_meters || wall.polygon_meters || []);
+      const close = anchors.reduce((best, candidate) => {
+        const distance = Math.hypot(candidate[0] - end[0], candidate[1] - end[1]);
+        return distance < best.distance ? { candidate, distance } : best;
+      }, { candidate: end, distance: .12 });
+      end = close.candidate;
+      if (!wallStart) { setWallStart(end); return; }
+      if (e.shiftKey) {
+        const axis = Math.abs(end[0] - wallStart[0]) >= Math.abs(end[1] - wallStart[1]) ? 1 : 0;
+        end = end.map((v, i) => i === axis ? wallStart[i] : v);
+      }
+      const length = Math.hypot(end[0] - wallStart[0], end[1] - wallStart[1]);
+      if (length < .25) { triggerFeedback('Choose an end at least 25 cm from the start.'); return; }
+      const level = drawingLevelAt(layout, wallStart);
+      if (layout.storeys?.length && (!level || drawingLevelAt(layout, end)?.id !== level.id)) {
+        triggerFeedback('Both wall endpoints must be on the same level drawing.');
+        setWallStart(null);
+        return;
+      }
+      const thickness = drawExterior ? .24 : .18;
+      const extension = end.map((value, i) => (value - wallStart[i]) / length * thickness / 2);
+      const polygon = wallStrip(wallStart.map((value, i) => value - extension[i]),
+        end.map((value, i) => value + extension[i]), thickness);
+      const newWall = { id: `wall_manual_${Date.now()}`, level_id: level?.id, is_exterior: drawExterior,
+        axis_meters: [wallStart, end], thickness_m: thickness, height_m: level?.height || layout.walls[0]?.height_m || 2.8,
+        polygon_meters: polygon, polygon_px: polygon.map(p => p.map(value => value / scale)), openings: [] };
+      onUpdateLayout({ ...layout, walls: [...walls, newWall], metadata: { ...layout.metadata, num_walls: walls.length + 1 } });
+      setWallStart(null);
+      triggerFeedback('Wall added to the 3D house.');
+      return;
+    }
+
     // 2. Add Door Tool
     if (activeTool === 'add_door' && onUpdateLayout && layout) {
       const scaleMperPx = layout.metadata?.scale_meters_per_pixel || 0.03;
@@ -189,7 +247,9 @@ export default function Floorplan2DCanvas({
         position: posM,
         position_meters: posM,
         width_m: 0.9,
-        type: 'single'
+        type: 'door',
+        associated_wall: clickedWall?.id,
+        level_id: clickedWall?.level_id || drawingLevelAt(layout, posM)?.id,
       };
       const updatedLayout = {
         ...layout,
@@ -233,25 +293,33 @@ export default function Floorplan2DCanvas({
 
   const handleWallClick = (wall, e) => {
     e.stopPropagation();
+    if (isCalibrating || ['draw_wall', 'add_door', 'align_levels'].includes(activeTool)) {
+      handleCanvasClick(e, wall);
+      return;
+    }
     if (activeTool === 'delete' && onUpdateLayout && layout) {
       const updatedWalls = layout.walls.filter((w) => w.id !== wall.id);
       onUpdateLayout({
         ...layout,
         walls: updatedWalls,
+        doors: doors.filter(opening => opening.associated_wall !== wall.id),
+        windows: windows.filter(opening => opening.associated_wall !== wall.id),
         metadata: { ...layout.metadata, num_walls: updatedWalls.length }
       });
       triggerFeedback(`[-] Removed wall (${wall.id})`);
       return;
     }
 
-    if (wall.is_exterior && onSelectFrontWall) {
+    if (activeTool === 'select' && wall.is_exterior && onSelectFrontWall) {
       onSelectFrontWall(wall.id);
     }
   };
 
   const handleRoomClick = (room, e) => {
     e.stopPropagation();
-    if (activeTool === 'relabel') {
+    if (isCalibrating || ['draw_wall', 'add_door', 'align_levels'].includes(activeTool)) {
+      handleCanvasClick(e);
+    } else if (activeTool === 'relabel') {
       setSelectedRoomForRelabel(room);
     } else if (onSelectRoom) {
       onSelectRoom(room);
@@ -301,6 +369,7 @@ export default function Floorplan2DCanvas({
   let canvasCursor = 'cursor-default';
   if (isCalibrating) canvasCursor = 'cursor-crosshair';
   else if (activeTool === 'add_door') canvasCursor = 'cursor-crosshair';
+  else if (activeTool === 'draw_wall' || activeTool === 'align_levels') canvasCursor = 'cursor-crosshair';
   else if (activeTool === 'delete') canvasCursor = 'cursor-pointer';
   else if (activeTool === 'relabel') canvasCursor = 'cursor-pointer';
 
@@ -334,6 +403,18 @@ export default function Floorplan2DCanvas({
             <span>Select</span>
           </button>
 
+          <button
+            onClick={() => { setActiveTool('draw_wall'); setWallStart(null); setIsCalibrating?.(false); }}
+            title="Draw a wall using two points"
+            aria-pressed={activeTool === 'draw_wall'}
+            className={`h-7 px-2.5 rounded-full flex items-center gap-1.5 ${activeTool === 'draw_wall' ? 'bg-[#1d1d1f] text-white' : ''}`}
+          ><PlusCircle className="w-3.5 h-3.5" />Wall</button>
+          {activeTool === 'draw_wall' && <button aria-pressed={drawExterior} title="Toggle new wall between interior and exterior"
+            className="h-7 px-2 border rounded" onClick={() => setDrawExterior(!drawExterior)}>{drawExterior ? 'Exterior' : 'Interior'}</button>}
+          {canAlignLevels && <button aria-pressed={activeTool === 'align_levels'} title="Align two storey drawings"
+            className="h-7 px-2 border rounded" onClick={() => { setActiveTool('align_levels'); setLevelAnchor(null); setIsCalibrating?.(false); }}>Align levels</button>}
+          {hasAlignedLevels && <button title="Return to separate plan drawings" className="h-7 px-2 border rounded"
+            onClick={() => onUpdateLayout(separateDrawingLevels(layout))}>Separate levels</button>}
           <button
             onClick={() => { setActiveTool('add_door'); if (setIsCalibrating) setIsCalibrating(false); }}
             title="Click on canvas or wall to insert a door"
@@ -626,6 +707,14 @@ export default function Floorplan2DCanvas({
               })}
 
             {/* 2. Walls */}
+            {activeTool === 'draw_wall' && wallStart && <circle
+              cx={wallStart[0] / layout.metadata.scale_meters_per_pixel}
+              cy={wallStart[1] / layout.metadata.scale_meters_per_pixel}
+              r="4" fill="#c94b25" stroke="white" strokeWidth="2" pointerEvents="none" />}
+            {activeTool === 'align_levels' && levelAnchor && <circle
+              cx={levelAnchor[0] / layout.metadata.scale_meters_per_pixel}
+              cy={levelAnchor[1] / layout.metadata.scale_meters_per_pixel}
+              r="4" fill="#287ab1" stroke="white" strokeWidth="2" pointerEvents="none" />}
             {showWalls &&
               walls.map((wall) => {
                 const isSelected = wall.id === frontWallId;
@@ -914,7 +1003,9 @@ export default function Floorplan2DCanvas({
               </button>
             </div>
             <p className="font-mono text-[9.5px] text-[#1d1d1f]/70 leading-relaxed">
-              {activeTool === 'select' && "Click any exterior terracotta wall to designate it as the front wall for facade synthesis."}
+              {activeTool === 'select' && 'Select an exterior wall to set the facade target.'}
+              {activeTool === 'draw_wall' && (wallStart ? 'Click the end of the wall. Hold Shift to keep it horizontal or vertical.' : 'Click the start of the wall. Nearby junctions snap into place.')}
+              {activeTool === 'align_levels' && (levelAnchor ? 'Click the matching corner on the upper drawing.' : 'Click a corner on the ground-floor drawing.')}
               {activeTool === 'add_door' && "Click anywhere on the plan to insert a door. The Three.js 3D model re-extrudes instantly."}
               {activeTool === 'delete' && "Click any door, window, or wall to delete it from the architectural model."}
               {activeTool === 'relabel' && "Click any room polygon or badge to change its space classification."}

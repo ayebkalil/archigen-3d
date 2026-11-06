@@ -24,7 +24,7 @@ export default function Navbar({
         </span>
         <span>
           ARCHIGEN<span className="brand-accent">3D</span>
-          <small>DESIGN WORKSPACE</small>
+          <small>NEURAL 2D-TO-3D STUDIO</small>
         </span>
       </a>
       <nav className="workspace-navigation" aria-label="Main workspace">

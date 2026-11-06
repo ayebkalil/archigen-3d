@@ -41,7 +41,7 @@ export default function MetricsSummary({ layout, frontWallId, selectedRoom, onSe
           </strong>
         </div>
         <div>
-          <small>Detected rooms</small>
+          <small>{layout.metadata?.source === 'sample_reference' ? 'Traced rooms' : 'Detected rooms'}</small>
           <strong>{rooms.length}</strong>
         </div>
       </div>

@@ -440,7 +440,7 @@ export default function GenerativeStudio({
         layout: layout,
         wall_id: frontWallId,
         style: targetStyle,
-        num_floors: numFloors
+        num_floors: layout?.storeys?.length ? 1 : numFloors
       };
 
       const res = await axios.post('/facade/generate', payload);
@@ -468,7 +468,19 @@ export default function GenerativeStudio({
     <div className="generative-page flex-1 flex flex-col h-full bg-[#efebe2] overflow-hidden select-none font-mono text-[#1d1d1f]">
       
       <div className="workspace-heading generative-heading">
-        <div><div className="workspace-eyebrow">OBJECTS & MATERIALS / WORKSPACE 02</div><h1>Generative studio<span>.</span></h1><p>Bring your references to life, one detail at a time.</p></div>
+        <div>
+          <div className="workspace-eyebrow">
+            <span>ARCHIGEN 3D</span>
+            <span className="dot">·</span>
+            <span>NEURAL 2D-TO-3D STUDIO</span>
+            <span className="dot">·</span>
+            <span>WORKSPACE 02</span>
+          </div>
+          <h1>
+            GENERATIVE <span>STUDIO.</span>
+          </h1>
+          <p>Bring your references to life, one detail at a time.</p>
+        </div>
         <div className="studio-mode-switch" aria-label="Generation workspace">
           <button data-testid="studio-furniture" aria-pressed={studioTab === 'furniture'} onClick={() => setStudioTab('furniture')}><Box size={17} /><span>Furniture<small>Image to 3D</small></span></button>
           <button data-testid="studio-facade" aria-pressed={studioTab === 'facade'} onClick={() => setStudioTab('facade')}><Building2 size={17} /><span>Facades<small>Material exploration</small></span></button>
@@ -821,7 +833,8 @@ export default function GenerativeStudio({
                   <span className="font-bold">{frontWallId || 'Exterior Front Wall'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#1d1d1f]/60">Storeys</span>
+                  <span className="text-[#1d1d1f]/60">{layout?.storeys?.length ? 'Facade level' : 'Storeys'}</span>
+                  {layout?.storeys?.length ? <span>{layout.storeys.find(level => level.id === layout.walls.find(wall => wall.id === frontWallId)?.level_id)?.label || 'Selected wall'}</span> : (
                   <div className="flex items-center space-x-1">
                     {[1, 2, 3].map(fl => (
                       <button
@@ -835,6 +848,7 @@ export default function GenerativeStudio({
                       </button>
                     ))}
                   </div>
+                  )}
                 </div>
               </div>
             </div>

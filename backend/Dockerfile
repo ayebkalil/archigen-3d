@@ -1,5 +1,5 @@
 # Multi-stage optimized Dockerfile for FastAPI Backend
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /install
 COPY backend/requirements.txt .
@@ -20,17 +20,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 # Copy installed packages from builder
 COPY --from=builder /install /usr/local
-COPY ./src /app/src
-COPY ./backend/app /app/app
+COPY backend/requirements-docker.txt /tmp/requirements-docker.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-docker.txt \
+    && useradd -m appuser \
+    && install -d -o appuser -g appuser /app/library/custom
 COPY ./models/saved/floorplan_unetpp/floorplan_multitask.onnx /app/models/saved/floorplan_unetpp/floorplan_multitask.onnx
 COPY ./models/saved/floorplan_unetpp/floorplan_fallback.onnx /app/models/saved/floorplan_unetpp/floorplan_fallback.onnx
 COPY ./models/saved/generator_perceptual_ema.onnx /app/models/saved/generator_perceptual_ema.onnx
-COPY ./models/saved/generator.onnx /app/models/saved/generator.onnx
+COPY ./models/saved/facade512_experiment/generator.onnx ./models/saved/facade512_experiment/generator.json /app/models/saved/facade512_experiment/
 COPY ./models/saved/facade_authoritative_metrics.json /app/models/saved/facade_authoritative_metrics.json
 COPY ./models/benchmarks /app/models/benchmarks
+COPY ./src /app/src
+COPY ./backend/app /app/app
 
-# Non-root user for security
-RUN useradd -m appuser && chown -R appuser /app
+ARG APP_REVISION=local
+LABEL org.opencontainers.image.revision=$APP_REVISION
 USER appuser
 
 EXPOSE 8000

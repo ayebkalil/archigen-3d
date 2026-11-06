@@ -34,7 +34,7 @@ async function main() {
   const facade = res ? await res.json() : JSON.parse(fs.readFileSync(process.env.ARCHIGEN_FACADE_FIXTURE, 'utf8'));
   assert.ok(facade.facade_frame && facade.openings.length === 5);
   fs.writeFileSync(path.join(out, 'facade-metadata.json'), JSON.stringify({ ...facade, texture_base64: undefined, sketch_base64: undefined }, null, 2));
-  const executablePath = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(p => fs.existsSync(p));
+  const executablePath = process.env.CHROME_PATH || ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find(p => fs.existsSync(p));
   assert.ok(executablePath, 'Chrome or Edge is installed');
   const browser = await puppeteer.launch({ executablePath, headless: true, args: ['--no-sandbox', '--use-angle=d3d11', '--enable-webgl'] });
   const errors = [], reports = [];
@@ -72,7 +72,7 @@ async function main() {
       await page.click(`button[title="${title}"]`);
     };
     const ready = async () => {
-      await page.goto(`${viewerUrl}/?phase1=${shapeName}&diagnostic=${diagnostic}#studio`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${viewerUrl}/?sample=detected&phase1=${shapeName}&diagnostic=${diagnostic}#studio`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => window.__ARCHIGEN_VIEWER__?.scene.children.some(o => o.userData.type === 'facade'));
       if (process.env.ARCHIGEN_FACADE_FIXTURE && facade.style) {
         await page.evaluate(style => {
@@ -153,7 +153,7 @@ async function main() {
     await ready();
     await click('Focus camera directly on Front Facade wall');
     await page.screenshot({ path: path.join(out, 'facade-alignment.png') });
-    await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'SPLIT (2D + 3D)').click());
+    await page.click('[data-testid=view-split]');
     await page.waitForFunction(() => {
       const viewer = window.__ARCHIGEN_VIEWER__;
       if (!viewer?.renderer.domElement.isConnected) return false;

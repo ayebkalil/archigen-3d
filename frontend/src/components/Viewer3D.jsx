@@ -4,6 +4,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createRoofGeometries } from '../geometry/roofGeometry.js';
+import { buildingLevels, clipRoomFloor, compileWallAssembly, exposedRoof, floorFootprints,
+  floorSurfaceGeometry, tileFloor, wallAssemblyGeometry } from '../geometry/houseGeometry.js';
 import { createFacadeGeometry, wallFacadeFrame, facadeOpeningPosition, facadeBounds } from '../geometry/facadeGeometry.js';
 import { RotateCcw, Box, Eye, Layers, Sun, Sparkles, Compass, Maximize2, Activity, Home } from 'lucide-react';
 
@@ -30,9 +32,11 @@ export default function Viewer3D({
   const gltfLoaderRef = useRef(new GLTFLoader());
 
   const [wireframe, setWireframe] = useState(false);
-  const [showFloors, setShowFloors] = useState(true);
+  const [activeLevel, setActiveLevel] = useState('all');
+  const [unresolvedOpenings, setUnresolvedOpenings] = useState(0);
   const [showRoof, setShowRoof] = useState(false);
   const [roofStyle, setRoofStyle] = useState('slab'); // 'slab' | 'pitched'
+  const [floorStyle, setFloorStyle] = useState('oak'); // 'oak' | 'marble' | 'adaptive'
   const [viewPreset, setViewPreset] = useState('perspective'); // 'perspective' | 'isometric' | 'top' | 'room'
   const [showFurniture, setShowFurniture] = useState(true);
   const [currentFps, setCurrentFps] = useState(60);
@@ -40,6 +44,7 @@ export default function Viewer3D({
 
   // Store layout centers for furniture positioning
   const centersRef = useRef({ centerX: 0, centerZ: 0 });
+  const buildingBoundsRef = useRef(new THREE.Box3());
 
   // PBR texture cache ref
   const pbrTexturesRef = useRef({
@@ -103,12 +108,42 @@ export default function Viewer3D({
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // OrbitControls
+    // OrbitControls with free panning and smooth damping
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.maxPolarAngle = Math.PI / 2 + 0.02; // Prevent dipping below ground
+    controls.screenSpacePanning = true;
+    controls.enablePan = true;
+    controls.panSpeed = 1.0;
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN
+    };
+    controls.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN
+    };
     controlsRef.current = controls;
+
+    // Prevent default context menu on right click so right-drag panning is instantaneous
+    const handleContextMenu = (e) => e.preventDefault();
+    renderer.domElement.addEventListener('contextmenu', handleContextMenu);
+
+    // Keyboard Navigation: WASD / Arrow Keys for free walking & exploration
+    const keysDown = new Set();
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        keysDown.add(e.code);
+      }
+    };
+    const handleKeyUp = (e) => {
+      keysDown.delete(e.code);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     // Environment Map (IBL Realistic Studio Reflections)
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
@@ -142,6 +177,7 @@ export default function Viewer3D({
     sunLight.shadow.mapSize.height = 2048;
     sunLight.shadow.radius = 2.4; // Soft penumbra
     sunLight.shadow.bias = -0.00015;
+    sunLight.shadow.normalBias = 0.025;
     sunLight.shadow.camera.near = 0.5;
     sunLight.shadow.camera.far = 130;
     sunLight.shadow.camera.left = -28;
@@ -218,8 +254,18 @@ export default function Viewer3D({
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+    const handlePointerDown = (e) => {
+      pointerStartX = e.clientX;
+      pointerStartY = e.clientY;
+    };
+
     const handleClick = (e) => {
       if (!containerRef.current || !cameraRef.current || !sceneRef.current) return;
+      const dist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
+      if (dist > 6) return; // User was dragging to rotate or pan, not clicking
+
       const rect = containerRef.current.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -237,15 +283,69 @@ export default function Viewer3D({
       }
     };
 
-    renderer.domElement.addEventListener('pointerdown', handleClick);
+    const handleDoubleClick = (e) => {
+      if (!containerRef.current || !cameraRef.current || !sceneRef.current || !controlsRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, cameraRef.current);
+      const intersects = raycaster.intersectObjects(sceneRef.current.children, true);
+      for (const hit of intersects) {
+        if (hit.point) {
+          // Double click centers the camera orbit point on the targeted room/surface
+          controlsRef.current.target.set(hit.point.x, Math.max(0.2, hit.point.y), hit.point.z);
+          controlsRef.current.update();
+          break;
+        }
+      }
+    };
+
+    renderer.domElement.addEventListener('pointerdown', handlePointerDown);
+    renderer.domElement.addEventListener('pointerup', handleClick);
+    renderer.domElement.addEventListener('dblclick', handleDoubleClick);
 
     // Animation & Live FPS Measurement Loop
     let animationFrameId;
     let frameCount = 0;
     let lastFpsTime = performance.now();
+    let lastWalkTime = performance.now();
 
     const animate = (now) => {
       animationFrameId = requestAnimationFrame(animate);
+
+      // WASD / Arrow Key camera translation
+      const dt = Math.min(0.1, (now - lastWalkTime) / 1000);
+      lastWalkTime = now;
+
+      if (keysDown.size > 0 && cameraRef.current && controlsRef.current) {
+        const cam = cameraRef.current;
+        const ctrl = controlsRef.current;
+
+        const forward = new THREE.Vector3();
+        cam.getWorldDirection(forward);
+        forward.y = 0;
+        if (forward.lengthSq() > 0.001) forward.normalize();
+
+        const right = new THREE.Vector3();
+        right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+        const move = new THREE.Vector3();
+        if (keysDown.has('KeyW') || keysDown.has('ArrowUp')) move.add(forward);
+        if (keysDown.has('KeyS') || keysDown.has('ArrowDown')) move.sub(forward);
+        if (keysDown.has('KeyD') || keysDown.has('ArrowRight')) move.add(right);
+        if (keysDown.has('KeyA') || keysDown.has('ArrowLeft')) move.sub(right);
+        if (keysDown.has('KeyE')) move.y += 1;
+        if (keysDown.has('KeyQ')) move.y -= 1;
+
+        if (move.lengthSq() > 0) {
+          const speed = 7.0; // 7 m/s walk speed
+          move.normalize().multiplyScalar(speed * dt);
+          cam.position.add(move);
+          ctrl.target.add(move);
+        }
+      }
+
       controls.update();
       renderer.render(scene, camera);
 
@@ -276,9 +376,14 @@ export default function Viewer3D({
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
       resizeObserver.disconnect();
       if (renderer.domElement) {
-        renderer.domElement.removeEventListener('pointerdown', handleClick);
+        renderer.domElement.removeEventListener('contextmenu', handleContextMenu);
+        renderer.domElement.removeEventListener('pointerdown', handlePointerDown);
+        renderer.domElement.removeEventListener('pointerup', handleClick);
+        renderer.domElement.removeEventListener('dblclick', handleDoubleClick);
       }
       renderer.dispose();
       if (containerRef.current) {
@@ -316,86 +421,26 @@ export default function Viewer3D({
     }
   }, [showRoof]);
 
-  // Helper: Remove consecutive duplicate or degenerate points
-  const cleanPolygonPoints = (pts) => {
-    if (!pts || pts.length < 3) return pts || [];
-    const result = [];
-    for (let i = 0; i < pts.length; i++) {
-      const curr = pts[i];
-      const prev = result[result.length - 1];
-      if (!prev || Math.hypot(curr[0] - prev[0], curr[1] - prev[1]) > 0.02) {
-        result.push(curr);
-      }
+  const fitCamera = (mode) => {
+    const camera = cameraRef.current, controls = controlsRef.current;
+    if (!camera || !controls || buildingBoundsRef.current.isEmpty()) return;
+    const bounds = buildingBoundsRef.current;
+    const target = bounds.getCenter(new THREE.Vector3());
+    const size = bounds.getSize(new THREE.Vector3());
+    const halfFov = THREE.MathUtils.degToRad(camera.fov) / 2;
+    if (mode === 'top') {
+      const distance = Math.max(size.z, size.x / camera.aspect) / (2 * Math.tan(halfFov));
+      camera.up.set(0, 0, -1);
+      camera.position.set(target.x, bounds.max.y + distance * 1.24, target.z);
+    } else {
+      const limitingFov = Math.atan(Math.tan(halfFov) * Math.min(1, camera.aspect));
+      const distance = size.length() / (2 * Math.sin(limitingFov)) * 1.15;
+      const direction = mode === 'isometric' ? new THREE.Vector3(1, 1, 1) : new THREE.Vector3(1.15, 1.35, 1.35);
+      camera.up.set(0, 1, 0);
+      camera.position.copy(direction.normalize().multiplyScalar(distance).add(target));
     }
-    if (result.length > 2 && Math.hypot(result[0][0] - result[result.length - 1][0], result[0][1] - result[result.length - 1][1]) < 0.02) {
-      result.pop();
-    }
-    return result;
-  };
-
-  // Helper: Snap opening (door / window) onto closest wall segment and compute orientation
-  const findWallSegmentForOpening = (posM, walls) => {
-    if (!posM || !walls || walls.length === 0) {
-      return {
-        center: posM || [0, 0],
-        angleRad: 0,
-        wallThickness: 0.18,
-        wallId: null,
-        isExterior: false
-      };
-    }
-
-    const px = posM[0];
-    const pz = posM[1];
-
-    let bestLineDist = Infinity;
-    let bestSeg = null;
-
-    for (let wIdx = 0; wIdx < walls.length; wIdx++) {
-      const wall = walls[wIdx];
-      const pts = wall.polygon_meters;
-      if (!pts || pts.length < 2) continue;
-
-      for (let i = 0; i < pts.length; i++) {
-        const p1 = pts[i];
-        const p2 = pts[(i + 1) % pts.length];
-        const dx = p2[0] - p1[0];
-        const dz = p2[1] - p1[1];
-        const L = Math.hypot(dx, dz);
-        if (L < 0.15) continue; // Skip tiny end-caps
-
-        // Distance from point to infinite line of segment
-        const lineDist = Math.abs((px - p1[0]) * dz - (pz - p1[1]) * dx) / L;
-        const t = ((px - p1[0]) * dx + (pz - p1[1]) * dz) / (L * L);
-        const segEndDist = Math.max(0.0, -t * L, (t - 1.0) * L);
-
-        if (lineDist < bestLineDist && segEndDist < 2.2) {
-          bestLineDist = lineDist;
-          const projX = p1[0] + t * dx;
-          const projZ = p1[1] + t * dz;
-          const angleRad = Math.atan2(-dz, dx);
-          bestSeg = {
-            center: [projX, projZ],
-            angleRad: angleRad,
-            wallThickness: wall.is_exterior ? 0.22 : 0.18,
-            wallId: wall.id,
-            isExterior: Boolean(wall.is_exterior)
-          };
-        }
-      }
-    }
-
-    if (!bestSeg) {
-      return {
-        center: [px, pz],
-        angleRad: 0,
-        wallThickness: 0.18,
-        wallId: null,
-        isExterior: false
-      };
-    }
-
-    return bestSeg;
+    controls.target.copy(target);
+    controls.update();
   };
 
   // Update Building Meshes when Layout / Facade Texture / selectedRoom / graphicsQuality changes
@@ -410,589 +455,356 @@ export default function Viewer3D({
         toRemove.push(obj);
       }
     });
+    const sharedTextures = new Set(Object.values(pbrTexturesRef.current).flatMap(set =>
+      set && typeof set === 'object' ? Object.values(set).filter(value => value?.isTexture) : []));
     toRemove.forEach((obj) => {
       obj.parent?.remove(obj);
       obj.traverse(child => {
         child.geometry?.dispose();
         const materials = Array.isArray(child.material) ? child.material : [child.material];
         materials.filter(Boolean).forEach(m => {
-          for (const value of Object.values(m)) if (value?.isTexture) value.dispose();
+          for (const value of Object.values(m)) if (value?.isTexture && !sharedTextures.has(value)) value.dispose();
           m.dispose();
         });
       });
     });
 
-    const walls = layout.walls || [];
-    const rooms = layout.rooms || [];
-    const wallHeight = (layout.walls?.[0]?.height_m || 2.8) * numFloors;
-
-    // Center building at origin (0, 0, 0)
+    const levels = buildingLevels(layout, numFloors);
+    const visibleLevels = levels.filter(level => activeLevel === 'all' || level.id === activeLevel);
+    if (!visibleLevels.length) visibleLevels.push(...levels);
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    [...walls, ...rooms].forEach((w) => {
-      w.polygon_meters?.forEach(([x, z]) => {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (z < minZ) minZ = z;
-        if (z > maxZ) maxZ = z;
-      });
-    });
-
+    for (const level of levels) {
+      for (const feature of [...(level.walls || []), ...(level.rooms || [])]) {
+        for (const [x, z] of feature.polygon_meters || []) {
+          minX = Math.min(minX, x + level.offset[0]);
+          maxX = Math.max(maxX, x + level.offset[0]);
+          minZ = Math.min(minZ, z + level.offset[1]);
+          maxZ = Math.max(maxZ, z + level.offset[1]);
+        }
+      }
+    }
     const centerX = (minX + maxX) / 2 || 0;
     const centerZ = (minZ + maxZ) / 2 || 0;
     centersRef.current = { centerX, centerZ };
-
-    const facadeSpecs = new Map();
-    const textureLoader = new THREE.TextureLoader();
-    walls.forEach(wall => {
-      const isFront = wall.id === frontWallId || (!frontWallId && wall.is_front);
-      const own = wall.facade_texture || {};
-      const data = isFront && facadeTextureUrl ? { ...own, ...(facadeData || {}), texture_base64: facadeTextureUrl } : own;
-      if (!data.texture_base64) return;
-      const frame = data.facade_frame || wallFacadeFrame(wall);
-      if (!frame) return;
-      const texture = textureLoader.load(data.texture_base64);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-      texture.repeat.set(1, 1);
-      // Preserve higher-resolution detail at oblique viewing angles; UVs remain normalized.
-      texture.anisotropy = Math.min(8, rendererRef.current?.capabilities.getMaxAnisotropy() || 1);
-      const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.02, side: THREE.DoubleSide, wireframe });
-      const geometry = createFacadeGeometry(frame, data.uv_bounds || facadeBounds(frame.length_m, wallHeight), wallHeight, centerX, centerZ);
-      const skin = new THREE.Mesh(geometry, material);
-      skin.castShadow = graphicsQuality === 'high';
-      skin.receiveShadow = graphicsQuality === 'high';
-      skin.userData = { isBuildingMesh: true, type: 'facade', wallId: wall.id, frame, uvBounds: data.uv_bounds };
-      scene.add(skin);
-      facadeSpecs.set(wall.id, { ...data, frame });
-    });
-
     const pbr = pbrTexturesRef.current;
-
-    // Shared Stucco / Wall Material for Wall Bodies, Corner Posts, Lintels & Sills
-    let defaultWallMat;
-    if (graphicsQuality === 'high' && pbr.stucco?.map) {
-      const sMap = pbr.stucco.map.clone();
-      sMap.repeat.set(1.5, 1);
-      sMap.needsUpdate = true;
-      const sNor = pbr.stucco.normalMap.clone();
-      sNor.repeat.set(1.5, 1);
-      sNor.needsUpdate = true;
-      const sArm = pbr.stucco.arm.clone();
-      sArm.repeat.set(1.5, 1);
-      sArm.needsUpdate = true;
-      defaultWallMat = new THREE.MeshStandardMaterial({
-        map: sMap,
-        normalMap: sNor,
-        normalScale: new THREE.Vector2(0.45, 0.45),
-        roughnessMap: sArm,
-        aoMap: sArm,
-        aoMapIntensity: 1.1,
-        roughness: 0.85,
-        metalness: 0.02,
-        color: 0xf8fafc,
-        side: THREE.DoubleSide,
-        wireframe: wireframe
-      });
-    } else {
-      defaultWallMat = new THREE.MeshStandardMaterial({
-        color: 0xe2e8f0,
-        roughness: 0.85,
-        metalness: 0.05,
-        side: THREE.DoubleSide,
-        wireframe: wireframe
-      });
-    }
-
-    // A. Extrude Walls with PBR Plaster Stucco Material (Cleaned & Solid Geometry)
-    walls.forEach((wall) => {
-      const pts = cleanPolygonPoints(wall.polygon_meters);
-      if (!pts || pts.length < 3) return;
-
-      const shape = new THREE.Shape();
-      shape.moveTo(pts[0][0] - centerX, -(pts[0][1] - centerZ));
-      for (let i = 1; i < pts.length; i++) {
-        shape.lineTo(pts[i][0] - centerX, -(pts[i][1] - centerZ));
-      }
-      shape.closePath();
-
-      const extrudeSettings = {
-        steps: 1,
-        depth: wallHeight,
-        bevelEnabled: false,
-      };
-
-      const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      geometry.rotateX(-Math.PI / 2);
-
-      let material;
-      const isFront = wall.id === frontWallId;
-
-      if (graphicsQuality === 'high' && pbr.stucco?.map) {
-        // High quality PBR Stucco with Normal & AO
-        const sMap = pbr.stucco.map.clone();
-        sMap.repeat.set(3, 1.5);
-        sMap.needsUpdate = true;
-        const sNor = pbr.stucco.normalMap.clone();
-        sNor.repeat.set(3, 1.5);
-        sNor.needsUpdate = true;
-        const sArm = pbr.stucco.arm.clone();
-        sArm.repeat.set(3, 1.5);
-        sArm.needsUpdate = true;
-
-        material = new THREE.MeshStandardMaterial({
-          map: sMap,
-          normalMap: sNor,
-          normalScale: new THREE.Vector2(0.45, 0.45),
-          roughnessMap: sArm,
-          aoMap: sArm,
-          aoMapIntensity: 1.1,
-          roughness: 0.85,
-          metalness: 0.02,
-          envMapIntensity: 0.8,
-          color: wall.is_exterior
-            ? (isFront ? 0xf59e0b : 0xe2e8f0)
-            : 0xf8fafc,
-          side: THREE.DoubleSide,
-          wireframe: wireframe,
-        });
-      } else {
-        material = new THREE.MeshStandardMaterial({
-          color: wall.is_exterior ? (isFront ? 0xf59e0b : 0x94a3b8) : 0xe2e8f0,
-          roughness: 0.85,
-          metalness: 0.05,
-          side: THREE.DoubleSide,
-          wireframe: wireframe,
-        });
-      }
-
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.castShadow = (graphicsQuality === 'high');
-      mesh.receiveShadow = (graphicsQuality === 'high');
-      mesh.userData = { isBuildingMesh: true, wallId: wall.id };
-      scene.add(mesh);
+    const highQuality = graphicsQuality === 'high';
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: highQuality ? 0xf3f0e9 : 0xe7e4dc,
+      ...(highQuality && pbr.stucco?.map ? { map: pbr.stucco.map, normalMap: pbr.stucco.normalMap,
+        normalScale: new THREE.Vector2(.35, .35), roughnessMap: pbr.stucco.arm } : {}),
+      roughness: .85, metalness: .02, wireframe,
     });
+    const floorMaterial = (texture, color, roughness) => new THREE.MeshStandardMaterial({
+      color: highQuality && texture?.map ? 0xffffff : color,
+      ...(highQuality && texture?.map ? { map: texture.map, normalMap: texture.normalMap,
+        normalScale: new THREE.Vector2(.45, .45), roughnessMap: texture.arm } : {}),
+      roughness, wireframe,
+    });
+    const oakMat = floorMaterial(pbr.oak, 0xc8aa88, .68);
+    const tileMat = floorMaterial(pbr.marble, 0xe2e4e5, .42);
+    const slabEdgeMat = new THREE.MeshStandardMaterial({ color: 0xd9d1c4, roughness: .92, wireframe });
+    const pickMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: THREE.DoubleSide });
+    const selectedMat = new THREE.MeshBasicMaterial({ color: 0x50a9dc, transparent: true, opacity: .27,
+      depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, side: THREE.DoubleSide });
+    let unresolved = 0;
+    for (const level of visibleLevels) {
+      const walls = level.walls || [];
+      const rooms = level.rooms || [];
+      const wallHeight = level.height;
+      const levelCenterX = centerX - level.offset[0];
+      const levelCenterZ = centerZ - level.offset[1];
+      const levelStart = scene.children.length;
+      const facadeSpecs = new Map();
+      const textureLoader = new THREE.TextureLoader();
+      walls.forEach(wall => {
+        const isFront = wall.id === frontWallId || (!frontWallId && wall.is_front);
+        const own = wall.facade_texture || {};
+        const data = isFront && facadeTextureUrl && (!facadeData?.wall_id || facadeData.wall_id === wall.id) ? { ...own, ...(facadeData || {}), texture_base64: facadeTextureUrl } : own;
+        if (!data.texture_base64) return;
+        const frame = data.facade_frame || wallFacadeFrame(wall);
+        if (!frame) return;
+        facadeSpecs.set(wall.id, { ...data, frame });
+      });
 
-    // A2. Sims-Style Seamless Corner Junction Posts & Welding Columns
-    // Physically and visually caps intersecting wall corners so there are ZERO cracks, air gaps, or disjointed slivers
-    const junctionPositions = [];
-    for (let i = 0; i < walls.length; i++) {
-      const pts1 = walls[i].polygon_meters || [];
-      for (let j = i + 1; j < walls.length; j++) {
-        const pts2 = walls[j].polygon_meters || [];
-        for (const p1 of pts1) {
-          for (const p2 of pts2) {
-            const dist = Math.hypot(p1[0] - p2[0], p1[1] - p2[1]);
-            if (dist < 0.38) {
-              const jX = (p1[0] + p2[0]) / 2 - centerX;
-              const jZ = (p1[1] + p2[1]) / 2 - centerZ;
-              const alreadyHas = junctionPositions.some(jp => Math.hypot(jp.x - jX, jp.z - jZ) < 0.18);
-              if (!alreadyHas) {
-                junctionPositions.push({
-                  x: jX,
-                  z: jZ,
-                  isExterior: Boolean(walls[i].is_exterior || walls[j].is_exterior)
-                });
-              }
-            }
+      const footprints = floorFootprints(level);
+      const bathroomRooms = rooms.filter(room => /bath|toilet/i.test(room.room_type || ''));
+      const tileAreas = floorStyle === 'adaptive' ? tileFloor(bathroomRooms, footprints) : [];
+      for (const elevation of level.floorElevations) {
+        for (const footprint of footprints) {
+          const slab = new THREE.Mesh(floorSurfaceGeometry(footprint, levelCenterX, levelCenterZ, .16),
+            [floorStyle === 'marble' ? tileMat : oakMat, slabEdgeMat]);
+          slab.position.y = elevation + .02;
+          slab.receiveShadow = highQuality;
+          slab.userData = { isBuildingMesh: true, type: 'foundation_slab', levelId: level.id };
+          scene.add(slab);
+        }
+        for (const area of tileAreas) {
+          const tile = new THREE.Mesh(floorSurfaceGeometry(area, levelCenterX, levelCenterZ), tileMat);
+          tile.position.y = elevation + .0205;
+          tile.receiveShadow = highQuality;
+          tile.userData = { isBuildingMesh: true, type: 'floor_finish' };
+          scene.add(tile);
+        }
+        for (const room of rooms) {
+          for (const region of clipRoomFloor(room, footprints)) {
+            const surface = new THREE.Mesh(floorSurfaceGeometry(region, levelCenterX, levelCenterZ),
+              room.id === selectedRoom?.id ? selectedMat : pickMat);
+            surface.position.y = elevation + .021;
+            surface.userData = { isBuildingMesh: true, isFloorMesh: true, room };
+            scene.add(surface);
           }
         }
       }
-    }
 
-    junctionPositions.forEach((j) => {
-      const postThick = j.isExterior ? 0.24 : 0.18;
-      const postGeo = new THREE.BoxGeometry(postThick, wallHeight, postThick);
-      const postMesh = new THREE.Mesh(postGeo, defaultWallMat);
-      postMesh.position.set(j.x, wallHeight / 2, j.z);
-      postMesh.castShadow = (graphicsQuality === 'high');
-      postMesh.receiveShadow = (graphicsQuality === 'high');
-      postMesh.userData = { isBuildingMesh: true, type: 'corner_junction' };
-      scene.add(postMesh);
-    });
-
-    // B. Floor Slabs for Rooms with Room-Specific PBR Materials
-    if (showFloors) {
-      rooms.forEach((room) => {
-        const pts = room.polygon_meters;
-        if (!pts || pts.length < 3) return;
-
-        const shape = new THREE.Shape();
-        shape.moveTo(pts[0][0] - centerX, -(pts[0][1] - centerZ));
-        for (let i = 1; i < pts.length; i++) {
-          shape.lineTo(pts[i][0] - centerX, -(pts[i][1] - centerZ));
+      const openingCandidates = [];
+      const scaleMperPx = layout.metadata?.scale_meters_per_pixel || .03;
+      const hostedByFacade = new Set();
+      facadeSpecs.forEach((spec, wallId) => {
+        for (const opening of spec.openings || []) {
+          const heightScale = wallHeight / (spec.wall_height_m || spec.uv_bounds?.wall_height_m || wallHeight);
+          hostedByFacade.add(`${wallId}:${opening.id}`);
+          openingCandidates.push({ ...opening, associated_wall: wallId,
+            position_meters: facadeOpeningPosition(opening, spec.frame),
+            facadeFrame: spec.frame, sill_m: opening.sill_m * heightScale, height_m: opening.height_m * heightScale });
         }
-        shape.closePath();
+      });
+      const byWallId = new Map(walls.map(wall => [wall.id, wall]));
+      for (const [type, openings] of [['door', level.doors || []], ['window', level.windows || []]]) {
+        for (const opening of openings) {
+          if (hostedByFacade.has(`${opening.associated_wall}:${opening.id}`)) continue;
+          const position = opening.position_meters || opening.position_px?.map(value => value * scaleMperPx);
+          for (const elevation of level.floorElevations) {
+            if (elevation > 0 && type === 'door' && byWallId.get(opening.associated_wall)?.is_exterior) continue;
+            openingCandidates.push({ ...opening, type, position_meters: position,
+              id: elevation === 0 ? opening.id : `${opening.id}-${elevation}`,
+              width_m: opening.width_m || (type === 'door' ? .9 : 1.1),
+              sill_m: elevation + (type === 'door' ? 0 : opening.sill_m ?? .9),
+              height_m: opening.height_m || (type === 'door' ? 2.1 : 1.4) });
+          }
+        }
+      }
+      const assembly = compileWallAssembly(walls, openingCandidates, wallHeight);
+      for (const [wallId, spec] of facadeSpecs) {
+        const { frame } = spec;
+        const texture = textureLoader.load(spec.texture_base64);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.repeat.set(1, 1);
+        // Preserve higher-resolution detail at oblique viewing angles; UVs remain normalized.
+        texture.anisotropy = Math.min(8, rendererRef.current?.capabilities.getMaxAnisotropy() || 1);
+        const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.7, metalness: 0.02, side: THREE.FrontSide, wireframe });
+        const geometry = createFacadeGeometry(frame, spec.uv_bounds || facadeBounds(frame.length_m, wallHeight), wallHeight, levelCenterX, levelCenterZ, assembly.hosted.filter(opening => opening.facadeFrame === frame));
+        const skin = new THREE.Mesh(geometry, material);
+        skin.castShadow = graphicsQuality === 'high';
+        skin.receiveShadow = graphicsQuality === 'high';
+        skin.userData = { isBuildingMesh: true, type: 'facade', wallId, frame, uvBounds: spec.uv_bounds };
+        scene.add(skin);
+      }
+      unresolved += assembly.unresolved.length;
+      const wallMesh = new THREE.Mesh(wallAssemblyGeometry(assembly.bands, levelCenterX, levelCenterZ), wallMat);
+      wallMesh.castShadow = wallMesh.receiveShadow = highQuality;
+      wallMesh.userData = { isBuildingMesh: true, type: 'wall_assembly', levelId: level.id,
+        hostedOpenings: assembly.hosted.length, unresolvedOpenings: assembly.unresolved };
+      scene.add(wallMesh);
+      const doors = assembly.hosted.filter(opening => opening.type === 'door');
+      const windows = assembly.hosted.filter(opening => opening.type === 'window');
+      const openingPlacement = opening => opening.facadeFrame ? {
+        ...opening.host, center: opening.position_meters,
+        angleRad: Math.atan2(-opening.facadeFrame.direction[1], opening.facadeFrame.direction[0]),
+      } : opening.host;
 
-        const floorGeo = new THREE.ShapeGeometry(shape);
-        floorGeo.rotateX(-Math.PI / 2);
+      // D. 3D Doors & Wall Lintels (Green Dots on Blueprint)
+      doors.forEach((door, dIdx) => {
+        const { center: [x, z], angleRad, wallThickness: wallThick } = openingPlacement(door);
+        const snappedX = x - levelCenterX;
+        const snappedZ = z - levelCenterZ;
+        const { width_m: doorWidth, height_m: doorHeight } = door;
 
-        // Approximate room bounds for texture repeat scale
-        let rMinX = Infinity, rMaxX = -Infinity, rMinZ = Infinity, rMaxZ = -Infinity;
-        pts.forEach(([x, z]) => {
-          if (x < rMinX) rMinX = x;
-          if (x > rMaxX) rMaxX = x;
-          if (z < rMinZ) rMinZ = z;
-          if (z > rMaxZ) rMaxZ = z;
+        // 2. 3D Architectural Door (Frame, Hinged Leaf, Lever Handles, Floor Threshold)
+        const doorGroup = new THREE.Group();
+        doorGroup.position.set(snappedX, door.sill_m, snappedZ);
+        doorGroup.rotation.y = angleRad;
+
+        // Frame Material (Architectural Charcoal Wood)
+        const frameMat = new THREE.MeshStandardMaterial({
+          color: 0x221f1d,
+          roughness: 0.65,
+          metalness: 0.08
         });
-        const rW = Math.max(2, rMaxX - rMinX);
-        const rD = Math.max(2, rMaxZ - rMinZ);
+        const frameThick = 0.045;
+        const frameDepth = wallThick + 0.02;
 
-        const isSelected = selectedRoom?.id === room.id;
-        const normType = (room.room_type || '').toLowerCase();
-        const isWetArea = normType.includes('bath') || normType.includes('toilet') || normType.includes('kitchen');
+        // Left Jamb
+        const jambLGeo = new THREE.BoxGeometry(frameThick, doorHeight, frameDepth);
+        const jambL = new THREE.Mesh(jambLGeo, frameMat);
+        jambL.position.set(-doorWidth / 2 + frameThick / 2, doorHeight / 2, 0);
+        jambL.castShadow = (graphicsQuality === 'high');
+        jambL.receiveShadow = (graphicsQuality === 'high');
+        doorGroup.add(jambL);
 
-        let floorMat;
+        // Right Jamb
+        const jambRGeo = new THREE.BoxGeometry(frameThick, doorHeight, frameDepth);
+        const jambR = new THREE.Mesh(jambRGeo, frameMat);
+        jambR.position.set(doorWidth / 2 - frameThick / 2, doorHeight / 2, 0);
+        jambR.castShadow = (graphicsQuality === 'high');
+        jambR.receiveShadow = (graphicsQuality === 'high');
+        doorGroup.add(jambR);
 
-        if (graphicsQuality === 'high' && isWetArea && pbr.marble?.map) {
-          // Luxury Architectural Polished Marble Tile PBR
-          const mMap = pbr.marble.map.clone();
-          mMap.repeat.set(Math.max(1, rW / 1.6), Math.max(1, rD / 1.6));
-          mMap.needsUpdate = true;
-          const mNor = pbr.marble.normalMap.clone();
-          mNor.repeat.set(Math.max(1, rW / 1.6), Math.max(1, rD / 1.6));
-          mNor.needsUpdate = true;
-          const mArm = pbr.marble.arm.clone();
-          mArm.repeat.set(Math.max(1, rW / 1.6), Math.max(1, rD / 1.6));
-          mArm.needsUpdate = true;
+        // Top Header Casing
+        const headGeo = new THREE.BoxGeometry(doorWidth, frameThick, frameDepth);
+        const headMesh = new THREE.Mesh(headGeo, frameMat);
+        headMesh.position.set(0, doorHeight - frameThick / 2, 0);
+        headMesh.castShadow = (graphicsQuality === 'high');
+        headMesh.receiveShadow = (graphicsQuality === 'high');
+        doorGroup.add(headMesh);
 
-          floorMat = new THREE.MeshStandardMaterial({
-            map: mMap,
-            normalMap: mNor,
-            normalScale: new THREE.Vector2(0.5, 0.5),
-            roughnessMap: mArm,
-            aoMap: mArm,
-            aoMapIntensity: 1.25,
-            roughness: 0.30,
-            metalness: 0.05,
-            envMapIntensity: 1.15,
-            color: isSelected ? 0xd0e8ff : 0xffffff,
-            emissive: isSelected ? 0x0284c7 : 0x000000,
-            emissiveIntensity: isSelected ? 0.28 : 0.0,
-            side: THREE.DoubleSide,
-            wireframe: wireframe,
-          });
-        } else if (graphicsQuality === 'high' && pbr.oak?.map) {
-          // Warm Architectural Oak Wood Planks PBR
-          const oMap = pbr.oak.map.clone();
-          oMap.repeat.set(Math.max(1, rW / 1.8), Math.max(1, rD / 1.8));
-          oMap.needsUpdate = true;
-          const oNor = pbr.oak.normalMap.clone();
-          oNor.repeat.set(Math.max(1, rW / 1.8), Math.max(1, rD / 1.8));
-          oNor.needsUpdate = true;
-          const oArm = pbr.oak.arm.clone();
-          oArm.repeat.set(Math.max(1, rW / 1.8), Math.max(1, rD / 1.8));
-          oArm.needsUpdate = true;
+        // Hinged Door Leaf (Warm Oak Finish)
+        const leafWidth = doorWidth - frameThick * 2;
+        const leafHeight = doorHeight - frameThick;
+        const leafThick = 0.04;
+        const leafMat = new THREE.MeshStandardMaterial({
+          color: 0x9b6b43, // Architectural warm oak
+          roughness: 0.55,
+          metalness: 0.05
+        });
 
-          floorMat = new THREE.MeshStandardMaterial({
-            map: oMap,
-            normalMap: oNor,
-            normalScale: new THREE.Vector2(0.75, 0.75),
-            roughnessMap: oArm,
-            aoMap: oArm,
-            aoMapIntensity: 1.15,
-            roughness: 0.70,
-            metalness: 0.02,
-            envMapIntensity: 0.95,
-            color: isSelected ? 0xd0e8ff : 0xffffff,
-            emissive: isSelected ? 0x0284c7 : 0x000000,
-            emissiveIntensity: isSelected ? 0.28 : 0.0,
-            side: THREE.DoubleSide,
-            wireframe: wireframe,
-          });
-        } else {
-          // Low Quality: Fast untextured architectural tones
-          floorMat = new THREE.MeshStandardMaterial({
-            color: isSelected ? 0xd0e8ff : (isWetArea ? 0xe2e8f0 : 0xdfd3c3),
-            emissive: isSelected ? 0x0284c7 : 0x000000,
-            emissiveIntensity: isSelected ? 0.28 : 0.0,
-            roughness: 0.85,
-            metalness: 0.0,
-            side: THREE.DoubleSide,
-            wireframe: wireframe,
-          });
-        }
+        const hingePivot = new THREE.Group();
+        hingePivot.position.set(-doorWidth / 2 + frameThick, 0, 0);
+        hingePivot.rotation.y = 0;
 
-        const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-        floorMesh.position.y = 0.02;
-        floorMesh.receiveShadow = (graphicsQuality === 'high');
-        floorMesh.userData = { isBuildingMesh: true, isFloorMesh: true, room: room };
-        scene.add(floorMesh);
+        const leafGeo = new THREE.BoxGeometry(leafWidth, leafHeight, leafThick);
+        const leafMesh = new THREE.Mesh(leafGeo, leafMat);
+        leafMesh.position.set(leafWidth / 2, leafHeight / 2 + 0.01, 0);
+        leafMesh.castShadow = (graphicsQuality === 'high');
+        leafMesh.receiveShadow = (graphicsQuality === 'high');
+        hingePivot.add(leafMesh);
+
+        // Polished Brass Lever Handle
+        const handleMat = new THREE.MeshStandardMaterial({
+          color: 0xd4af37, // Polished brass hardware
+          metalness: 0.85,
+          roughness: 0.20
+        });
+        const leverGeo = new THREE.BoxGeometry(0.10, 0.02, 0.02);
+        const leverF = new THREE.Mesh(leverGeo, handleMat);
+        leverF.position.set(leafWidth - 0.07, 0.98, leafThick / 2 + 0.02);
+        hingePivot.add(leverF);
+
+        const leverB = new THREE.Mesh(leverGeo, handleMat);
+        leverB.position.set(leafWidth - 0.07, 0.98, -leafThick / 2 - 0.02);
+        hingePivot.add(leverB);
+
+        doorGroup.add(hingePivot);
+
+        // Floor threshold strip
+        const threshGeo = new THREE.BoxGeometry(doorWidth, 0.015, wallThick);
+        const threshMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 });
+        const threshMesh = new THREE.Mesh(threshGeo, threshMat);
+        threshMesh.position.set(0, 0.008, 0);
+        doorGroup.add(threshMesh);
+
+        doorGroup.userData = { isBuildingMesh: true, type: 'door', doorId: door.id || `door_${dIdx}`, facadeOpening: door.facadeFrame ? door : null };
+        scene.add(doorGroup);
       });
 
-      // Foundation base: Room floors are fully rendered with distinct floor materials above.
-      // Global foundation slab is avoided to prevent Z-fighting and cross-building polygon bridging.
+      // E. 3D Windows, Wall Sills & Lintels (Blue Squares on Blueprint)
+      windows.forEach((win, wIdx) => {
+        const { center: [x, z], angleRad, wallThickness: wallThick } = openingPlacement(win);
+        const snappedX = x - levelCenterX;
+        const snappedZ = z - levelCenterZ;
+        const { width_m: winWidth, sill_m: sillHeight, height_m: winHeight } = win;
+        const winTop = sillHeight + winHeight;
+
+        // 3. 3D Architectural Window (Outer Frame, Mullion, Exterior Sill Shelf, Reflective Glass Panes)
+        const winGroup = new THREE.Group();
+        winGroup.position.set(snappedX, 0, snappedZ);
+        winGroup.rotation.y = angleRad;
+
+        const frameMat = new THREE.MeshStandardMaterial({
+          color: 0x1e242b, // Architectural dark bronze / black aluminum
+          metalness: 0.65,
+          roughness: 0.35
+        });
+        const frameThick = 0.04;
+        const frameDepth = wallThick * 0.70;
+
+        // Frame profiles (bottom, top, left, right)
+        const botGeo = new THREE.BoxGeometry(winWidth, frameThick, frameDepth);
+        const botMesh = new THREE.Mesh(botGeo, frameMat);
+        botMesh.position.set(0, sillHeight + frameThick / 2, 0);
+        winGroup.add(botMesh);
+
+        const topGeo = new THREE.BoxGeometry(winWidth, frameThick, frameDepth);
+        const topMesh = new THREE.Mesh(topGeo, frameMat);
+        topMesh.position.set(0, winTop - frameThick / 2, 0);
+        winGroup.add(topMesh);
+
+        const leftGeo = new THREE.BoxGeometry(frameThick, winHeight, frameDepth);
+        const leftMesh = new THREE.Mesh(leftGeo, frameMat);
+        leftMesh.position.set(-winWidth / 2 + frameThick / 2, sillHeight + winHeight / 2, 0);
+        winGroup.add(leftMesh);
+
+        const rightGeo = new THREE.BoxGeometry(frameThick, winHeight, frameDepth);
+        const rightMesh = new THREE.Mesh(rightGeo, frameMat);
+        rightMesh.position.set(winWidth / 2 - frameThick / 2, sillHeight + winHeight / 2, 0);
+        winGroup.add(rightMesh);
+
+        // Center Vertical Mullion
+        const mullGeo = new THREE.BoxGeometry(0.035, winHeight - frameThick * 2, frameDepth);
+        const mullMesh = new THREE.Mesh(mullGeo, frameMat);
+        mullMesh.position.set(0, sillHeight + winHeight / 2, 0);
+        winGroup.add(mullMesh);
+
+        // Exterior Sill Shelf (protruding drip lip)
+        const shelfGeo = new THREE.BoxGeometry(winWidth + 0.08, 0.035, wallThick + 0.06);
+        const shelfMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.50, metalness: 0.30 });
+        const shelfMesh = new THREE.Mesh(shelfGeo, shelfMat);
+        shelfMesh.position.set(0, sillHeight - 0.015, 0.02);
+        winGroup.add(shelfMesh);
+
+        // Glass Panes (Translucent PBR Glass)
+        const glassMat = (graphicsQuality === 'high')
+          ? new THREE.MeshPhysicalMaterial({
+              color: 0xe0f2fe,
+              transparent: true,
+              opacity: 0.35,
+              roughness: 0.05,
+              metalness: 0.1,
+              transmission: 0.85,
+              ior: 1.5,
+              reflectivity: 0.9,
+              envMapIntensity: 1.5,
+              side: THREE.DoubleSide,
+              depthWrite: false
+            })
+          : new THREE.MeshStandardMaterial({
+              color: 0x93c5fd,
+              transparent: true,
+              opacity: 0.40,
+              roughness: 0.1,
+              metalness: 0.1,
+              side: THREE.DoubleSide
+            });
+
+        const paneWidth = (winWidth - frameThick * 3) / 2;
+        const paneHeight = winHeight - frameThick * 2;
+        const paneGeo = new THREE.BoxGeometry(paneWidth, paneHeight, 0.01);
+
+        const paneL = new THREE.Mesh(paneGeo, glassMat);
+        paneL.position.set(-winWidth / 4 + frameThick / 4, sillHeight + winHeight / 2, 0);
+        winGroup.add(paneL);
+
+        const paneR = new THREE.Mesh(paneGeo, glassMat);
+        paneR.position.set(winWidth / 4 - frameThick / 4, sillHeight + winHeight / 2, 0);
+        winGroup.add(paneR);
+
+        winGroup.userData = { isBuildingMesh: true, type: 'window', winId: win.id || `win_${wIdx}`, facadeOpening: win.facadeFrame ? win : null };
+        scene.add(winGroup);
+      });
+
+      for (const mesh of scene.children.slice(levelStart)) mesh.position.y += level.elevation;
     }
-
-    const scaleMperPx = layout.metadata?.scale_meters_per_pixel || 0.03;
-    const renderedOpenings = [];
-    facadeSpecs.forEach((spec, wallId) => {
-      // The bridge records quantized sketch rectangles, so frames and glass use
-      // exactly those dimensions rather than unrelated viewer defaults.
-      (spec.openings || []).forEach(op => renderedOpenings.push({
-        ...op, position_meters: facadeOpeningPosition(op, spec.frame),
-        associated_wall: wallId, facadeFrame: spec.frame,
-        facadeHeightScale: wallHeight / (spec.wall_height_m || spec.uv_bounds?.wall_height_m || wallHeight),
-      }));
-    });
-    const superseded = op => {
-      const spec = facadeSpecs.get(op.associated_wall);
-      return spec?.openings?.some(rendered => rendered.id === op.id);
-    };
-    const doors = [...(layout.doors || []).filter(op => !superseded(op)), ...renderedOpenings.filter(op => op.type === 'door')];
-    const windows = [...(layout.windows || []).filter(op => !superseded(op)), ...renderedOpenings.filter(op => op.type === 'window')];
-    const openingSegment = op => op.facadeFrame ? {
-      center: op.position_meters,
-      angleRad: Math.atan2(-op.facadeFrame.direction[1], op.facadeFrame.direction[0]),
-      wallThickness: 0.22, wallId: op.associated_wall, isExterior: true,
-    } : findWallSegmentForOpening(op.position_meters, walls);
-
-    // D. 3D Doors & Wall Lintels (Green Dots on Blueprint)
-    doors.forEach((door, dIdx) => {
-      const posM = door.position_meters || (door.position_px ? [door.position_px[0] * scaleMperPx, door.position_px[1] * scaleMperPx] : null);
-      if (!posM) return;
-
-      const segInfo = openingSegment({ ...door, position_meters: posM });
-      const [snappedXPlan, snappedZPlan] = segInfo.center;
-      const snappedX = snappedXPlan - centerX;
-      const snappedZ = snappedZPlan - centerZ;
-      const angleRad = segInfo.angleRad;
-      const wallThick = segInfo.wallThickness || 0.18;
-
-      const doorWidth = door.facadeFrame ? door.width_m : Math.max(0.70, Math.min(door.width_m || 0.90, 1.80));
-      const doorHeight = door.facadeFrame ? door.height_m * door.facadeHeightScale : Math.min(door.height_m || 2.15, wallHeight - 0.20);
-      const lintelHeight = wallHeight - doorHeight;
-
-      // 1. Wall Lintel above door (fills empty space with solid wall up to ceiling, embedded into flanking walls)
-      if (lintelHeight > 0.05 && !door.facadeFrame) {
-        const lintelGeo = new THREE.BoxGeometry(doorWidth + 0.10, lintelHeight, wallThick + 0.02);
-        const lintelMesh = new THREE.Mesh(lintelGeo, defaultWallMat);
-        lintelMesh.position.set(
-          snappedX,
-          doorHeight + lintelHeight / 2,
-          snappedZ
-        );
-        lintelMesh.rotation.y = angleRad;
-        lintelMesh.castShadow = (graphicsQuality === 'high');
-        lintelMesh.receiveShadow = (graphicsQuality === 'high');
-        lintelMesh.userData = { isBuildingMesh: true, type: 'door_lintel', doorId: door.id || `door_${dIdx}` };
-        scene.add(lintelMesh);
-      }
-
-      // 2. 3D Architectural Door (Frame, Hinged Leaf, Lever Handles, Floor Threshold)
-      const doorGroup = new THREE.Group();
-      doorGroup.position.set(snappedX, 0, snappedZ);
-      doorGroup.rotation.y = angleRad;
-
-      // Frame Material (Architectural Charcoal Wood)
-      const frameMat = new THREE.MeshStandardMaterial({
-        color: 0x221f1d,
-        roughness: 0.65,
-        metalness: 0.08
-      });
-      const frameThick = 0.045;
-      const frameDepth = wallThick + 0.02;
-
-      // Left Jamb
-      const jambLGeo = new THREE.BoxGeometry(frameThick, doorHeight, frameDepth);
-      const jambL = new THREE.Mesh(jambLGeo, frameMat);
-      jambL.position.set(-doorWidth / 2 + frameThick / 2, doorHeight / 2, 0);
-      jambL.castShadow = (graphicsQuality === 'high');
-      jambL.receiveShadow = (graphicsQuality === 'high');
-      doorGroup.add(jambL);
-
-      // Right Jamb
-      const jambRGeo = new THREE.BoxGeometry(frameThick, doorHeight, frameDepth);
-      const jambR = new THREE.Mesh(jambRGeo, frameMat);
-      jambR.position.set(doorWidth / 2 - frameThick / 2, doorHeight / 2, 0);
-      jambR.castShadow = (graphicsQuality === 'high');
-      jambR.receiveShadow = (graphicsQuality === 'high');
-      doorGroup.add(jambR);
-
-      // Top Header Casing
-      const headGeo = new THREE.BoxGeometry(doorWidth, frameThick, frameDepth);
-      const headMesh = new THREE.Mesh(headGeo, frameMat);
-      headMesh.position.set(0, doorHeight - frameThick / 2, 0);
-      headMesh.castShadow = (graphicsQuality === 'high');
-      headMesh.receiveShadow = (graphicsQuality === 'high');
-      doorGroup.add(headMesh);
-
-      // Hinged Door Leaf (Warm Oak Finish)
-      const leafWidth = doorWidth - frameThick * 2;
-      const leafHeight = doorHeight - frameThick;
-      const leafThick = 0.04;
-      const leafMat = new THREE.MeshStandardMaterial({
-        color: 0x9b6b43, // Architectural warm oak
-        roughness: 0.55,
-        metalness: 0.05
-      });
-
-      const hingePivot = new THREE.Group();
-      hingePivot.position.set(-doorWidth / 2 + frameThick, 0, 0);
-      hingePivot.rotation.y = door.facadeFrame ? 0 : -0.35; // ~20° slightly ajar for realistic look
-
-      const leafGeo = new THREE.BoxGeometry(leafWidth, leafHeight, leafThick);
-      const leafMesh = new THREE.Mesh(leafGeo, leafMat);
-      leafMesh.position.set(leafWidth / 2, leafHeight / 2 + 0.01, 0);
-      leafMesh.castShadow = (graphicsQuality === 'high');
-      leafMesh.receiveShadow = (graphicsQuality === 'high');
-      hingePivot.add(leafMesh);
-
-      // Polished Brass Lever Handle
-      const handleMat = new THREE.MeshStandardMaterial({
-        color: 0xd4af37, // Polished brass hardware
-        metalness: 0.85,
-        roughness: 0.20
-      });
-      const leverGeo = new THREE.BoxGeometry(0.10, 0.02, 0.02);
-      const leverF = new THREE.Mesh(leverGeo, handleMat);
-      leverF.position.set(leafWidth - 0.07, 0.98, leafThick / 2 + 0.02);
-      hingePivot.add(leverF);
-
-      const leverB = new THREE.Mesh(leverGeo, handleMat);
-      leverB.position.set(leafWidth - 0.07, 0.98, -leafThick / 2 - 0.02);
-      hingePivot.add(leverB);
-
-      doorGroup.add(hingePivot);
-
-      // Floor threshold strip
-      const threshGeo = new THREE.BoxGeometry(doorWidth, 0.015, wallThick);
-      const threshMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.4 });
-      const threshMesh = new THREE.Mesh(threshGeo, threshMat);
-      threshMesh.position.set(0, 0.008, 0);
-      doorGroup.add(threshMesh);
-
-      doorGroup.userData = { isBuildingMesh: true, type: 'door', doorId: door.id || `door_${dIdx}`, facadeOpening: door.facadeFrame ? door : null };
-      scene.add(doorGroup);
-    });
-
-    // E. 3D Windows, Wall Sills & Lintels (Blue Squares on Blueprint)
-    windows.forEach((win, wIdx) => {
-      const posM = win.position_meters || (win.position_px ? [win.position_px[0] * scaleMperPx, win.position_px[1] * scaleMperPx] : null);
-      if (!posM) return;
-
-      const segInfo = openingSegment({ ...win, position_meters: posM });
-      const [snappedXPlan, snappedZPlan] = segInfo.center;
-      const snappedX = snappedXPlan - centerX;
-      const snappedZ = snappedZPlan - centerZ;
-      const angleRad = segInfo.angleRad;
-      const wallThick = segInfo.wallThickness || 0.20;
-
-      const winWidth = win.facadeFrame ? win.width_m : Math.max(0.60, Math.min(win.width_m || 1.10, 3.20));
-      const sillHeight = win.facadeFrame ? win.sill_m * win.facadeHeightScale : Math.min(win.sill_m ?? 0.90, wallHeight * 0.35);
-      const winHeight = win.facadeFrame ? win.height_m * win.facadeHeightScale : Math.min(win.height_m || 1.40, wallHeight - sillHeight - 0.35);
-      const winTop = sillHeight + winHeight;
-      const lintelHeight = wallHeight - winTop;
-
-      // 1. Wall Sill below window (fills space from ground to sill, embedded into flanking walls)
-      if (sillHeight > 0.05 && !win.facadeFrame) {
-        const sillGeo = new THREE.BoxGeometry(winWidth + 0.12, sillHeight, wallThick + 0.02);
-        const sillMesh = new THREE.Mesh(sillGeo, defaultWallMat);
-        sillMesh.position.set(snappedX, sillHeight / 2, snappedZ);
-        sillMesh.rotation.y = angleRad;
-        sillMesh.castShadow = (graphicsQuality === 'high');
-        sillMesh.receiveShadow = (graphicsQuality === 'high');
-        sillMesh.userData = { isBuildingMesh: true, type: 'window_sill_wall', winId: win.id || `win_${wIdx}` };
-        scene.add(sillMesh);
-      }
-
-      // 2. Wall Lintel above window (fills space from window top to ceiling, embedded into flanking walls)
-      if (lintelHeight > 0.05 && !win.facadeFrame) {
-        const lintelGeo = new THREE.BoxGeometry(winWidth + 0.12, lintelHeight, wallThick + 0.02);
-        const lintelMesh = new THREE.Mesh(lintelGeo, defaultWallMat);
-        lintelMesh.position.set(snappedX, winTop + lintelHeight / 2, snappedZ);
-        lintelMesh.rotation.y = angleRad;
-        lintelMesh.castShadow = (graphicsQuality === 'high');
-        lintelMesh.receiveShadow = (graphicsQuality === 'high');
-        lintelMesh.userData = { isBuildingMesh: true, type: 'window_lintel_wall', winId: win.id || `win_${wIdx}` };
-        scene.add(lintelMesh);
-      }
-
-      // 3. 3D Architectural Window (Outer Frame, Mullion, Exterior Sill Shelf, Reflective Glass Panes)
-      const winGroup = new THREE.Group();
-      winGroup.position.set(snappedX, 0, snappedZ);
-      winGroup.rotation.y = angleRad;
-
-      const frameMat = new THREE.MeshStandardMaterial({
-        color: 0x1e242b, // Architectural dark bronze / black aluminum
-        metalness: 0.65,
-        roughness: 0.35
-      });
-      const frameThick = 0.04;
-      const frameDepth = wallThick * 0.70;
-
-      // Frame profiles (bottom, top, left, right)
-      const botGeo = new THREE.BoxGeometry(winWidth, frameThick, frameDepth);
-      const botMesh = new THREE.Mesh(botGeo, frameMat);
-      botMesh.position.set(0, sillHeight + frameThick / 2, 0);
-      winGroup.add(botMesh);
-
-      const topGeo = new THREE.BoxGeometry(winWidth, frameThick, frameDepth);
-      const topMesh = new THREE.Mesh(topGeo, frameMat);
-      topMesh.position.set(0, winTop - frameThick / 2, 0);
-      winGroup.add(topMesh);
-
-      const leftGeo = new THREE.BoxGeometry(frameThick, winHeight, frameDepth);
-      const leftMesh = new THREE.Mesh(leftGeo, frameMat);
-      leftMesh.position.set(-winWidth / 2 + frameThick / 2, sillHeight + winHeight / 2, 0);
-      winGroup.add(leftMesh);
-
-      const rightGeo = new THREE.BoxGeometry(frameThick, winHeight, frameDepth);
-      const rightMesh = new THREE.Mesh(rightGeo, frameMat);
-      rightMesh.position.set(winWidth / 2 - frameThick / 2, sillHeight + winHeight / 2, 0);
-      winGroup.add(rightMesh);
-
-      // Center Vertical Mullion
-      const mullGeo = new THREE.BoxGeometry(0.035, winHeight - frameThick * 2, frameDepth);
-      const mullMesh = new THREE.Mesh(mullGeo, frameMat);
-      mullMesh.position.set(0, sillHeight + winHeight / 2, 0);
-      winGroup.add(mullMesh);
-
-      // Exterior Sill Shelf (protruding drip lip)
-      const shelfGeo = new THREE.BoxGeometry(winWidth + 0.08, 0.035, wallThick + 0.06);
-      const shelfMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.50, metalness: 0.30 });
-      const shelfMesh = new THREE.Mesh(shelfGeo, shelfMat);
-      shelfMesh.position.set(0, sillHeight - 0.015, 0.02);
-      winGroup.add(shelfMesh);
-
-      // Glass Panes (Translucent PBR Glass)
-      const glassMat = (graphicsQuality === 'high')
-        ? new THREE.MeshPhysicalMaterial({
-            color: 0xe0f2fe,
-            transparent: true,
-            opacity: 0.35,
-            roughness: 0.05,
-            metalness: 0.1,
-            transmission: 0.85,
-            ior: 1.5,
-            reflectivity: 0.9,
-            envMapIntensity: 1.5,
-            side: THREE.DoubleSide,
-            depthWrite: false
-          })
-        : new THREE.MeshStandardMaterial({
-            color: 0x93c5fd,
-            transparent: true,
-            opacity: 0.40,
-            roughness: 0.1,
-            metalness: 0.1,
-            side: THREE.DoubleSide
-          });
-
-      const paneWidth = (winWidth - frameThick * 3) / 2;
-      const paneHeight = winHeight - frameThick * 2;
-      const paneGeo = new THREE.BoxGeometry(paneWidth, paneHeight, 0.01);
-
-      const paneL = new THREE.Mesh(paneGeo, glassMat);
-      paneL.position.set(-winWidth / 4 + frameThick / 4, sillHeight + winHeight / 2, 0);
-      winGroup.add(paneL);
-
-      const paneR = new THREE.Mesh(paneGeo, glassMat);
-      paneR.position.set(winWidth / 4 - frameThick / 4, sillHeight + winHeight / 2, 0);
-      winGroup.add(paneR);
-
-      winGroup.userData = { isBuildingMesh: true, type: 'window', winId: win.id || `win_${wIdx}`, facadeOpening: win.facadeFrame ? win : null };
-      scene.add(winGroup);
-    });
+    setUnresolvedOpenings(unresolved);
 
     // F. 3D Unified Architectural Roof (The Sims-Style Continuous Building Envelope)
     if (roofGroupRef.current) {
@@ -1031,39 +843,35 @@ export default function Viewer3D({
         side: THREE.DoubleSide
       });
 
-      const roofs = createRoofGeometries(layout, { centerX, centerZ, wallHeight, style: roofStyle });
-      roofs.forEach(({ geometry, footprint, fallback }, index) => {
-        const topMaterial = roofStyle === 'pitched' && !fallback ? pitchedRoofMat : roofSlabMat;
-        const roof = new THREE.Mesh(geometry, [topMaterial, soffitMat]);
-        roof.castShadow = graphicsQuality === 'high';
-        roof.receiveShadow = graphicsQuality === 'high';
-        roof.userData = { isRoofMesh: true, type: 'roof', style: roofStyle, component: index, footprint, fallback };
-        roofGroup.add(roof);
-        if (fallback) console.warn('Roof uses closed slab fallback:', fallback);
-      });
+      for (const level of visibleLevels) {
+        const above = visibleLevels.some(other => other.elevation > level.elevation);
+        const footprints = exposedRoof(level, visibleLevels);
+        if (!footprints.length) continue;
+        const style = above ? 'slab' : roofStyle;
+        const roofs = createRoofGeometries({ envelope: footprints }, {
+          centerX: centerX - level.offset[0], centerZ: centerZ - level.offset[1],
+          wallHeight: level.height + level.elevation, style, overhang: above ? .08 : .22,
+        });
+        roofs.forEach(({ geometry, footprint, fallback }, index) => {
+          const roof = new THREE.Mesh(geometry, [style === 'pitched' && !fallback ? pitchedRoofMat : roofSlabMat, soffitMat]);
+          roof.castShadow = roof.receiveShadow = highQuality;
+          roof.userData = { isRoofMesh: true, type: 'roof', style, component: index, footprint, fallback, levelId: level.id };
+          roofGroup.add(roof);
+          if (fallback) console.warn('Roof uses closed slab fallback:', fallback);
+        });
+      }
 
       roofGroup.visible = showRoof;
     }
 
-    // Default framing
-    if (controlsRef.current && cameraRef.current && viewPreset === 'perspective') {
-      const camera = cameraRef.current;
-      const aspect = Math.max(0.1, containerRef.current.clientWidth / Math.max(1, containerRef.current.clientHeight));
-      camera.aspect = aspect;
-      camera.updateProjectionMatrix();
-      const roofBounds = new THREE.Box3().setFromObject(roofGroupRef.current);
-      const height = Math.max(wallHeight, Number.isFinite(roofBounds.max.y) ? roofBounds.max.y : 0);
-      const spanX = Number.isFinite(maxX - minX) ? maxX - minX : 8;
-      const spanZ = Number.isFinite(maxZ - minZ) ? maxZ - minZ : 8;
-      const radius = Math.hypot(spanX + 0.5, spanZ + 0.5, height) / 2;
-      const halfFov = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * Math.min(1, aspect));
-      const distance = radius / Math.sin(halfFov) * 1.15;
-      const target = new THREE.Vector3(0, height / 2, 0);
-      controlsRef.current.target.copy(target);
-      camera.position.copy(new THREE.Vector3(1.15, 1.35, 1.35).normalize().multiplyScalar(distance).add(target));
-      controlsRef.current.update();
+    const bounds = new THREE.Box3();
+    for (const mesh of scene.children) {
+      if (mesh.userData.isBuildingMesh) bounds.expandByObject(mesh);
     }
-  }, [layout, frontWallId, facadeTextureUrl, facadeData, numFloors, wireframe, showFloors, selectedRoom, graphicsQuality, roofStyle]);
+    if (roofGroupRef.current) bounds.expandByObject(roofGroupRef.current);
+    buildingBoundsRef.current = bounds;
+    if (['perspective', 'top', 'isometric'].includes(viewPreset)) fitCamera(viewPreset);
+  }, [layout, frontWallId, facadeTextureUrl, facadeData, numFloors, wireframe, activeLevel, selectedRoom, graphicsQuality, roofStyle, floorStyle]);
 
   // Update 3D Furniture Assets when furnishingData changes
   useEffect(() => {
@@ -1098,6 +906,7 @@ export default function Viewer3D({
     }
 
     if (!showFurniture || !furnishingData) return;
+    let current = true;
 
     const { centerX, centerZ } = centersRef.current;
     const loader = gltfLoaderRef.current;
@@ -1105,6 +914,11 @@ export default function Viewer3D({
     // Iterate through furnished rooms
     Object.entries(furnishingData).forEach(([roomId, designResult]) => {
       if (!designResult || !designResult.is_valid || !designResult.items) return;
+      const room = layout?.rooms?.find(item => item.id === roomId);
+      const level = layout?.storeys?.find(item => item.id === room?.level_id);
+      if (level && activeLevel !== 'all' && activeLevel !== level.id) return;
+      const [offsetX, offsetZ] = level?.offset || [0, 0];
+      const baseY = level?.elevation || 0;
 
       const roomItems = designResult.items;
       roomItems.forEach((item) => {
@@ -1114,15 +928,16 @@ export default function Viewer3D({
           item.glb,
           (gltf) => {
             const model = gltf.scene;
+            if (!current) { disposeHierarchy(model); return; }
 
             // Shared unmirrored transform: X_three = x_plan - centerX, Z_three = y_plan - centerZ
-            const posX = item.position_m[0] - centerX;
-            const posZ = item.position_m[1] - centerZ;
+            const posX = item.position_m[0] + offsetX - centerX;
+            const posZ = item.position_m[1] + offsetZ - centerZ;
             const isRug = item.category === 'rug' || item.item_id?.includes('rug');
             // Floor slab is at y = 0.02.
             // Furniture sits on top of floor slab (y = 0.02).
             // Rug is elevated to y = 0.023 with polygonOffset to strictly eliminate z-fighting with floor meshes.
-            const posY = isRug ? 0.023 : 0.02;
+            const posY = baseY + (isRug ? 0.023 : 0.02);
             model.position.set(posX, posY, posZ);
 
             // Rotation convention: rotation.y = (180.0 - alpha_deg) * (pi / 180)
@@ -1158,46 +973,35 @@ export default function Viewer3D({
           },
           undefined,
           (err) => {
+            if (!current) return;
             console.error('Failed to load furniture asset:', item.glb, err);
             const [w, d, h] = item.dimensions_m || [1, 1, 1];
             const boxGeo = new THREE.BoxGeometry(w, h, d);
             const boxMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8 });
             const boxMesh = new THREE.Mesh(boxGeo, boxMat);
-            boxMesh.position.set(item.position_m[0] - centerX, h / 2, item.position_m[1] - centerZ);
+            boxMesh.position.set(item.position_m[0] + offsetX - centerX, baseY + .02 + h / 2, item.position_m[1] + offsetZ - centerZ);
             boxMesh.userData = { isFurnitureMesh: true, roomId, itemId: item.item_id };
             furnitureGroup.add(boxMesh);
           }
         );
       });
     });
-  }, [furnishingData, showFurniture, layout, graphicsQuality]);
+    return () => { current = false; };
+  }, [furnishingData, showFurniture, layout, graphicsQuality, activeLevel]);
 
   // View Presets: 3-4 Distinct Architectural Camera Modes
   const setCameraPerspective = () => {
-    if (!cameraRef.current || !controlsRef.current) return;
-    cameraRef.current.position.set(16, 18, 22);
-    cameraRef.current.up.set(0, 1, 0);
-    controlsRef.current.target.set(0, 1.5, 0);
-    controlsRef.current.update();
+    fitCamera('perspective');
     setViewPreset('perspective');
   };
 
   const setCameraIsometric = () => {
-    if (!cameraRef.current || !controlsRef.current) return;
-    // True 45° architectural axonometric view
-    cameraRef.current.position.set(22, 22, 22);
-    cameraRef.current.up.set(0, 1, 0);
-    controlsRef.current.target.set(0, 0, 0);
-    controlsRef.current.update();
+    fitCamera('isometric');
     setViewPreset('isometric');
   };
 
   const setCameraTopDown = () => {
-    if (!cameraRef.current || !controlsRef.current) return;
-    cameraRef.current.position.set(0, 32, 0);
-    cameraRef.current.up.set(0, 0, -1);
-    controlsRef.current.target.set(0, 0, 0);
-    controlsRef.current.update();
+    fitCamera('top');
     setViewPreset('top');
   };
 
@@ -1210,10 +1014,14 @@ export default function Viewer3D({
     rx /= pts.length;
     rz /= pts.length;
     const { centerX, centerZ } = centersRef.current;
-    const targetX = rx - centerX;
-    const targetZ = rz - centerZ;
-    controlsRef.current.target.set(targetX, 0.8, targetZ);
-    cameraRef.current.position.set(targetX + 5.0, 4.2, targetZ + 5.0);
+    const level = layout?.storeys?.find(item => item.id === selectedRoom.level_id);
+    const [offsetX, offsetZ] = level?.offset || [0, 0];
+    const baseY = level?.elevation || 0;
+    const targetX = rx + offsetX - centerX;
+    const targetZ = rz + offsetZ - centerZ;
+    if (level) setActiveLevel(level.id);
+    controlsRef.current.target.set(targetX, baseY + 0.8, targetZ);
+    cameraRef.current.position.set(targetX + 5.0, baseY + 4.2, targetZ + 5.0);
     cameraRef.current.up.set(0, 1, 0);
     controlsRef.current.update();
     setViewPreset('room');
@@ -1229,15 +1037,20 @@ export default function Viewer3D({
     const frame = (targetWall.id === frontWallId && facadeData?.facade_frame)
       || targetWall.facade_texture?.facade_frame || wallFacadeFrame(targetWall);
     if (!frame) return;
+    const level = layout.storeys?.find(item => item.id === targetWall.level_id);
+    const [offsetX, offsetZ] = level?.offset || [0, 0];
+    const baseY = level?.elevation || 0;
+    const height = level?.height || numFloors * (targetWall.height_m || 2.8);
+    if (level && activeLevel !== 'all' && activeLevel !== level.id) setActiveLevel(level.id);
     const len = frame.length_m;
-    const targetX = frame.origin[0] + frame.direction[0] * len / 2 - centerX;
-    const targetZ = frame.origin[1] + frame.direction[1] * len / 2 - centerZ;
+    const targetX = frame.origin[0] + frame.direction[0] * len / 2 + offsetX - centerX;
+    const targetZ = frame.origin[1] + frame.direction[1] * len / 2 + offsetZ - centerZ;
     const [nx, nz] = frame.outward;
 
     const camDist = Math.max(len * 1.3, 7.5);
-    cameraRef.current.position.set(targetX + nx * camDist, (numFloors * 2.8) * 0.6, targetZ + nz * camDist);
+    cameraRef.current.position.set(targetX + nx * camDist, baseY + height * 0.6, targetZ + nz * camDist);
     cameraRef.current.up.set(0, 1, 0);
-    controlsRef.current.target.set(targetX, (numFloors * 2.8) * 0.45, targetZ);
+    controlsRef.current.target.set(targetX, baseY + height * 0.45, targetZ);
     controlsRef.current.update();
     setViewPreset('facade');
   };
@@ -1252,10 +1065,42 @@ export default function Viewer3D({
     <div className="viewer-panel viewport-panel flex-1 min-w-0 flex flex-col h-full bg-[#f1ede4] relative overflow-hidden select-none font-mono" aria-label="3D house viewer">
       {/* 3D Viewport Toolbar */}
       <div className="viewer-toolbar viewport-toolbar h-12 shrink-0 overflow-x-auto border-b border-[#1d1d1f]/15 bg-[#f7f4ed]/90 backdrop-blur-md px-4 flex items-center justify-between z-10 text-[#1d1d1f] select-none">
-        <div className="viewport-title"><Box size={16} /><strong>3D house</strong><span>Orbit · zoom · inspect</span></div>
+        <div className="viewport-title"><Box size={16} /><strong className="font-stencil tracking-wider uppercase">3D House</strong><span title="Drag to orbit. Right-drag or use WASD to move. Double-click to center.">Orbit · pan · zoom</span></div>
 
         {/* Viewport Control Buttons & Camera Presets */}
         <div className="viewer-tools flex shrink-0 items-center space-x-1.5">
+          {layout?.storeys?.length > 1 && <select aria-label="Visible building levels" value={activeLevel}
+            onChange={event => setActiveLevel(event.target.value)} className="rounded border bg-white px-2 py-1 text-xs">
+            <option value="all">All levels</option>
+            {layout.storeys.map(level => <option key={level.id} value={level.id}>{level.label}</option>)}
+          </select>}
+          {unresolvedOpenings > 0 && <span className="text-[10px] text-amber-800"
+            title="These detections could not be matched to a supported wall span. Review them on the 2D plan.">
+            {unresolvedOpenings} {unresolvedOpenings === 1 ? 'opening needs' : 'openings need'} review
+          </span>}
+          {/* Floor Finish Material Selector */}
+          <div className="flex items-center space-x-0.5 bg-white/80 p-0.5 rounded border border-[#1d1d1f]/20 shadow-xs" title="Floor finish material across rooms">
+            <span className="text-[9px] font-mono text-[#1d1d1f]/60 px-1 uppercase">Floor:</span>
+            {[
+              ['oak', 'Wood'],
+              ['marble', 'Tile'],
+              ['adaptive', 'Adaptive']
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                data-testid={`floor-style-${id}`}
+                onClick={() => setFloorStyle(id)}
+                className={`px-1.5 py-0.5 text-[9.5px] rounded transition-colors ${
+                  floorStyle === id
+                    ? 'bg-[#1d1d1f] text-[#efebe2] font-semibold'
+                    : 'text-[#1d1d1f]/70 hover:text-[#1d1d1f]'
+                }`}
+                title={`Set floor material to ${label}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {/* Real-time FPS Monitor */}
           <div className="viewer-fps flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[#1d1d1f]/5 border border-[#1d1d1f]/10 text-[9.5px] text-[#2a7a6e] font-semibold" title="Live rendering frame rate on local GPU">
             <Activity className="w-3 h-3 text-[#2a7a6e] animate-pulse" />

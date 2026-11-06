@@ -5,9 +5,15 @@ export default function WorkspaceHeading({ activeTab, setActiveTab, isAnalyzing,
   return (
     <div className="workspace-heading">
       <div>
-        <div className="workspace-eyebrow">ARCHITECTURE / WORKSPACE 01</div>
+        <div className="workspace-eyebrow">
+          <span>ARCHIGEN 3D</span>
+          <span className="dot">·</span>
+          <span>NEURAL 2D-TO-3D STUDIO</span>
+          <span className="dot">·</span>
+          <span>WORKSPACE 01</span>
+        </div>
         <h1>
-          Floorplan workspace<span>.</span>
+          FLOORPLAN <span>WORKSPACE.</span>
         </h1>
         <p>Refine your plan. Explore the space it becomes.</p>
       </div>

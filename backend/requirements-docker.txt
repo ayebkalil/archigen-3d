@@ -1,0 +1,2 @@
+# CPU furniture GLB export. TripoSR CUDA has its own native environment.
+trimesh==5.2.0

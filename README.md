@@ -248,18 +248,27 @@ Le benchmark sur 50 plans réels (architecturaux, CubiCasa5k, plans externes ; *
 git clone https://github.com/ayebk/archigen-3d.git
 cd archigen-3d
 
-# 2. Récupérer les poids des modèles via DVC (depuis le stockage cloud synchronisé ou remote local)
-# Exemple de configuration d'un remote de restauration :
-dvc remote add -d -f cloud_backup "C:\Users\ayebk\OneDrive\archigen_dvc_remote_backup"
-dvc pull
+# 2. Configurer le stockage DVC partagé de l'équipe et récupérer les poids Docker
+dvc remote add --local -d team-weights /path/to/shared-dvc-storage
+dvc pull models/saved/floorplan_unetpp/floorplan_multitask.onnx.dvc models/saved/floorplan_unetpp/floorplan_fallback.onnx.dvc models/saved/generator_perceptual_ema.onnx.dvc models/saved/facade512_experiment/generator.onnx.dvc
 
 # 3. Lancer la pile complète (FastAPI + React 18 + Nginx)
-docker compose up --build -d
+docker compose up --build -d --wait
 ```
 
 * **Application Web :** `http://localhost:3000`
 * **Documentation Interactive API Swagger :** `http://localhost:8000/docs`
 * **Health Check Endpoint :** `http://localhost:8000/health` (Conteneur validé en statut `healthy`)
+
+Après un `git pull`, relancez `docker compose up --build -d --wait` pour reconstruire
+les images et recréer les conteneurs. `docker compose start` redémarre les conteneurs
+existants. La bibliothèque de mobilier est conservée dans le volume Compose
+`furniture_library`. Les ports hôte sont configurables avec `ARCHIGEN_WEB_PORT`
+et `ARCHIGEN_API_PORT` si une instance native utilise déjà les ports 3000 et 8000.
+
+Le conteneur utilise ONNX Runtime CPU pour le plan et la façade 512, et le mode
+volumétrique CPU pour le mobilier. Pour TripoSR CUDA, voir
+[l'environnement natif du mobilier](docs/furniture-quality-experiment.md).
 
 ---
 
