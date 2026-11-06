@@ -20,6 +20,9 @@ COPY ./models/benchmarks /app/models/benchmarks
 COPY ./src /app/src
 COPY ./backend/app /app/app
 
+# The CPU furniture path uses PyMCubes when TripoSR is unavailable.
+RUN pip install --no-cache-dir --only-binary=:all: PyMCubes==0.1.6
+
 ARG APP_REVISION=local
 LABEL org.opencontainers.image.revision=$APP_REVISION
 USER appuser
