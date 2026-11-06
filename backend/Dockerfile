@@ -1,15 +1,4 @@
-# Multi-stage optimized Dockerfile for FastAPI Backend
-FROM python:3.11-slim AS builder
-
-WORKDIR /install
-COPY backend/requirements.txt .
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    && pip install --no-cache-dir --prefix=/install -r requirements.txt \
-    && apt-get purge -y --auto-remove build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
+# The CPU runtime dependencies are available as wheels on supported hosts.
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -18,12 +7,10 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed packages from builder
-COPY --from=builder /install /usr/local
-COPY backend/requirements-docker.txt /tmp/requirements-docker.txt
-RUN pip install --no-cache-dir -r /tmp/requirements-docker.txt \
+COPY backend/requirements.txt backend/requirements-docker.txt /tmp/
+RUN pip install --no-cache-dir --only-binary=:all: -r /tmp/requirements.txt -r /tmp/requirements-docker.txt \
     && useradd -m appuser \
-    && install -d -o appuser -g appuser /app/library/custom
+    && install -d -o appuser -g appuser /app/library /app/library/custom
 COPY ./models/saved/floorplan_unetpp/floorplan_multitask.onnx /app/models/saved/floorplan_unetpp/floorplan_multitask.onnx
 COPY ./models/saved/floorplan_unetpp/floorplan_fallback.onnx /app/models/saved/floorplan_unetpp/floorplan_fallback.onnx
 COPY ./models/saved/generator_perceptual_ema.onnx /app/models/saved/generator_perceptual_ema.onnx
