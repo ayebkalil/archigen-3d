@@ -4,7 +4,7 @@ Durée totale cible 3 min 30 s. Les temps sont des repères de répétition.
 
 ## Diapositive 1 - 30 secondes
 
-Notre projet ArchiGen-3D transforme un plan 2D en une maison 3D interactive. Le studio aide à inspecter les pièces et à préparer les façades. Notre trinôme réunit Khalil Ayeb, Amine Ben Fadhel et Khawla Hawari. La capture montre une démonstration tracée. Pour mesurer la qualité des modèles, nous utilisons les jeux de validation et les tests documentés.
+Notre projet ArchiGen-3D transforme un plan 2D en une maison 3D interactive. Le studio aide à inspecter les pièces et à préparer les façades. Khawla Haweri pilote les données et le MLOps, Med Amone Benfadhel l’application et le déploiement, et Khalil Ayeb les modèles Deep Learning. La capture montre une démonstration tracée. Pour mesurer la qualité des modèles, nous utilisons les jeux de validation et les tests documentés.
 
 ## Diapositive 2 - 45 secondes
 
@@ -20,4 +20,4 @@ Notre premier verrou est la généralisation des plans. Sur douze plans externes
 
 ## Diapositive 5 - 30 secondes
 
-Pour les quatre semaines restantes, nous proposons un premier jalon sur un nouveau test externe, piloté par Khalil. La deuxième semaine porte sur les modèles candidats et le parcours API et interface avec Amine. La troisième sécurise DVC, Docker, la CI et le monitoring avec Khawla et Amine. La dernière semaine rassemble les tests et la répétition. La répartition demande la validation du trinôme. Notre démonstration finale doit traiter un plan inédit et générer une façade avec une procédure reproductible.
+Pour les quatre semaines restantes, nous prévoyons un premier jalon sur un nouveau test externe, piloté par Khalil. La deuxième semaine porte sur les modèles candidats et le parcours API et interface avec Med Amone. La troisième sécurise DVC, Docker, la CI et le monitoring avec Khawla et Med Amone. La dernière semaine rassemble les tests et la répétition. Notre démonstration finale doit traiter un plan inédit et générer une façade avec une procédure reproductible.

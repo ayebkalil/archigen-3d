@@ -17,15 +17,15 @@ ArchiGen-3D - Plans 2D, reconstruction de maisons et synthèse de façades
 | Workspace MLflow | Stockage local mlflow.db et mlruns/. Affichage avec mlflow ui, port 5000. |
 | Avancement global | 78 % estimés par la moyenne simple des six composantes de la page 3. Estimation de charge, à valider par le trinôme. |
 
-### Membres et rôles proposés
+### Membres et responsabilités
 
-| Membre | Rôle principal proposé | Email institutionnel |
+| Membre | Rôle principal | Email institutionnel |
 | --- | --- | --- |
-| Khalil Ayeb | Modèles DL, entraînement et analyse des résultats | À compléter |
-| Khawla Hawari | Données, DVC, MLflow et reproductibilité | À compléter |
-| Amine Ben Fadhel | API, interface React et intégration Docker | À compléter |
+| Khawla Haweri | MLOps et données. DVC, MLflow et CI | À compléter |
+| Med Amone Benfadhel | Fullstack et déploiement. API, React et Docker | À compléter |
+| Khalil Ayeb | Deep Learning et vision. Entraînement et évaluation | À compléter |
 
-Les noms proviennent du dépôt. Les rôles et la matrice RACI de la page 5 constituent une proposition de répartition à confirmer.
+Le groupe a communiqué les noms. Ces rôles définissent les responsabilités pour la suite du projet, détaillées dans le RACI de la page 5.
 
 ### Périmètre et démonstration
 
@@ -122,38 +122,39 @@ P2 - Production. Rejouer DVC et Docker depuis un clone propre. Vérifier ports, 
 
 P3 - Surveillance. Définir une référence des statistiques d’images et un signal de dérive, puis mesurer les faux positifs. Les métriques d’API existantes couvrent la santé et la latence. La détection formelle de dérive reste à réaliser.
 
-P4 - Livraison. Valider les rôles, compléter les informations administratives, consolider les contributions Git, répéter la démonstration et figer la version finale.
+P4 - Livraison. Compléter les informations administratives, consolider les contributions Git, répéter la démonstration et figer la version finale.
 
 ## Planning et responsabilités
 
-Section 5 du gabarit officiel - proposition à valider par le trinôme
+Section 5 du gabarit officiel - responsabilités attribuées au trinôme
 
 ### Gantt pour les quatre semaines restantes
 
-| Tâche / jalon | S+1 | S+2 | S+3 | S+4 | Responsable proposé |
+| Tâche / jalon | S+1 | S+2 | S+3 | S+4 | Responsable |
 | --- | --- | --- | --- | --- | --- |
 | Test externe, adaptation et tuning | ● | ● |  |  | Khalil |
 | Façade 512 et styles | ● | ● |  |  | Khalil |
-| API, schémas et parcours UI | ● | ● | ● |  | Amine |
-| DVC, Docker et clone propre | ● | ● | ● |  | Khawla + Amine |
+| API, schémas et parcours UI | ● | ● | ● |  | Med Amone |
+| DVC, Docker et clone propre | ● | ● | ● |  | Khawla + Med Amone |
 | CI, parité et monitoring |  | ● | ● |  | Khawla |
 | Tests et répétition finale |  |  | ● | ● | Toute l’équipe |
 
 S+1 à S+4 sont des semaines relatives à la séance. La date de soutenance finale demande confirmation. Les cellules pleines indiquent les semaines de travail prévues.
 
-### Matrice RACI proposée
+### Matrice RACI
 
-| Tâche | Khalil | Khawla | Amine |
+| Tâche | Khalil | Khawla | Med Amone |
 | --- | --- | --- | --- |
 | Données et DVC | C | R/A | I |
 | Entraînement DL | R/A | C | I |
 | MLflow et registre | R | A | I |
 | API FastAPI et inférence | C | C | R/A |
 | Interface React / Three.js | C | I | R/A |
-| Docker, CI et monitoring | C | R/A | R |
+| Docker et déploiement | C | C | R/A |
+| CI et surveillance | C | R/A | R |
 | Tests et démonstration | R | R | R/A |
 
-R réalise, A valide, C conseille, I est informé. Les responsabilités indiquent la répartition de travail proposée, à confirmer avec chaque membre.
+R réalise, A valide, C conseille, I est informé. Khalil pilote les modèles, Khawla les données et la traçabilité, et Med Amone l’application et le déploiement.
 
 ### Critères de livraison et preuves
 
@@ -161,4 +162,4 @@ Chaque candidat final doit disposer d’un checkpoint et d’un hash, d’un run
 
 Sources techniques accessibles dans le dépôt. src/floorplan/models.py, src/models/architecture.py, models/saved, mlflow.db, .dvc/config, docker-compose.yml et .github/workflows/ci-tests.yml. Les benchmarks chiffrés sont détaillés dans le rapport d’évaluation technique joint au projet.
 
-Champs à finaliser avant dépôt. TrackX, identifiant administratif du groupe, emails institutionnels, validation des estimations et du RACI. Le nom de fichier utilise ArchiGen3D comme nom de projet.
+Champs à finaliser avant dépôt. TrackX, identifiant administratif du groupe, emails institutionnels, validation des estimations d’avancement. Le nom de fichier utilise ArchiGen3D comme nom de projet.

@@ -15,9 +15,9 @@
 
 ## 👥 Équipe de Développement
 
-* **Khalil Ayeb**
-* **Amine Ben Fadhel**
-* **Khawla Hawari**
+* **Khalil Ayeb** - Deep Learning, vision et évaluation
+* **Med Amone Benfadhel** - Fullstack et déploiement
+* **Khawla Haweri** - MLOps, données et reproductibilité
 
 ---
 
@@ -297,4 +297,4 @@ Le [dossier du jalon](docs/midterm/README.md) contient les procédures de démon
 - [Pitch PDF](output/pdf/Pitch_MiParcours_TrackX_ArchiGen3D.pdf)
 - [Pitch PowerPoint modifiable](output/presentation/Pitch_MiParcours_TrackX_ArchiGen3D.pptx)
 
-La copie de travail locale a passé 119 tests Python, 27 tests frontend et le build Vite le 11 novembre 2026. Le numéro de track, les coordonnées institutionnelles et la répartition proposée demandent confirmation avant dépôt.
+La copie de travail locale a passé 119 tests Python, 27 tests frontend et le build Vite le 11 novembre 2026. Le numéro de track, les coordonnées institutionnelles demandent confirmation avant dépôt.

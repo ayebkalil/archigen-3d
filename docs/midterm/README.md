@@ -17,10 +17,18 @@ La durée du pitch est de 3 min 30 s, répartie en 30, 45, 60, 45 et 30 secondes
 1. Confirmer le numéro de track et remplacer TrackX dans les documents et les noms de fichiers.
 2. Confirmer le nom administratif du groupe. ArchiGen3D est le nom de projet utilisé.
 3. Renseigner les trois emails institutionnels.
-4. Valider les rôles, les responsabilités RACI et les estimations d'avancement avec le trinôme.
+4. Valider les estimations d'avancement avec le trinôme.
 5. Confirmer la date finale et traduire S+1 à S+4 en semaines calendaires.
 
 Le document propose 78 % d'avancement, soit la moyenne arrondie de 85, 80, 85, 85, 75 et 60 %. Il s'agit d'une estimation d'ingénierie, proposée pour validation.
+
+## Équipe et responsabilités
+
+- Khawla Haweri assure les données, DVC, MLflow, la CI et la reproductibilité.
+- Med Amone Benfadhel assure FastAPI, React, Three.js, Docker et le déploiement.
+- Khalil Ayeb assure les modèles Deep Learning, les entraînements et leur évaluation.
+
+Le RACI du rapport applique cette répartition au travail restant.
 
 ## Environnement et preuve de validation
 
