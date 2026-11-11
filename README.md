@@ -287,3 +287,14 @@ python src/floorplan/evaluate.py --model multitask --split test
 # Générer un modèle 3D complet (OBJ + MTL + Textures) depuis un plan 2D
 python scripts/floorplan_to_3d.py --input data/CubiCasa5k/cubicasa5k/cubicasa5k/high_quality_architectural/10611/F1_scaled.png
 ```
+
+
+## Jalon de mi-parcours du 11 novembre 2026
+
+Le [dossier du jalon](docs/midterm/README.md) contient les procédures de démonstration, de reproduction MLflow et de validation. Le rapport de cinq pages, le pitch de cinq diapositives et les notes orales sont préparés pour la séance.
+
+- [Rapport PDF](output/pdf/Rapport_MiParcours_TrackX_ArchiGen3D.pdf)
+- [Pitch PDF](output/pdf/Pitch_MiParcours_TrackX_ArchiGen3D.pdf)
+- [Pitch PowerPoint modifiable](output/presentation/Pitch_MiParcours_TrackX_ArchiGen3D.pptx)
+
+La copie de travail locale a passé 119 tests Python, 27 tests frontend et le build Vite le 11 novembre 2026. Le numéro de track, les coordonnées institutionnelles et la répartition proposée demandent confirmation avant dépôt.
