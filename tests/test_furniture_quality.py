@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from src.furniture.quality_geometry import prepare_input, extract_surface, to_room_coordinates, rasterize_atlas
+from src.furniture.quality_geometry import prepare_input, extract_surface, to_room_coordinates, rasterize_atlas, bake_neural_atlas
 
 
 def test_marching_cubes_preserves_native_xyz_on_asymmetric_field():
@@ -79,3 +79,22 @@ def test_warmup_and_requests_share_one_furniture_model(monkeypatch):
         instances = list(pool.map(lambda _: ImageTo3DGenerator.get_instance(), range(16)))
     assert len(constructions) == 1
     assert all(instance is constructions[0] for instance in instances)
+
+
+def test_fast_atlas_unwrapping_keeps_layered_surfaces_non_overlapping():
+    # Two parallel front-facing squares in the same mesh must never collide in UV space.
+    import trimesh
+    v = np.array([
+        [0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0],
+        [0, 0, .5], [1, 0, .5], [1, 1, .5], [0, 1, .5],
+    ], dtype=np.float32)
+    f = np.array([[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]], dtype=np.int32)
+    mesh = trimesh.Trimesh(vertices=v, faces=f, process=False)
+    canonical, faces_out, uvs, texture, coverage = bake_neural_atlas(
+        mesh, lambda pts: np.clip(pts, 0, 1), resolution=128
+    )
+    assert texture.size == (128, 128)
+    assert coverage > 0.2
+    pos_fwd, cov = rasterize_atlas(canonical, faces_out, uvs, 128)
+    pos_rev, _ = rasterize_atlas(canonical, faces_out[::-1], uvs, 128)
+    np.testing.assert_allclose(pos_fwd[cov], pos_rev[cov], atol=1e-5)

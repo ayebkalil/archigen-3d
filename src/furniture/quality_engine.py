@@ -31,7 +31,7 @@ class QualityFurnitureEngine:
         self.device = torch.device('cuda' if use_gpu and torch.cuda.is_available() else 'cpu')
         self.device_name = f'TripoSR quality / {self.device}'
         self.lock = threading.Lock()
-        self.chunk_size = 8192
+        self.chunk_size = 65536
         self.peak_device_mib = 0
         if self.device.type == 'cuda':
             total, used = gpu_usage()
@@ -77,15 +77,16 @@ class QualityFurnitureEngine:
     def query(self, scene, positions, key):
         torch = self.torch
         values = []
+        scene_f32 = scene.float()
         # Density exp activation remains FP32 to avoid FP16 overflow.
         with torch.inference_mode():
             for start in range(0, len(positions), self.chunk_size):
                 points = torch.as_tensor(positions[start:start+self.chunk_size], dtype=torch.float32, device=self.device)
-                result = self.model.renderer.query_triplane(self.model.decoder, points, scene.float())[key]
+                result = self.model.renderer.query_triplane(self.model.decoder, points, scene_f32)[key]
                 values.append(result.float().cpu().numpy())
         return np.concatenate(values)
 
-    def density_volume(self, scene, resolution):
+    def _dense_density_volume(self, scene, resolution):
         radius = self.model.renderer.cfg.radius
         axis = np.linspace(-radius, radius, resolution, dtype=np.float32)
         volume = np.empty((resolution, resolution, resolution), np.float32)
@@ -96,6 +97,42 @@ class QualityFurnitureEngine:
             if start % 32 == 0:
                 self.check_budget()
                 print(f'Furniture density: {start+2}/{resolution} slabs', flush=True)
+        return volume
+
+    def density_volume(self, scene, resolution):
+        if resolution <= 96:
+            return self._dense_density_volume(scene, resolution)
+
+        from scipy.ndimage import maximum_filter, minimum_filter
+
+        radius = self.model.renderer.cfg.radius
+        coarse_n = 96
+        ax_c = np.linspace(-radius, radius, coarse_n, dtype=np.float32)
+        grid_c = np.stack(np.meshgrid(ax_c, ax_c, ax_c, indexing='ij'), -1).reshape(-1, 3)
+        coarse = self.query(scene, grid_c, 'density_act')[:, 0].reshape(coarse_n, coarse_n, coarse_n)
+        self.check_budget()
+
+        # Dilate a generous safety band around level=25.0 so thin features are never missed.
+        c_max = maximum_filter(coarse, size=5)
+        c_min = minimum_filter(coarse, size=5)
+        active_c = (c_max >= 8.0) & (c_min <= 42.0)
+
+        idx = np.clip((np.arange(resolution) * (coarse_n - 1) / float(resolution - 1)).round().astype(int), 0, coarse_n - 1)
+        active_fine = active_c[np.ix_(idx, idx, idx)]
+        ii, jj, kk = np.nonzero(active_fine)
+        if len(ii) == 0:
+            return self._dense_density_volume(scene, resolution)
+
+        ax_f = np.linspace(-radius, radius, resolution, dtype=np.float32)
+        pts_active = np.column_stack((ax_f[ii], ax_f[jj], ax_f[kk]))
+        print(f'Furniture density: sparse {len(pts_active)}/{resolution**3} active surface pts', flush=True)
+        vals = self.query(scene, pts_active, 'density_act')[:, 0]
+        self.check_budget()
+
+        volume = np.where(coarse[np.ix_(idx, idx, idx)] > 25.0, np.float32(30.0), np.float32(0.0))
+        volume[ii, jj, kk] = vals
+        if not (volume.min() < 25.0 < volume.max()):
+            return self._dense_density_volume(scene, resolution)
         return volume
 
     def generate_from_image(self, image, name='Custom Furniture', category='chair', remove_bg=True, target_height_m=None):
