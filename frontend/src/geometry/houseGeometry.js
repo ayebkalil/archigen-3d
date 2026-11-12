@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import ClipperLib from 'clipper-lib';
 import { cleanRing, roofFootprints } from './roofGeometry.js';
+import { STOREY_HEIGHT_M, DOOR_HEIGHT_M, WINDOW_HEIGHT_M, WINDOW_SILL_M } from './buildingDimensions.js';
 
 const GRID = 100000;
 const { Clipper, ClipperOffset, PolyTree, ClipType, PolyType, PolyFillType, JoinType, EndType } = ClipperLib;
@@ -50,7 +51,7 @@ export function floorFootprints(layout) {
 
 export function buildingLevels(layout, repeats = 1) {
   if (!layout.storeys?.length) {
-    const unitHeight = layout.walls?.[0]?.height_m || 2.8;
+    const unitHeight = layout.walls?.[0]?.height_m || STOREY_HEIGHT_M;
     return [{ ...layout, id: 'main', elevation: 0, offset: [0, 0], unitHeight,
       height: unitHeight * repeats, floorElevations: Array.from({ length: repeats }, (_, i) => i * unitHeight) }];
   }
@@ -72,7 +73,7 @@ export function drawingLevelAt(layout, position) {
   });
 }
 
-function distanceToRing(point, ring) {
+export function signedDistanceToRing(point, ring) {
   let inside = false, nearest = Infinity;
   ring.forEach((a, i) => {
     const b = ring[(i + 1) % ring.length];
@@ -82,7 +83,7 @@ function distanceToRing(point, ring) {
     const t = Math.max(0, Math.min(1, dot(relative, delta) / (dot(delta, delta) || 1)));
     nearest = Math.min(nearest, Math.hypot(...subtract(point, pointAt(a, delta, t))));
   });
-  return inside ? 0 : nearest;
+  return inside ? nearest : -nearest;
 }
 
 // A multi-panel sheet needs a user decision. Nearby drawings can also be
@@ -91,7 +92,7 @@ export function alignDrawingLevels(layout, groundAnchor, upperAnchor) {
   const footprints = roofFootprints(layout);
   if (footprints.length !== 2) throw new Error('Level alignment requires two separate detected footprints.');
   const nearest = (point, polygons) => polygons.reduce((best, polygon, index) => {
-    const distance = distanceToRing(point, polygon.outer);
+    const distance = Math.max(0, -signedDistanceToRing(point, polygon.outer));
     return distance < best.distance ? { index, distance } : best;
   }, { index: -1, distance: Infinity });
   const ground = nearest(groundAnchor, footprints), upper = nearest(upperAnchor, footprints);
@@ -99,7 +100,7 @@ export function alignDrawingLevels(layout, groundAnchor, upperAnchor) {
     throw new Error('Pick matching points on two different plan outlines.');
   }
   const ordered = [footprints[ground.index], footprints[upper.index]];
-  const height = layout.walls[0]?.height_m || 2.8;
+  const height = layout.walls[0]?.height_m || STOREY_HEIGHT_M;
   const ids = ['ground', 'upper'];
   const tag = (item, point) => ({ ...item, level_id: ids[nearest(point, ordered).index] });
   const tagPolygon = item => {
@@ -269,7 +270,74 @@ function hostOpening(opening, runs) {
   const { run, along, bridge } = best;
   const center = pointAt(run.start, run.direction, along);
   return { center, direction: run.direction, angleRad: Math.atan2(-run.direction[1], run.direction[0]),
-    wallThickness: run.thickness, wallId: run.wallId, bridge };
+    wallThickness: run.thickness, wallId: run.wallId, run, bridge };
+}
+
+export function fitHouseOpenings(level, scale = .03) {
+  const openings = [['door', level.doors || []], ['window', level.windows || []]].flatMap(([type, items]) => items.map(item => ({
+    ...item, type,
+    position_meters: item.position_meters || item.position_px?.map(value => value * scale),
+    width_m: item.width_m || (type === 'door' ? .9 : 1.1),
+  })));
+  const runs = level.walls.flatMap(wallRuns);
+  const hosts = openings.map(opening => hostOpening(opening, runs));
+
+  return openings.map((opening, index) => {
+    const host = hosts[index];
+    const door = opening.type === 'door';
+    let width = opening.width_m;
+    let position = opening.position_meters;
+    if (host && !host.bridge) {
+      const { run, center, direction } = host;
+      const normal = [-direction[1], direction[0]];
+      let left = dot(subtract(run.start, center), direction) + .07;
+      let right = dot(subtract(run.end, center), direction) - .07;
+      let keepLeft = -width / 2, keepRight = width / 2;
+      const reserve = (distance, padding) => {
+        if (distance < 0) left = Math.max(left, distance + padding);
+        else right = Math.min(right, distance - padding);
+      };
+      // Keep space between neighboring openings even when both widen.
+      for (const [otherIndex, other] of hosts.entries()) {
+        if (!other || otherIndex === index || Math.abs(dot(other.direction, direction)) < .99) continue;
+        const relative = subtract(other.center, center);
+        if (Math.abs(dot(relative, normal)) > .08) continue;
+        const distance = dot(relative, direction);
+        const neighborHalf = openings[otherIndex].width_m / 2;
+        reserve(distance, Math.max(Math.abs(distance) / 2 + .04, neighborHalf + .08));
+        // Touching window detections can give up a few centimeters for a pier.
+        if (!door && openings[otherIndex].type === 'window' && Math.abs(distance) < width / 2 + neighborHalf + .08) {
+          if (distance < 0) keepLeft = Math.min(0, -width / 2 + .05);
+          else keepRight = Math.max(0, width / 2 - .05);
+        }
+      }
+      // Keep the added width out of perpendicular and diagonal wall joints.
+      for (const other of runs) {
+        const a = subtract(other.start, center), b = subtract(other.end, center);
+        const da = dot(a, normal), db = dot(b, normal);
+        if (da * db > 0 || Math.abs(db - da) < .05) continue;
+        const joint = pointAt(a, subtract(b, a), -da / (db - da));
+        reserve(dot(joint, direction), other.thickness / 2 + .05);
+      }
+      const target = door ? (run.exterior ? .92 : .82) : .88;
+      const maxShift = door ? .24 : .10;
+      // Expand on the free side of a return with only a small center shift.
+      left = Math.min(left, keepLeft);
+      right = Math.max(right, keepRight);
+      const fittedWidth = Math.min(Math.max(width, target), right - left, 2 * Math.min(right + maxShift, maxShift - left));
+      if (fittedWidth >= .15) {
+        const shift = Math.max(left + fittedWidth / 2, Math.min(0, right - fittedWidth / 2));
+        position = pointAt(position, direction, shift);
+        width = fittedWidth;
+      }
+    }
+    const height = door
+      ? Math.min(opening.height_m || DOOR_HEIGHT_M, width < .7 ? 1.8 : 1.90)
+      : Math.min(opening.height_m || WINDOW_HEIGHT_M, 1.03, width * 1.08);
+    const sill = opening.sill_m ?? WINDOW_SILL_M;
+    return { ...opening, associated_wall: host?.wallId || opening.associated_wall, position_meters: position, width_m: width,
+      height_m: height, sill_m: door ? 0 : sill === WINDOW_SILL_M ? Math.max(sill, Math.min(1.18, 1.86 - height)) : sill };
+  });
 }
 
 function offsetPolygons(polygons, distance) {

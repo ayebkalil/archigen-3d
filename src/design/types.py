@@ -65,6 +65,23 @@ class PlacedItem:
     wall_contact_ratio: float = 1.0  # Share of back edge within 0.10m of a wall pixel (target >= 0.80)
     scale: Tuple[float, float, float] = (1.0, 1.0, 1.0)  # 3D proportional scale factor (sx, sy, sz)
 
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "item_id": self.item_id,
+            "catalog_id": self.catalog_id,
+            "name": self.name,
+            "category": self.category,
+            "position_m": [round(value, 3) for value in self.position_m],
+            "rotation_deg": round(self.rotation_deg, 1),
+            "dimensions_m": [round(value, 3) for value in self.dimensions_m],
+            "scale": [round(value, 3) for value in self.scale],
+            "glb": self.glb,
+            "placement_rule": self.placement_rule,
+            "wall_distance_cm": round(self.wall_distance_cm, 1),
+            "wall_contact_ratio": round(self.wall_contact_ratio, 3),
+            "footprint_polygon": [[round(p[0], 3), round(p[1], 3)] for p in self.polygon_coords],
+        }
+
 @dataclass
 class ValidationReport:
     """Strict geometric validation report for a furnished room layout."""
@@ -104,24 +121,7 @@ class RoomDesignResult:
             "is_valid": self.is_valid,
             "status": computed_status,
             "failure_reason": self.failure_reason,
-            "items": [
-                {
-                    "item_id": it.item_id,
-                    "catalog_id": it.catalog_id,
-                    "name": it.name,
-                    "category": it.category,
-                    "position_m": [round(it.position_m[0], 3), round(it.position_m[1], 3)],
-                    "rotation_deg": round(it.rotation_deg, 1),
-                    "dimensions_m": [round(d, 3) for d in it.dimensions_m],
-                    "scale": [round(s, 3) for s in it.scale],
-                    "glb": it.glb,
-                    "placement_rule": it.placement_rule,
-                    "wall_distance_cm": round(it.wall_distance_cm, 1),
-                    "wall_contact_ratio": round(it.wall_contact_ratio, 3),
-                    "footprint_polygon": [[round(p[0], 3), round(p[1], 3)] for p in it.polygon_coords]
-                }
-                for it in self.items
-            ],
+            "items": [item.to_dict() for item in self.items],
             "metadata": self.metadata,
             "validation": {
                 "is_valid": self.validation.is_valid if self.validation else self.is_valid,

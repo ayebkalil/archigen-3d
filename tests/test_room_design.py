@@ -11,8 +11,9 @@ Tests:
 
 import pytest
 import numpy as np
+from shapely.geometry import Polygon, box
 from src.design.engine import RoomDesignEngine
-from src.design.types import RoomDesignResult
+from src.design.types import PlacedItem, RoomDesignResult
 
 @pytest.fixture
 def engine():
@@ -165,6 +166,71 @@ def test_placement_determinism(engine):
         assert it1.catalog_id == it2.catalog_id
         np.testing.assert_allclose(it1.position_m, it2.position_m, atol=1e-6)
         assert abs(it1.rotation_deg - it2.rotation_deg) < 1e-6
+
+
+def test_alternate_bedroom_layouts_respect_detected_openings(engine):
+    room = box(0, 0, 4.5, 4)
+    doors = [{"position_meters": [.9, 0], "width_m": .8}]
+    windows = [{"position_meters": [4.5, 1.9], "width_m": 1.4}]
+    designs = [engine.design_room(list(room.exterior.coords), "bedroom", doors=doors, windows=windows, seed=seed)
+               for seed in (42, 43)]
+    assert all(design.is_valid and design.metadata["layout_options"] >= 2 for design in designs)
+    assert designs[0].items[0].position_m != designs[1].items[0].position_m
+    door_zone = box(.5, 0, 1.3, .85)
+    window_zone = box(4.48, 1.2, 4.52, 2.6)
+    for design in designs:
+        assert all(Polygon(item.polygon_coords).intersection(door_zone).area < 1e-4 for item in design.items)
+        assert all(Polygon(item.polygon_coords).intersection(window_zone).area < 1e-4
+                   for item in design.items if item.placement_rule == "back_to_wall")
+
+
+def test_walking_route_requires_clear_width_between_doors(engine):
+    room = box(0, 0, 5, 2)
+    doors = [{"position_meters": [x, 1], "width_m": .8} for x in (0, 5)]
+    _, _, zones = engine.classifier.classify_and_snap_edges(room, doors=doors)
+    assert len(zones) == 2
+    for depth, reachable in ((1.61, False), (1.40, True)):
+        footprint = box(2.25, 0, 2.75, depth)
+        obstacle = PlacedItem("table_0", "coffee_table", "Table", "coffee_table", (2.5, depth / 2), 0,
+                              (.5, depth, .4), "", list(footprint.exterior.coords)[:-1], "center")
+        report = engine.validator.validate(room, [obstacle], zones)
+        assert report.bfs_reachable is reachable
+        assert report.is_valid is reachable
+        assert not report.door_clearance_violation
+
+
+def test_concave_dining_places_accessible_seating_off_the_centroid(engine):
+    room = Polygon([(0, 0), (5, 0), (5, 1.8), (1.8, 1.8), (1.8, 5), (0, 5)])
+    assert not room.contains(room.centroid)
+    result = engine.design_room(list(room.exterior.coords), "dining", doors=[{"position_meters": [.9, 0], "width_m": .8}])
+    assert result.is_valid
+    assert {"dining_table", "dining_chair"} <= {item.category for item in result.items}
+    assert all(room.buffer(.02).covers(Polygon(item.polygon_coords)) for item in result.items)
+
+
+def test_furniture_adapts_to_narrow_rooms_at_the_same_area(engine):
+    regular = engine.design_room(list(box(0, 0, 3, 4).exterior.coords), "bedroom")
+    narrow = engine.design_room(list(box(0, 0, 1.95, 12 / 1.95).exterior.coords), "bedroom")
+    assert regular.is_valid and narrow.is_valid
+    assert regular.items[0].catalog_id == "bed_double"
+    assert narrow.items[0].catalog_id == "bed_single"
+    assert .8 <= narrow.items[0].scale[0] < regular.items[0].scale[0] == 1.0
+
+
+def test_catalog_choices_keep_the_slot_and_validate_other_furniture(engine):
+    polygon = list(box(0, 0, 6, 4.5).exterior.coords)
+    design = engine.design_room(polygon, "living").to_dict()
+    sofa = next(item for item in design["items"] if item["category"] == "sofa")
+    choices = engine.furniture_choices(polygon, "living", design["items"], sofa["item_id"])
+    assert choices
+    for choice in choices:
+        assert choice["item_id"] == sofa["item_id"]
+        assert choice["category"] == "sofa"
+        assert choice["glb"] != sofa["glb"]
+        assert choice["rotation_deg"] == sofa["rotation_deg"]
+        replacement = Polygon(choice["footprint_polygon"])
+        assert all(replacement.intersection(Polygon(other["footprint_polygon"])).area < .001
+                   for other in design["items"] if other is not sofa and other["category"] != "rug")
 
 def test_uncalibrated_scale_flag_and_dimensions(engine):
     """Verify uncalibrated scale flag and room width/depth metadata are returned."""
@@ -447,6 +513,7 @@ def test_compact_room_furnishing_and_proportional_scaling(engine):
         force_furnish=True
     )
     assert res_bath.is_valid, f"Compact bathroom layout failed: {res_bath.failure_reason}"
+    assert res_bath.metadata["compact_mode"] is True
     toilet = next(it for it in res_bath.items if it.category == "toilet")
     assert toilet.scale[0] < 0.80
     assert toilet.dimensions_m[0] < 0.45

@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 
 from src.bridge.facade_bridge import FacadeBridge, CMP_PALETTE
+from src.data.facade_palette import EXPERIMENT_CMP_PALETTE, FACADE_STYLES
 
 
 @pytest.mark.parametrize("angle", [0.0, 0.7, np.pi / 2])
@@ -72,3 +73,41 @@ def test_blank_structural_wall_remains_blank_in_facade_sketch():
     wall = {"geometry_fixed": True, "polygon_meters": [[0, 0], [8, 0], [8, .2], [0, .2]], "openings": []}
     _, _, _, openings = bridge._build_facade_sketch(wall, is_front=True)
     assert openings == []
+
+
+def test_neutral_checkpoint_finishes_change_only_wall_pixels():
+    class NeutralEngine:
+        neural_style = True
+        resolution = 512
+
+        def generate(self, sketch, style):
+            buffer = io.BytesIO()
+            Image.new("RGB", (512, 512), (160, 160, 160)).save(buffer, format="PNG")
+            return buffer.getvalue()
+
+        def describe(self, style):
+            return {"style_conditioned": False, "supported_styles": []}
+
+    bridge = FacadeBridge.__new__(FacadeBridge)
+    bridge.inference_engine = NeutralEngine()
+    bridge.enhance_textures = False
+    wall = {
+        "height_m": 2.5,
+        "polygon_meters": [[0, 0], [6, 0], [6, .2], [0, .2]],
+        "openings": [{"id": "window", "type": "window", "position_along_wall_m": 3, "width_m": 1.2}],
+    }
+    default = bridge.render_wall_facade(wall, style=None, material_finish=True)
+    assert "finish" not in default["model_info"]
+    assert np.all(np.asarray(default["photo_image"]) == 160)
+    textures = []
+    for style in FACADE_STYLES:
+        result = bridge.render_wall_facade(wall, style=style, material_finish=True)
+        assert result["wall_height_m"] == 2.5
+        assert result["model_info"] == {"style_conditioned": False, "supported_styles": [], "finish": style}
+        semantic = np.asarray(result["sketch_image"])
+        photo = np.asarray(result["photo_image"])
+        wall_pixels = np.all(semantic == EXPERIMENT_CMP_PALETTE["facade"], axis=-1)
+        assert np.any(wall_pixels)
+        assert np.all(photo[~wall_pixels] == 160)
+        textures.append(photo[wall_pixels].tobytes())
+    assert len(set(textures)) == len(FACADE_STYLES)

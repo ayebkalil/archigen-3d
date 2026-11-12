@@ -6,10 +6,13 @@ import ControlPanel from './components/ControlPanel';
 import Floorplan2DCanvas from './components/Floorplan2DCanvas';
 import Viewer3D from './components/Viewer3D';
 import { createSampleHouse, rescaleSampleHouse, SAMPLE_FRONT_WALL } from './geometry/sampleHousePlan';
+import { buildingLevels, fitHouseOpenings } from './geometry/houseGeometry.js';
 import MetricsSummary from './components/MetricsSummary';
 import RoomDesignPanel from './components/RoomDesignPanel';
 import FacadeModal from './components/FacadeModal';
 import GenerativeStudio from './components/GenerativeStudio';
+
+const FurnitureCatalog = React.lazy(() => import('./components/FurnitureCatalog.jsx'));
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -78,13 +81,13 @@ export default function App() {
   const [transitionTarget, setTransitionTarget] = useState('studio');
   const [activeTab, setActiveTab] = useState('split');
   const [pageView, setPageView] = useState('floorplan'); // 'floorplan' | 'generative_studio'
+  const [initialStudioTab, setInitialStudioTab] = useState('furniture');
   const [file, setFile] = useState(null);
   const [imageUrl, setImageUrl] = useState('/sample_floorplan.png');
   const [scale, setScale] = useState(0.03);
   const [numFloors, setNumFloors] = useState(1);
-  const [selectedStyle, setSelectedStyle] = useState('Modern Minimalist');
+  const [selectedStyle, setSelectedStyle] = useState(null);
   const [frontWallId, setFrontWallId] = useState(null);
-  const [facadeTextureUrl, setFacadeTextureUrl] = useState(null);
 
   const [layout, setLayout] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -93,17 +96,21 @@ export default function App() {
   const [health, setHealth] = useState(null);
   const [latency, setLatency] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const analysisRequest = React.useRef(0);
+  const facadeRevision = React.useRef(0);
 
   // Room Design State (Stage 3)
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [furnishingData, setFurnishingData] = useState({});
   const [isDesigning, setIsDesigning] = useState(false);
+  const [roomFocusTrigger, setRoomFocusTrigger] = useState(0);
+  const [catalogSelection, setCatalogSelection] = useState(null);
 
   // Facade Studio State
-  const [facadeData, setFacadeData] = useState(null);
+  const [facadeDraft, setFacadeDraft] = useState(null);
   const [showFacadeModal, setShowFacadeModal] = useState(false);
-  const [isSwitchingStyle, setIsSwitchingStyle] = useState(false);
   const [facadeFocusTrigger, setFacadeFocusTrigger] = useState(0);
+  const appliedFacade = layout?.walls.find(wall => wall.id === frontWallId)?.facade_texture;
 
   // 1. Health check & Initial Demo load
   useEffect(() => {
@@ -112,8 +119,7 @@ export default function App() {
       .then((res) => setHealth(res.data))
       .catch((err) => console.log('Backend not reachable yet:', err));
 
-    // Automatically analyze default sample floorplan on initial startup
-    loadDefaultSample();
+    if (currentView === 'studio' && !file) loadDefaultSample();
 
     // Listen for cross-frame messages from the ARCHIGEN by KKM Hero Showcase
     const handleHash = () => {
@@ -150,6 +156,7 @@ export default function App() {
   };
 
   const loadDefaultSample = async () => {
+    const request = ++analysisRequest.current;
     try {
       setIsAnalyzing(true);
       const urlParams = new URLSearchParams(window.location.search);
@@ -158,29 +165,29 @@ export default function App() {
       const sampleMime = sampleParam === 'fresh_12' ? 'image/jpeg' : 'image/png';
       const res = await fetch(samplePath);
       const blob = await res.blob();
+      if (request !== analysisRequest.current) return;
       const sampleFile = new File([blob], samplePath.replace('/', ''), { type: sampleMime });
       setFile(sampleFile);
       setImageUrl(samplePath);
-      if (samplePath === '/sample_floorplan.png' && sampleParam !== 'detected') {
-        showSampleReference(scale);
-      } else {
-        await executeAnalysis(sampleFile, scale, numFloors, null);
-      }
+      const reference = samplePath === '/sample_floorplan.png' ? showSampleReference(scale) : null;
+      await executeAnalysis(sampleFile, scale, numFloors, null, reference);
     } catch (err) {
       console.error('Failed to load default sample:', err);
     } finally {
-      setIsAnalyzing(false);
+      if (request === analysisRequest.current) setIsAnalyzing(false);
     }
   };
 
   const showSampleReference = (sampleScale) => {
-    setLayout(createSampleHouse(sampleScale));
+    const reference = createSampleHouse(sampleScale);
+    setLayout(reference);
     setFrontWallId(SAMPLE_FRONT_WALL);
-    setFacadeTextureUrl(null);
-    setFacadeData(null);
+    setSelectedStyle(null);
+    setFacadeDraft(null);
     setSelectedRoom(null);
     setFurnishingData({});
     setErrorMsg(null);
+    return reference;
   };
 
   const handleFileUpload = (uploadedFile) => {
@@ -188,12 +195,17 @@ export default function App() {
     const url = URL.createObjectURL(uploadedFile);
     setImageUrl(url);
     setFrontWallId(null);
-    setFacadeTextureUrl(null);
+    setFacadeDraft(null);
     executeAnalysis(uploadedFile, scale, numFloors, null);
   };
 
-  const executeAnalysis = async (fileObj, curScale, curFloors, wallId) => {
+  const executeAnalysis = async (fileObj, curScale, curFloors, wallId, reference = null) => {
     if (!fileObj) return;
+    const request = ++analysisRequest.current;
+    if (!reference) {
+      facadeRevision.current++;
+      setFacadeDraft(null);
+    }
     setIsAnalyzing(true);
     setErrorMsg(null);
     const startTime = performance.now();
@@ -202,12 +214,21 @@ export default function App() {
     formData.append('file', fileObj);
     if (curScale) formData.append('scale_override', curScale.toString());
     formData.append('num_floors', curFloors.toString());
-    if (wallId) formData.append('front_wall_id', wallId);
+    if (wallId && !reference) formData.append('front_wall_id', wallId);
+    if (reference) {
+      const referenceScale = reference.metadata.scale_meters_per_pixel;
+      formData.append('reference_rooms', JSON.stringify(reference.rooms.map(room => ({
+        id: room.id,
+        room_type: room.room_type,
+        polygon_px: room.polygon_meters.map(point => point.map(value => value / referenceScale)),
+      }))));
+    }
 
     try {
       const response = await axios.post('/predict/floorplan', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
+      if (request !== analysisRequest.current) return;
 
       const data = response.data;
       const duration = Math.round(performance.now() - startTime);
@@ -215,6 +236,18 @@ export default function App() {
       // Read backend measured latency or fallback to client roundtrip
       const headerLatency = response.headers['x-inference-latency-ms'];
       setLatency(headerLatency ? parseFloat(headerLatency).toFixed(1) : duration);
+
+      if (reference) {
+        const scores = data.reference_room_confidences;
+        const requestedTypes = new Map(reference.rooms.map(room => [room.id, room.room_type]));
+        setLayout(current => current?.metadata.source === 'sample_reference' ? {
+          ...current,
+          rooms: current.rooms.map(room => requestedTypes.get(room.id) === room.room_type
+            ? { ...room, confidence: scores?.[room.id] ?? null }
+            : room),
+        } : current);
+        return;
+      }
 
       // Reconstruct layout structure
       const parsedLayout = {
@@ -229,13 +262,14 @@ export default function App() {
           num_walls: data.walls.length,
           num_rooms: data.rooms.length,
         },
-        walls: data.walls,
+        // Studio finishes are generated from the fitted 3D openings after analysis.
+        walls: data.walls.map(({ facade_texture, ...wall }) => wall),
         rooms: data.rooms.map((r, i) => ({
           id: `room_${i}`,
           room_type: r.room_type,
           surface_m2: r.surface_m2,
+          confidence: r.confidence,
           polygon_meters: r.polygon_points,
-          centroid_meters: r.polygon_points?.[0] || [0, 0],
         })),
         doors: data.doors || [],
         windows: data.windows || [],
@@ -243,6 +277,8 @@ export default function App() {
       };
 
       setLayout(parsedLayout);
+      setSelectedRoom(null);
+      setFurnishingData({});
 
       if (data.rooms.length === 0) {
         setErrorMsg('No rooms detected. This plan style may not be supported (e.g. dense CAD dimension text, low-contrast raster, or non-standard drafting symbols).');
@@ -251,30 +287,44 @@ export default function App() {
       // Find Front Wall & its Facade Texture
       const frontWall = data.walls.find((w) => w.is_front) || data.walls.find((w) => w.is_exterior);
       setFrontWallId(frontWall?.id || null);
-      setFacadeTextureUrl(frontWall?.facade_texture?.texture_base64 || null);
-      setFacadeData(frontWall?.facade_texture?.texture_base64 ? frontWall.facade_texture : null);
+      setSelectedStyle(null);
     } catch (err) {
+      if (request !== analysisRequest.current) return;
       console.error('Inference error:', err);
       setErrorMsg(err.response?.data?.detail || 'Floorplan analysis failed.');
     } finally {
-      setIsAnalyzing(false);
+      if (request === analysisRequest.current) setIsAnalyzing(false);
     }
   };
 
   const handleSelectFrontWall = (newWallId) => {
     const wall = layout?.walls.find(item => item.id === newWallId);
     if (!wall?.is_exterior) return;
+    if (newWallId !== frontWallId) {
+      facadeRevision.current++;
+      setFacadeDraft(null);
+      if (wall.facade_texture?.texture_base64) setSelectedStyle(wall.facade_texture.style ?? null);
+    }
     setFrontWallId(newWallId);
-    setFacadeTextureUrl(wall.facade_texture?.texture_base64 || null);
-    setFacadeData(wall.facade_texture?.texture_base64 ? wall.facade_texture : null);
+  };
+
+  const handleSetNumFloors = (count) => {
+    if (count === numFloors) return;
+    facadeRevision.current++;
+    setFacadeDraft(null);
+    setNumFloors(count);
+    if (layout && !layout.storeys?.length) {
+      setLayout(current => ({ ...current, walls: current.walls.map(wall => ({ ...wall, facade_texture: undefined })) }));
+    }
   };
 
   const handleCalibrateScale = (newScale) => {
     setScale(newScale);
     if (layout?.metadata.source === 'sample_reference') {
-      setLayout(rescaleSampleHouse(layout, newScale));
-      setFacadeTextureUrl(null);
-      setFacadeData(null);
+      facadeRevision.current++;
+      setFacadeDraft(null);
+      const rescaled = rescaleSampleHouse(layout, newScale);
+      setLayout({ ...rescaled, walls: rescaled.walls.map(wall => ({ ...wall, facade_texture: undefined })) });
       setSelectedRoom(null);
       setFurnishingData({});
     } else if (file) {
@@ -282,94 +332,131 @@ export default function App() {
     }
   };
 
-  const handleLayoutEdit = (next) => {
-    setLayout({ ...next, walls: next.walls.map(wall => ({ ...wall, facade_texture: undefined,
-      openings: [...next.doors, ...next.windows].filter(opening => opening.associated_wall === wall.id) })) });
-    setFacadeTextureUrl(null);
-    setFacadeData(null);
-    setSelectedRoom(room => next.rooms.find(item => item.id === room?.id) || null);
-    if (!next.walls.some(wall => wall.id === frontWallId)) setFrontWallId(null);
+  const handleRunAnalysis = () => {
+    const reference = layout?.metadata.source === 'sample_reference' ? layout : null;
+    if (reference && scale !== reference.metadata.scale_meters_per_pixel) handleCalibrateScale(scale);
+    executeAnalysis(file, scale, numFloors, frontWallId, reference);
   };
 
-  const handleGenerateFacade = async (overrideStyle = null) => {
-    const targetStyle = overrideStyle || selectedStyle;
-    if (!layout) {
-      setErrorMsg('Please click "EXTRACT 3D FLOORPLAN" first before generating facade textures.');
-      return;
-    }
+  const handleLayoutEdit = (next) => {
+    facadeRevision.current++;
+    setFacadeDraft(null);
+    const before = [...layout.doors, ...layout.windows];
+    const after = [...next.doors, ...next.windows];
+    setLayout({ ...next, walls: next.walls.map(wall => {
+      const previous = layout.walls.find(item => item.id === wall.id);
+      const openings = after.filter(opening => opening.associated_wall === wall.id);
+      const oldOpenings = before.filter(opening => opening.associated_wall === wall.id);
+      const sameGeometry = previous?.polygon_meters === wall.polygon_meters &&
+        previous?.level_id === wall.level_id && openings.length === oldOpenings.length &&
+        openings.every((opening, i) => opening === oldOpenings[i]);
+      return { ...wall, openings, facade_texture: sameGeometry ? wall.facade_texture : undefined };
+    }) });
+    setSelectedRoom(room => next.rooms.find(item => item.id === room?.id) || null);
+    if (!next.walls.some(wall => wall.id === frontWallId)) setFrontWallId(next.walls.find(wall => wall.is_exterior)?.id || null);
+  };
 
+  const requestFacade = async (style) => {
+    const target = layout?.walls.find(wall => wall.id === frontWallId && wall.is_exterior);
+    if (!target) throw new Error('Choose an exterior wall.');
+    if (isAnalyzing && layout.metadata.source !== 'sample_reference') throw new Error('Wait for floorplan analysis to finish.');
+    const revision = facadeRevision.current;
+    const level = buildingLevels(layout, numFloors).find(item => item.walls.includes(target));
+    if (!level) throw new Error('The selected wall is outside the building levels.');
+    const openings = fitHouseOpenings(level, layout.metadata.scale_meters_per_pixel)
+      .filter(opening => opening.associated_wall === target.id);
+    const response = await axios.post('/facade/generate', {
+      wall: { ...target, height_m: level.unitHeight, openings, facade_texture: undefined },
+      wall_id: target.id,
+      style,
+      num_floors: target.level_id ? 1 : numFloors,
+    });
+    if (revision !== facadeRevision.current) return null;
+    if (response.data?.wall_id !== target.id || !response.data.texture_base64) throw new Error('Facade generation failed.');
+    return response.data;
+  };
+
+  const applyFacade = (finish) => {
+    setLayout(current => current && ({
+      ...current,
+      walls: current.walls.map(wall => wall.is_exterior && wall.id === finish.wall_id
+        ? { ...wall, facade_texture: finish }
+        : wall),
+    }));
+  };
+
+  const viewFacadeIn3D = () => {
+    setPageView('floorplan');
+    setActiveTab('3d');
+    setRoomFocusTrigger(0);
+    setFacadeFocusTrigger(previous => previous + 1);
+  };
+
+  const openFacadeStudio = () => {
+    setInitialStudioTab('facade');
+    setPageView('generative_studio');
+  };
+
+  const handleGenerateFacade = async (style = selectedStyle) => {
+    setSelectedStyle(style);
     setIsGeneratingFacade(true);
+    setErrorMsg(null);
     try {
-      const payload = {
-        layout: layout,
-        wall_id: frontWallId,
-        style: targetStyle,
-        num_floors: numFloors
-      };
-
-      const res = await axios.post('/facade/generate', payload);
-      if (res.data?.status === 'success') {
-        setFacadeData(res.data);
-        if (res.data.texture_base64) {
-          setFacadeTextureUrl(res.data.texture_base64);
-        }
+      const draft = await requestFacade(style);
+      if (draft) {
+        setFacadeDraft(draft);
         setShowFacadeModal(true);
       }
     } catch (err) {
-      console.error('Facade generation error:', err);
-      setErrorMsg(err.response?.data?.detail || 'Facade generation failed.');
+      setErrorMsg(err.response?.data?.detail || err.message);
     } finally {
       setIsGeneratingFacade(false);
-    }
-  };
-
-  const handleSwitchFacadeStyle = async (newStyle) => {
-    setSelectedStyle(newStyle);
-    setIsSwitchingStyle(true);
-    try {
-      const payload = {
-        layout: layout,
-        wall_id: frontWallId,
-        style: newStyle,
-        num_floors: numFloors
-      };
-      const res = await axios.post('/facade/generate', payload);
-      if (res.data?.status === 'success') {
-        setFacadeData(res.data);
-        if (res.data.texture_base64) {
-          setFacadeTextureUrl(res.data.texture_base64);
-        }
-      }
-    } catch (err) {
-      console.error('Facade style switch error:', err);
-      setErrorMsg(err.response?.data?.detail || 'Style generation failed.');
-    } finally {
-      setIsSwitchingStyle(false);
     }
   };
 
   // --- Room Design Engine Handlers (Stage 3) ---
   const handleSelectRoom = (room) => {
     setSelectedRoom(room);
+    setCatalogSelection(null);
+  };
+
+  const inspectRoomIn3D = () => {
+    setActiveTab('3d');
+    setFacadeFocusTrigger(0);
+    setRoomFocusTrigger(previous => previous + 1);
+  };
+
+  const designRoomPayload = (room, preset, seed, forceFurnish) => {
+    if (!room || !layout) return null;
+    const level = buildingLevels(layout).find(item => item.rooms.some(candidate => candidate.id === room.id));
+    if (!level) return null;
+    const scaleMPerPx = layout.metadata?.scale_meters_per_pixel || .03;
+    const openings = fitHouseOpenings(level, scaleMPerPx);
+    return {
+      room_id: room.id,
+      room_type: room.room_type,
+      polygon_meters: room.polygon_meters,
+      doors: openings.filter(opening => opening.type === 'door'),
+      windows: openings.filter(opening => opening.type === 'window'),
+      wall_segments: level.walls.map(({ facade_texture, openings, ...wall }) => wall),
+      scale_m_per_px: scaleMPerPx,
+      preset,
+      seed,
+      force_furnish: forceFurnish,
+    };
   };
 
   const handleGenerateDesign = async (room, preset = 'contemporary_minimal', seed = 42, forceFurnish = false) => {
-    if (!room) return;
+    const payload = designRoomPayload(room, preset, seed, forceFurnish);
+    if (!payload) return;
+    setCatalogSelection(null);
     setIsDesigning(true);
     try {
-      const payload = {
-        room_id: room.id,
-        room_type: room.room_type,
-        polygon_meters: room.polygon_meters,
-        doors: layout?.doors || [],
-        windows: layout?.windows || [],
-        wall_segments: layout?.walls || [],
-        preset: preset,
-        seed: seed,
-        force_furnish: forceFurnish
-      };
       const response = await axios.post('/design', payload);
       const result = response.data;
+      if (typeof result?.is_valid !== 'boolean' || !Array.isArray(result.items)) {
+        throw new Error('The room design service returned an invalid response.');
+      }
       setFurnishingData((prev) => ({
         ...prev,
         [room.id]: result
@@ -380,7 +467,7 @@ export default function App() {
         ...prev,
         [room.id]: {
           is_valid: false,
-          failure_reason: err.response?.data?.detail || 'INFERENCE_ERROR',
+          failure_reason: 'REQUEST_FAILED',
           items: []
         }
       }));
@@ -390,8 +477,47 @@ export default function App() {
   };
 
   const handleRegenerateDesign = (room, preset) => {
-    const newSeed = Math.floor(Math.random() * 1000000) + 1;
-    handleGenerateDesign(room, preset, newSeed);
+    const current = furnishingData[room.id];
+    handleGenerateDesign(room, preset, (current?.seed ?? 42) + 1, Boolean(current?.metadata?.compact_mode));
+  };
+
+  const handleRoomPreset = (roomId, preset) => {
+    setFurnishingData(current => {
+      const design = current[roomId];
+      if (!design?.is_valid || design.preset === preset) return current;
+      const items = design.items.map(item => ({ ...item, finish: undefined }));
+      return { ...current, [roomId]: { ...design, preset, items } };
+    });
+  };
+
+  const handleSelectFurniture = async (roomId, itemId) => {
+    if (isDesigning) return;
+    const room = layout?.rooms.find(candidate => candidate.id === roomId);
+    const design = furnishingData[roomId];
+    const item = design?.items.find(candidate => candidate.item_id === itemId);
+    if (!room || !design?.is_valid || !item) return;
+    const payload = designRoomPayload(room, design.preset, design.seed, Boolean(design.metadata?.compact_mode));
+    if (!payload) return;
+
+    setSelectedRoom(room);
+    const selection = { roomId, item, design, choices: [], loading: true };
+    setCatalogSelection(selection);
+    try {
+      const { data } = await axios.post('/design/furniture-choices', { ...payload, item_id: itemId, items: design.items });
+      setCatalogSelection(current => current === selection ? { ...selection, choices: data.choices || [], loading: false } : current);
+    } catch {
+      setCatalogSelection(current => current === selection ? {
+        ...selection, loading: false, error: 'The alternative models could not be loaded. You can still change the finish.',
+      } : current);
+    }
+  };
+
+  const applyFurnitureChoice = item => {
+    const { roomId, design } = catalogSelection;
+    setFurnishingData(current => current[roomId] === design ? {
+      ...current, [roomId]: { ...design, items: design.items.map(other => other.item_id === item.item_id ? item : other) },
+    } : current);
+    setCatalogSelection(null);
   };
 
   const handleClearDesign = (roomId) => {
@@ -405,12 +531,13 @@ export default function App() {
   const handleRelabelRoom = (roomId, newType) => {
     if (!layout) return;
     const updatedRooms = layout.rooms.map((r) =>
-      r.id === roomId ? { ...r, room_type: newType } : r
+      r.id === roomId ? { ...r, room_type: newType, confidence: newType === r.room_type ? r.confidence : null } : r
     );
     setLayout({ ...layout, rooms: updatedRooms });
     if (selectedRoom?.id === roomId) {
-      setSelectedRoom((prev) => ({ ...prev, room_type: newType }));
+      setSelectedRoom(updatedRooms.find(room => room.id === roomId));
     }
+    handleClearDesign(roomId);
   };
 
 
@@ -484,7 +611,10 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         pageView={pageView}
-        setPageView={setPageView}
+        setPageView={view => {
+          setInitialStudioTab('furniture');
+          setPageView(view);
+        }}
         onReturnToShowcase={() => triggerTransition('showcase')}
       />
 
@@ -492,47 +622,54 @@ export default function App() {
       {pageView === 'generative_studio' ? (
         <ErrorBoundary onReset={() => setPageView('floorplan')}>
           <GenerativeStudio
+            initialTab={initialStudioTab}
             layout={layout}
             frontWallId={frontWallId}
-            onApplyFacadeTexture={(tex, data) => {
-              setFacadeTextureUrl(tex);
-              if (data) {
-                setFacadeData(data);
-                if (data.wall_id) setFrontWallId(data.wall_id);
-                if (data.num_floors) setNumFloors(data.num_floors);
-              }
-            }}
+            onSelectWall={handleSelectFrontWall}
+            selectedStyle={selectedStyle}
+            setSelectedStyle={setSelectedStyle}
+            numFloors={numFloors}
+            setNumFloors={handleSetNumFloors}
+            requestFacade={requestFacade}
+            onApplyFacadeTexture={applyFacade}
+            onViewFacadeIn3D={viewFacadeIn3D}
             onNavigateToFloorplan={() => setPageView('floorplan')}
           />
         </ErrorBoundary>
       ) : (
       <section className="workspace-page">
-      <WorkspaceHeading activeTab={activeTab} setActiveTab={setActiveTab} isAnalyzing={isAnalyzing} hasLayout={!!layout} />
+      <WorkspaceHeading activeTab={activeTab} setActiveTab={setActiveTab} isAnalyzing={isAnalyzing}
+        hasLayout={!!layout} onEditFacades={frontWallId ? openFacadeStudio : null} />
       <div className="floorplan-shell flex-1 flex overflow-hidden relative">
         {/* Left Sidebar Controls */}
         <ControlPanel
           referenceLevels={layout?.storeys}
           isTracedSample={layout?.metadata.source === 'sample_reference'}
-          onShowReference={imageUrl === '/sample_floorplan.png' && layout?.metadata.source !== 'sample_reference' ? () => showSampleReference(scale) : null}
           fileName={file?.name}
           imageUrl={imageUrl}
-          onOpenGenerativeStudio={() => setPageView('generative_studio')}
+          onOpenGenerativeStudio={() => {
+            setInitialStudioTab('furniture');
+            setPageView('generative_studio');
+          }}
           onFileUpload={handleFileUpload}
-          onRunAnalysis={() => executeAnalysis(file, scale, numFloors, frontWallId)}
+          onRunAnalysis={handleRunAnalysis}
           onGenerateFacade={handleGenerateFacade}
-          onOpenFacadeModal={() => setShowFacadeModal(true)}
+          onOpenFacadeModal={() => {
+            setFacadeDraft(appliedFacade);
+            setShowFacadeModal(true);
+          }}
           isAnalyzing={isAnalyzing}
           isGeneratingFacade={isGeneratingFacade}
           scale={scale}
           setScale={setScale}
           numFloors={numFloors}
-          setNumFloors={setNumFloors}
+          setNumFloors={handleSetNumFloors}
           selectedStyle={selectedStyle}
           setSelectedStyle={setSelectedStyle}
           frontWallId={frontWallId}
-          hasLayout={!!layout}
-          facadeTextureUrl={facadeTextureUrl}
-          facadeModelInfo={facadeData?.model_info}
+          layout={layout}
+          onSelectWall={handleSelectFrontWall}
+          appliedFacade={appliedFacade}
           isCalibrating={isCalibrating}
           setIsCalibrating={setIsCalibrating}
         />
@@ -568,15 +705,15 @@ export default function App() {
                 <Viewer3D
                   layout={layout}
                   frontWallId={frontWallId}
-                  facadeTextureUrl={facadeTextureUrl}
-                  facadeData={facadeData}
                   numFloors={numFloors}
                   isSplit={true}
                   selectedRoom={selectedRoom}
                   onSelectRoom={handleSelectRoom}
                   furnishingData={furnishingData}
+                  onSelectFurniture={handleSelectFurniture}
                   onClearRoomFurnishings={handleClearDesign}
                   facadeFocusTrigger={facadeFocusTrigger}
+                  roomFocusTrigger={roomFocusTrigger}
                 />
               </>
             )}
@@ -603,15 +740,15 @@ export default function App() {
               <Viewer3D
                 layout={layout}
                 frontWallId={frontWallId}
-                facadeTextureUrl={facadeTextureUrl}
-                facadeData={facadeData}
                 numFloors={numFloors}
                 isSplit={false}
                 selectedRoom={selectedRoom}
                 onSelectRoom={handleSelectRoom}
                 furnishingData={furnishingData}
+                onSelectFurniture={handleSelectFurniture}
                 onClearRoomFurnishings={handleClearDesign}
                 facadeFocusTrigger={facadeFocusTrigger}
+                roomFocusTrigger={roomFocusTrigger}
               />
             )}
 
@@ -623,6 +760,9 @@ export default function App() {
                 onGenerateDesign={handleGenerateDesign}
                 onRegenerateDesign={handleRegenerateDesign}
                 onClearDesign={handleClearDesign}
+                onInspectRoom={inspectRoomIn3D}
+                onSelectFurniture={handleSelectFurniture}
+                onPresetChange={handleRoomPreset}
                 furnishingData={furnishingData}
                 isDesigning={isDesigning}
                 onRelabelRoom={handleRelabelRoom}
@@ -637,14 +777,24 @@ export default function App() {
       </section>
       )}
 
+      {catalogSelection && furnishingData[catalogSelection.roomId] === catalogSelection.design && (
+        <React.Suspense fallback={null}>
+          <FurnitureCatalog key={`${catalogSelection.roomId}:${catalogSelection.item.item_id}`}
+            item={catalogSelection.item} choices={catalogSelection.choices} preset={catalogSelection.design.preset}
+            loading={catalogSelection.loading} error={catalogSelection.error}
+            onApply={applyFurnitureChoice} onClose={() => setCatalogSelection(null)} />
+        </React.Suspense>
+      )}
       {/* Facade Synthesis Studio Modal */}
       <FacadeModal
         isOpen={showFacadeModal}
         onClose={() => setShowFacadeModal(false)}
-        facadeData={facadeData}
-        onSwitchStyle={handleSwitchFacadeStyle}
-        isSwitchingStyle={isSwitchingStyle}
-        onFocusIn3D={() => setFacadeFocusTrigger((prev) => prev + 1)}
+        facadeData={facadeDraft}
+        onSwitchStyle={handleGenerateFacade}
+        isSwitchingStyle={isGeneratingFacade}
+        isApplied={appliedFacade === facadeDraft}
+        onApply={() => applyFacade(facadeDraft)}
+        onFocusIn3D={viewFacadeIn3D}
       />
     </div>
   );

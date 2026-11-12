@@ -130,3 +130,12 @@ outputs/
 test_facade_out.png
 TripoSR/
 frontend/public/vendor/
+
+# Local runtime custom furniture assets
+frontend/public/models/custom/
+frontend/public/models/custom_furniture.json
+
+# Temporary scratch & submission packaging directories
+tmp/
+.chart-data-*/
+output/submission/

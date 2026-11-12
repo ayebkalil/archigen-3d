@@ -11,12 +11,24 @@ import numpy as np
 import cv2
 from shapely.geometry import Polygon, LineString, Point
 from shapely.validation import make_valid
+from src.floorplan.dimensions import STOREY_HEIGHT_M, DOOR_HEIGHT_M, WINDOW_HEIGHT_M, WINDOW_SILL_M
+from src.floorplan.wall_reconstruction import solid_stroke_at_opening, structural_support, trace_wall_runs
 
 ROOM_NAMES = {
     0: "Background", 1: "Living Room", 2: "Bedroom", 3: "Kitchen",
     4: "Bathroom", 5: "Entry / Hall", 6: "Balcony / Terrace",
     7: "Storage", 8: "Closet", 9: "Garage", 10: "Office", 11: "Other"
 }
+
+def score_room_polygon(probabilities: np.ndarray, class_id: int, polygon_px) -> float | None:
+    """Average the requested semantic class over a room in model canvas coordinates."""
+    region = np.zeros(probabilities.shape[1:], dtype=np.uint8)
+    cv2.fillPoly(region, [np.rint(polygon_px).astype(np.int32)], 1)
+    scores = probabilities[class_id][region > 0]
+    if not scores.size:
+        return None
+    mean_score = float(scores.mean())
+    return round(mean_score, 4) if math.isfinite(mean_score) else None
 
 def repair_polygon_to_single_polygon(poly: Polygon, max_area_change_pct: float = 10.0) -> Tuple[Polygon, bool, float]:
     """
@@ -82,7 +94,7 @@ class FloorplanVectorizer:
         polygon_epsilon_ratio: float = 0.015,
         snap_angle_deg_tolerance: float = 12.0,
         default_door_width_m: float = 0.85,
-        wall_height_m: float = 2.80,
+        wall_height_m: float = STOREY_HEIGHT_M,
         min_area_habitable_m2: float = 2.0,
         min_area_service_m2: float = 0.8
     ):
@@ -146,21 +158,22 @@ class FloorplanVectorizer:
         mask: np.ndarray,
         room_mask: Any = None,
         struct_mask: Any = None,
-        scale_override_m_per_px: Any = None
+        scale_override_m_per_px: Any = None,
+        room_probabilities: np.ndarray | None = None,
+        source_gray: np.ndarray | None = None,
     ) -> Dict[str, Any]:
         """
         Main pipeline: Takes (H, W) class index mask and extracts structured vector layout.
         Supports optional semantic room_mask and struct_mask (with Wall_External).
+        room_probabilities contains the semantic class probabilities in (C, H, W) order.
         """
         h, w = mask.shape
         wall_binary = (mask == 1).astype(np.uint8)
         door_binary = (mask == 2).astype(np.uint8)
         window_binary = (mask == 3).astype(np.uint8)
-
-        # 1. Morphological filtering to clean noise and bridge small wall breaks
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        wall_clean = cv2.morphologyEx(wall_binary, cv2.MORPH_CLOSE, kernel)
-        wall_clean = cv2.morphologyEx(wall_clean, cv2.MORPH_OPEN, kernel)
+        # Ink is reliable negative evidence on sparse line drawings. Dense scans
+        # and textured/color plans continue to use semantic opening evidence.
+        source_ink = (source_gray < 140).astype(np.uint8) if source_gray is not None and np.mean(source_gray > 235) >= .90 else None
 
         # 2. Scale estimation with manual override support
         if scale_override_m_per_px is not None and scale_override_m_per_px > 0:
@@ -173,7 +186,20 @@ class FloorplanVectorizer:
         # 3. Outer Building Shell (Watertight Exterior Envelope from Filled Footprint)
         # Seal all structural boundaries (walls, doors, windows) with morphological closure
         # so windows and exterior doors do not breach the exterior envelope.
-        all_structure = ((wall_clean > 0) | (door_binary > 0) | (window_binary > 0)).astype(np.uint8)
+        all_structure = structural_support(wall_binary, door_binary | window_binary)
+        runs = [run for run in trace_wall_runs(all_structure, scale_m_per_px, source_ink)
+                if run.length * run.thickness >= self.min_wall_area or run.length * scale_m_per_px >= .35]
+        if len(runs) > 1:
+            bodies = [Polygon(run.outline()) for run in runs]
+            runs = [
+                run for index, run in enumerate(runs) if run.length * scale_m_per_px >= .75
+                or any(index != other and bodies[index].distance(body) * scale_m_per_px <= .15
+                       for other, body in enumerate(bodies))
+            ]
+        # Doors and windows close partitions in plan. Their 3D cutouts are applied later.
+        wall_clean = all_structure.copy()
+        for run in runs:
+            cv2.fillConvexPoly(wall_clean, np.rint(run.outline()).astype(np.int32), 1)
         k_close = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
         sealed_structure = cv2.morphologyEx(all_structure, cv2.MORPH_CLOSE, k_close)
 
@@ -233,100 +259,55 @@ class FloorplanVectorizer:
                         shell_failure_code = "INVALID_GEOMETRY"
                         building_perimeter_m = 0.0
 
-        # 4. Wall Contour extraction and Rectilinear Polygon simplification
-        wall_contours, _ = cv2.findContours(wall_clean, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # 4. Export explicit wall axes and strip footprints. Contour holes are
+        # room interiors and must never be serialized as independent walls.
         walls = []
         wall_segments = []
-
-        wall_id = 0
-        for cnt in wall_contours:
-            area = cv2.contourArea(cnt)
-            if area < self.min_wall_area:
-                continue
-
-            # Simplify polygon using Douglas-Peucker
-            peri = cv2.arcLength(cnt, True)
-            epsilon = max(1.5, self.polygon_epsilon_ratio * peri)
-            approx = cv2.approxPolyDP(cnt, epsilon, True).reshape(-1, 2)
-
-            if len(approx) < 3:
-                continue
-
-            # Rectilinear snapping
-            snapped_poly = [approx[0].tolist()]
-            for i in range(1, len(approx)):
-                p_snap = self.snap_angle_rectilinear(snapped_poly[-1], approx[i].tolist())
-                snapped_poly.append([round(p_snap[0], 2), round(p_snap[1], 2)])
-
-            # Convert to meters
-            poly_meters = [[round(pt[0] * scale_m_per_px, 3), round(pt[1] * scale_m_per_px, 3)] for pt in snapped_poly]
-
-            # Validate and repair wall polygon with Shapely to guarantee solid, non-self-intersecting geometry
-            try:
-                poly_raw = Polygon(poly_meters)
-                if not poly_raw.is_valid:
-                    clean_wall_poly, rep_ok, _ = repair_polygon_to_single_polygon(poly_raw, max_area_change_pct=30.0)
-                    if rep_ok and clean_wall_poly.is_valid and clean_wall_poly.geom_type == "Polygon":
-                        poly_meters = [[round(pt[0], 3), round(pt[1], 3)] for pt in clean_wall_poly.exterior.coords[:-1]]
-                    else:
-                        b = poly_raw.buffer(0)
-                        if b.geom_type == "Polygon" and b.is_valid and not b.is_empty:
-                            poly_meters = [[round(pt[0], 3), round(pt[1], 3)] for pt in b.exterior.coords[:-1]]
-                        elif b.geom_type == "MultiPolygon" and len(b.geoms) > 0:
-                            dom = max(b.geoms, key=lambda p: p.area)
-                            if dom.is_valid and not dom.is_empty:
-                                poly_meters = [[round(pt[0], 3), round(pt[1], 3)] for pt in dom.exterior.coords[:-1]]
-            except Exception:
-                pass
-
-            if len(poly_meters) < 3:
-                continue
-
-            # Determine if Exterior Wall:
-            # Method A: from struct_mask (class 2 = Wall_External vs class 1 = Wall_Internal)
-            # Method B: from building envelope proximity (fallback if no struct_mask)
-            is_exterior = False
+        for index, run in enumerate(runs):
+            direction = run.direction
+            normal = np.array([-direction[1], direction[0]])
+            midpoint = (run.start + run.end) / 2
+            outline = run.outline()
             if struct_mask is not None:
-                # Sample pixels under contour
-                wall_patch = np.zeros((h, w), dtype=np.uint8)
-                cv2.drawContours(wall_patch, [cnt], -1, 1, thickness=-1)
-                ext_pixels = int(np.logical_and(wall_patch == 1, struct_mask == 2).sum())
-                int_pixels = int(np.logical_and(wall_patch == 1, struct_mask == 1).sum())
-                # Exterior if Wall_External pixels dominate Wall_Internal pixels
-                if ext_pixels > int_pixels and ext_pixels > 30:
-                    is_exterior = True
-            elif len(footprint_contours) > 0 and len(largest_ext) >= 3:
-                # Fallback: check distance to outer contour
-                M = cv2.moments(cnt)
-                if M["m00"] > 0:
-                    c_pt = (M["m10"] / M["m00"], M["m01"] / M["m00"])
-                    dist_to_ext = cv2.pointPolygonTest(largest_ext, c_pt, True)
-                    if abs(dist_to_ext) < 15.0:
-                        is_exterior = True
+                patch = np.zeros((h, w), dtype=np.uint8)
+                cv2.fillConvexPoly(patch, np.rint(outline).astype(np.int32), 1)
+                ext_count = np.count_nonzero((patch > 0) & (struct_mask == 2))
+                int_count = np.count_nonzero((patch > 0) & (struct_mask == 1))
+                is_exterior = bool(ext_count > int_count)
+            else:
+                is_exterior = bool(footprint_contours) and abs(cv2.pointPolygonTest(
+                    largest_ext, tuple(midpoint), True)) <= run.thickness / 2 + 3
 
-            # Register wall
-            walls.append({
-                "id": f"wall_{wall_id}",
+            polygon_meters = np.round(outline * scale_m_per_px, 3).tolist()
+            axis_meters = np.round(np.array([run.start, run.end]) * scale_m_per_px, 3).tolist()
+            wall = {
+                "id": f"wall_{index}",
                 "is_exterior": is_exterior,
-                "polygon_px": snapped_poly,
-                "polygon_meters": poly_meters,
-                "area_m2": round(area * (scale_m_per_px ** 2), 2),
+                "polygon_px": np.round(outline, 2).tolist(),
+                "polygon_meters": polygon_meters,
+                "axis_meters": axis_meters,
+                "thickness_m": round(run.thickness * scale_m_per_px, 3),
+                "area_m2": round(run.length * run.thickness * scale_m_per_px ** 2, 2),
                 "height_m": self.wall_height_m,
-                "openings": []
-            })
+                "openings": [],
+            }
+            if is_exterior:
+                def side_coverage(sign):
+                    points = np.linspace(run.start, run.end, 5)[1:-1]
+                    points = np.rint(points + sign * normal * (run.thickness / 2 + 5)).astype(int)
+                    return sum(clean_envelope[y, x] for x, y in points if 0 <= x < w and 0 <= y < h)
 
-            # Break into segments for door/window association
-            for i in range(len(poly_meters)):
-                p1 = poly_meters[i]
-                p2 = poly_meters[(i + 1) % len(poly_meters)]
-                wall_segments.append({
-                    "wall_id": f"wall_{wall_id}",
-                    "line": LineString([p1, p2]),
-                    "start": p1,
-                    "end": p2
-                })
-
-            wall_id += 1
+                outward = normal if side_coverage(1) < side_coverage(-1) else -normal
+                forward = np.array([outward[1], -outward[0]])
+                anchor = run.start if direction @ forward > 0 else run.end
+                wall["facade_frame"] = {
+                    "origin": ((anchor + outward * run.thickness / 2) * scale_m_per_px).tolist(),
+                    "direction": forward.tolist(),
+                    "outward": outward.tolist(),
+                    "length_m": run.length * scale_m_per_px,
+                }
+            walls.append(wall)
+            wall_segments.append((run, LineString(axis_meters)))
 
         # 5. Doors & Windows extraction with wall gating, dimensional filtering, and fragment clustering
         def extract_openings(bin_mask: np.ndarray, opening_type: str):
@@ -347,36 +328,40 @@ class FloorplanVectorizer:
                 rect = cv2.minAreaRect(c)
                 dim_m = max(rect[1]) * scale_m_per_px
 
-                # Find closest wall segment
-                best_wall_id = None
-                min_dist = float("inf")
-                for seg in wall_segments:
-                    dist = seg["line"].distance(center_pt)
-                    if dist < min_dist:
-                        min_dist = dist
-                        best_wall_id = seg["wall_id"]
-
-                # Gate 1: Wall proximity filter (must be within 0.85m of a wall)
-                if min_dist > 0.85:
-                    continue
-
                 # Gate 2: Dimension filter (reject fragments < 0.50m or oversized gaps > 2.50m for doors)
                 if opening_type == "door":
                     if dim_m < 0.50 or dim_m > 2.50:
                         continue
                     clamped_width = round(max(0.65, min(dim_m, 2.20)), 2)
-                    height_m = 2.1
                 else:
                     if dim_m < 0.40 or dim_m > 3.50:
                         continue
                     clamped_width = round(max(0.50, min(dim_m, 3.00)), 2)
-                    height_m = 1.4
+
+                # Prefer a nearby axis with enough wall on each side for the whole opening.
+                hosts = []
+                for index, (_, axis) in enumerate(wall_segments):
+                    distance = axis.distance(center_pt)
+                    if distance > .85:
+                        continue
+                    along = axis.project(center_pt)
+                    margin = clamped_width / 2 - .08
+                    fits = distance <= .28 and margin <= along <= axis.length - margin
+                    hosts.append((not fits, distance, index))
+                if not hosts:
+                    continue
+                _, min_dist, host = min(hosts)
+                best_wall_id = walls[host]["id"]
+                if source_ink is not None and solid_stroke_at_opening(
+                    source_ink, wall_segments[host][0], np.array([center_px_x, center_px_y]),
+                    clamped_width / scale_m_per_px,
+                ):
+                    continue
 
                 raw_candidates.append({
                     "position_px": [round(center_px_x, 1), round(center_px_y, 1)],
                     "position_meters": [round(cx, 3), round(cy, 3)],
                     "width_m": clamped_width,
-                    "height_m": height_m,
                     "associated_wall": best_wall_id,
                     "distance_to_wall_m": round(min_dist, 3)
                 })
@@ -419,7 +404,8 @@ class FloorplanVectorizer:
                     "position_px": [round(avg_px_x, 1), round(avg_px_y, 1)],
                     "position_meters": [round(avg_x, 3), round(avg_y, 3)],
                     "width_m": round(avg_w, 2),
-                    "height_m": 2.1 if opening_type == "door" else 1.4,
+                    "height_m": DOOR_HEIGHT_M if opening_type == "door" else WINDOW_HEIGHT_M,
+                    "sill_m": 0.0 if opening_type == "door" else WINDOW_SILL_M,
                     "associated_wall": best_wall,
                     "distance_to_wall_m": round(min_dw, 3)
                 }
@@ -446,8 +432,18 @@ class FloorplanVectorizer:
         room_idx = 0
         total_interior_area_m2 = 0.0
         num_rooms_repaired = 0
+        partition_count, partitions, partition_stats, _ = cv2.connectedComponentsWithStats(
+            1 - wall_clean, connectivity=4)
+        outside_ids = set(np.concatenate([partitions[0], partitions[-1], partitions[:, 0], partitions[:, -1]]))
+        min_room_pixels = self.min_area_service_m2 / scale_m_per_px ** 2
+        enclosed_ids = [
+            index for index in range(1, partition_count) if index not in outside_ids
+            and partition_stats[index, cv2.CC_STAT_AREA] >= min_room_pixels
+            and min(partition_stats[index, cv2.CC_STAT_WIDTH], partition_stats[index, cv2.CC_STAT_HEIGHT])
+            * scale_m_per_px >= .35
+        ]
 
-        if room_mask is not None and np.max(room_mask) > 0:
+        if room_mask is not None and (np.max(room_mask) > 0 or len(enclosed_ids) >= 2):
             # Hybrid Room Partitioning:
             # 1. Mask room predictions with walls to split same-class adjacent rooms
             clean_room = room_mask.copy()
@@ -460,6 +456,25 @@ class FloorplanVectorizer:
             labeled_map = np.zeros((h, w), dtype=np.int32)
             region_info = {}
             current_label = 1
+
+            # A physically closed chamber defines one room, even if the semantic
+            # head predicts several labels or drops pixels near its boundaries.
+            for chamber in enclosed_ids:
+                region = partitions == chamber
+                area = int(partition_stats[chamber, cv2.CC_STAT_AREA])
+                votes = np.bincount(clean_room[region], minlength=len(ROOM_NAMES))
+                class_id = int(np.argmax(votes[1:])) + 1
+                geometry_only = votes[class_id] < .1 * area
+                labeled_map[region] = current_label
+                region_info[current_label] = {
+                    "class_id": 0 if geometry_only else class_id,
+                    "area_px": area,
+                    "min_thresh": px_area_service,
+                    "geometry_only": geometry_only,
+                    "enclosed": True,
+                }
+                clean_room[region] = 0
+                current_label += 1
 
             for c_id in range(1, 12):
                 c_bin = (clean_room == c_id).astype(np.uint8)
@@ -522,7 +537,8 @@ class FloorplanVectorizer:
                     if comp_area < 8:
                         continue
                     dilated_comp = cv2.dilate(comp, k_abs, iterations=2)
-                    touching = labeled_map[(dilated_comp > 0) & (labeled_map > 0)]
+                    partition = partitions[comp > 0][0]
+                    touching = labeled_map[(dilated_comp > 0) & (labeled_map > 0) & (partitions == partition)]
                     if len(touching) > 0:
                         best_lbl = Counter(touching).most_common(1)[0][0]
                         labeled_map[comp > 0] = best_lbl
@@ -539,7 +555,8 @@ class FloorplanVectorizer:
                             region_info[current_label] = {
                                 "class_id": 1,  # Living Room / Common space
                                 "area_px": comp_area,
-                                "min_thresh": px_area_habitable
+                                "min_thresh": px_area_habitable,
+                                "geometry_only": True,
                             }
                             current_label += 1
                     break
@@ -568,7 +585,8 @@ class FloorplanVectorizer:
                 largest_c = max(r_cnts, key=cv2.contourArea)
                 if cv2.contourArea(largest_c) < 15:
                     continue
-                r_approx = cv2.approxPolyDP(largest_c, 2.5, True).reshape(-1, 2)
+                epsilon = 1.0 if info.get("enclosed") else min(2.5, max(.75, self.polygon_epsilon_ratio * cv2.arcLength(largest_c, True)))
+                r_approx = cv2.approxPolyDP(largest_c, epsilon, True).reshape(-1, 2)
                 if len(r_approx) < 3:
                     continue
                 area_m2 = round(int(smoothed_rm.sum()) * (scale_m_per_px ** 2), 2)
@@ -591,6 +609,9 @@ class FloorplanVectorizer:
                 cx = (M["m10"] / max(M["m00"], 1e-4)) * scale_m_per_px
                 cy = (M["m01"] / max(M["m00"], 1e-4)) * scale_m_per_px
                 c_id = info["class_id"]
+                confidence = None
+                if room_probabilities is not None and not info.get("geometry_only"):
+                    confidence = score_room_polygon(room_probabilities, c_id, np.asarray(r_poly_m) / scale_m_per_px)
                 total_interior_area_m2 += area_m2
 
                 # Classify room edges against wall mask
@@ -623,8 +644,9 @@ class FloorplanVectorizer:
 
                 rooms.append({
                     "id": f"room_{room_idx}",
-                    "room_type": ROOM_NAMES.get(c_id, "Other Room"),
+                    "room_type": ROOM_NAMES.get(c_id, "Other Room") if c_id else "Unclassified Room",
                     "surface_m2": area_m2,
+                    "confidence": confidence,
                     "centroid_meters": [round(cx, 3), round(cy, 3)],
                     "polygon_meters": r_poly_m,
                     "was_repaired": r_repaired,
@@ -699,8 +721,28 @@ class FloorplanVectorizer:
             except Exception:
                 pass
 
-        # 8. Watertight Exterior Building Envelope for Seamless Unified Roof
+        # 8. Keep floors on the wall-supported building outline. Buffering
+        # disconnected room labels alone can create extra slabs inside one house.
         envelope_polygons = []
+        room_centers = [
+            Polygon(room["polygon_meters"]).representative_point()
+            for room in rooms
+            if len(room["polygon_meters"]) >= 3
+        ]
+        for contour in footprint_contours:
+            if cv2.contourArea(contour) * scale_m_per_px ** 2 < 2.0:
+                continue
+            outline = cv2.approxPolyDP(contour, 1.5, True).reshape(-1, 2) * scale_m_per_px
+            if len(outline) < 3:
+                continue
+            polygon = Polygon(outline)
+            if not polygon.is_valid:
+                polygon, repaired, _ = repair_polygon_to_single_polygon(polygon)
+                if not repaired:
+                    continue
+            if any(polygon.covers(center) for center in room_centers):
+                envelope_polygons.append(np.round(np.asarray(polygon.exterior.coords[:-1]), 3).tolist())
+
         try:
             from shapely.ops import unary_union
             valid_r_polys = [
@@ -708,7 +750,7 @@ class FloorplanVectorizer:
                 for r in rooms
                 if len(r.get("polygon_meters", [])) >= 3 and Polygon(r["polygon_meters"]).is_valid
             ]
-            if valid_r_polys:
+            if not envelope_polygons and valid_r_polys:
                 # Buffer rooms by 0.22m to bridge walls and corridors
                 buffered = [p.buffer(0.22, join_style=2) for p in valid_r_polys]
                 merged_env = unary_union(buffered)

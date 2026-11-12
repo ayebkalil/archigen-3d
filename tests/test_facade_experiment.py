@@ -83,6 +83,9 @@ def test_untrained_styles_are_reported_as_neutral():
     assert info['style_conditioned'] is False
     assert info['supported_styles'] == []
     with pytest.raises(ValueError): engine.style_id('unknown')
+    engine.supported_styles = [0]
+    assert engine.style_id(None) == NEUTRAL_STYLE
+    assert engine.describe(None)['style_conditioned'] is False
 
 
 def test_512_bridge_uvs_and_no_heuristic_tint():

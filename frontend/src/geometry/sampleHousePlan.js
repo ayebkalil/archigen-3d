@@ -1,4 +1,5 @@
 import { wallStrip } from './houseGeometry.js';
+import { STOREY_HEIGHT_M, DOOR_HEIGHT_M, WINDOW_HEIGHT_M, WINDOW_SILL_M } from './buildingDimensions.js';
 
 // Traced against the bundled drawing at a reference image size of 1832 × 1344.
 // The two drawings share the top-left exterior corner. The input bitmap is
@@ -55,7 +56,7 @@ const DRAWINGS = [
     voids: [],
   },
   {
-    id: 'upper', label: 'Upper floor', elevation: 2.8, anchor: [1037, 131],
+    id: 'upper', label: 'Upper floor', elevation: STOREY_HEIGHT_M, anchor: [1037, 131],
     outline: [[1025, 119], [1559, 119], [1559, 323], [1732, 323], [1732, 678], [1025, 678]],
     exterior: [
       ['north', [1037, 131], [1547, 131], [[1142, 131, 94], [1375, 131, 69], [1460, 131, 69]]],
@@ -120,13 +121,14 @@ export function createSampleHouse(scale = .03) {
           definitions.forEach(([x, z, width], i) => {
             const opening = { id: `${wallId}_${type}_${i}`, type, level_id: id, associated_wall: wallId,
               position_meters: meters([x, z]), width_m: width * 512 / 1832 * scale,
-              sill_m: type === 'door' ? 0 : .9, height_m: type === 'door' ? 2.1 : 1.35 };
+              sill_m: type === 'door' ? 0 : WINDOW_SILL_M,
+              height_m: type === 'door' ? DOOR_HEIGHT_M : WINDOW_HEIGHT_M };
             openings.push(opening);
             destination.push(opening);
           });
         }
         walls.push({ id: wallId, level_id: id, is_exterior: isExterior, is_front: wallId === SAMPLE_FRONT_WALL,
-          height_m: 2.8, axis_meters: axis, thickness_m: thickness, facade_frame: facadeFrame,
+          height_m: STOREY_HEIGHT_M, axis_meters: axis, thickness_m: thickness, facade_frame: facadeFrame,
           polygon_meters: ring, polygon_px: ring.map(p => p.map(v => v / scale)), openings });
       }
     }
@@ -138,7 +140,7 @@ export function createSampleHouse(scale = .03) {
       }, 0);
       rooms.push({ id: `${id}_room_${i}`, level_id: id, room_type, polygon_meters, surface_m2: Number((Math.abs(area) / 2).toFixed(2)) });
     });
-    return { id, label, elevation, height: 2.8, offset, envelope: [drawing.outline.map(meters)], floorVoids: drawing.voids.map(ring => ring.map(meters)) };
+    return { id, label, elevation, height: STOREY_HEIGHT_M, offset, envelope: [drawing.outline.map(meters)], floorVoids: drawing.voids.map(ring => ring.map(meters)) };
   });
   return { walls, rooms, doors, windows, storeys, envelope: storeys.flatMap(level => level.envelope),
     metadata: { source: 'sample_reference', canvas_size: [512, 512], scale_meters_per_pixel: scale,

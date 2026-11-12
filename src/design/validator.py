@@ -6,14 +6,16 @@ Strict geometric validation suite for furnished room layouts:
 2. Door clearance zones completely clear
 3. All items inside room polygon
 4. Back-to-wall items within 2 cm of wall face
-5. BFS walking path reachability from door to items
+5. Connected walking space from doors to furniture access points
 """
 
 import math
-from collections import deque
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
-from shapely.geometry import Polygon, Point, box, LineString
+from typing import List, Dict, Any, Optional
+from shapely import get_parts
+from shapely.geometry import Polygon, Point, LineString
+from shapely.ops import unary_union
+from src.design.edge_classifier import opening_position
 from src.design.types import PlacedItem, ValidationReport
 
 class LayoutValidator:
@@ -38,7 +40,8 @@ class LayoutValidator:
         door_clearance_zones: List[Polygon],
         doors: Optional[List[Dict[str, Any]]] = None,
         wall_dist_map_m: Optional[np.ndarray] = None,
-        scale_m_per_px: float = 0.03
+        scale_m_per_px: float = 0.03,
+        corridor_width_m: Optional[float] = None,
     ) -> ValidationReport:
         """
         Validates all constraints on the furnished layout.
@@ -150,9 +153,12 @@ class LayoutValidator:
                             )
                             is_valid = False
 
-        # 5. BFS Reachability from door to primary items
-        bfs_ok = self._check_bfs_reachability(room_poly, items, item_polys, doors)
-        if not bfs_ok:
+        # 5. Walking reachability from door to usable sides of the furniture
+        reachable = self._check_reachability(
+            room_poly, items, item_polys, door_clearance_zones, doors,
+            corridor_width_m or self.min_corridor_width_m,
+        )
+        if not reachable:
             is_valid = False
             reasons.append("NO_PATH: Placed furniture blocks walkable path from entrance door to room items")
 
@@ -163,127 +169,68 @@ class LayoutValidator:
             door_clearance_violation=door_violation,
             out_of_bounds_count=out_of_bounds_count,
             max_wall_gap_cm=max_wall_gap_cm,
-            bfs_reachable=bfs_ok,
+            bfs_reachable=reachable,
             failure_reasons=reasons
         )
 
-    def _check_bfs_reachability(
-        self,
-        room_poly: Polygon,
-        items: List[PlacedItem],
-        item_polys: List[Polygon],
-        doors: Optional[List[Dict[str, Any]]]
-    ) -> bool:
-        """
-        Runs BFS on a 10cm grid inside the room to confirm that an agent entering
-        through the door can walk freely to the front of each placed primary item.
-        """
-        bounds = room_poly.bounds  # minx, miny, maxx, maxy
-        grid_res = 0.10  # 10 cm grid
-        minx, miny, maxx, maxy = bounds
+    def _check_reachability(self, room, items, footprints, door_zones, doors, width):
+        # A centimeter of tolerance keeps a nominal half-meter aisle connected
+        # after polygon and model dimensions have been rounded.
+        radius = width / 2 - .005
+        obstacles = unary_union([poly for item, poly in zip(items, footprints) if item.category != "rug"])
+        free = room.buffer(-radius).difference(obstacles.buffer(radius))
+        components = [part for part in get_parts(free) if part.area > .001]
+        entrances = door_zones
+        if not entrances and doors:
+            for door in doors:
+                position = opening_position(door)
+                if position and room.boundary.distance(Point(position)) <= .4:
+                    entrances = [*entrances, Point(position).buffer(radius + .45)]
 
-        cols = int(math.ceil((maxx - minx) / grid_res)) + 1
-        rows = int(math.ceil((maxy - miny) / grid_res)) + 1
-
-        if cols < 2 or rows < 2 or (cols * rows) > 250000:
-            return True  # Avoid excessive grid sizes
-
-        # 0 = walkable, 1 = obstacle/outside
-        grid = np.ones((rows, cols), dtype=np.uint8)
-
-        # Mark room interior as walkable
-        for r in range(rows):
-            y = miny + r * grid_res
-            for c in range(cols):
-                x = minx + c * grid_res
-                pt = Point(x, y)
-                if room_poly.contains(pt):
-                    grid[r, c] = 0
-
-        # Mark non-rug furniture as obstacles
-        for idx, ip in enumerate(item_polys):
-            if items[idx].category == "rug":
+        access_points = []
+        has_desk_chair = any(item.category == "office_chair" for item in items)
+        has_dining_chair = any(item.category == "dining_chair" for item in items)
+        for item in items:
+            if item.category in {"rug", "plant", "lamp", "coffee_table", "nightstand"}:
                 continue
-            i_bounds = ip.bounds
-            c_start = max(0, int((i_bounds[0] - minx) / grid_res))
-            c_end = min(cols, int(math.ceil((i_bounds[2] - minx) / grid_res)) + 1)
-            r_start = max(0, int((i_bounds[1] - miny) / grid_res))
-            r_end = min(rows, int(math.ceil((i_bounds[3] - miny) / grid_res)) + 1)
-
-            for r in range(r_start, r_end):
-                y = miny + r * grid_res
-                for c in range(c_start, c_end):
-                    x = minx + c * grid_res
-                    if ip.contains(Point(x, y)):
-                        grid[r, c] = 1
-
-        # Determine start cell(s) from door position
-        start_cells = []
-        if doors:
-            for d in doors:
-                pos = d.get("center_meters") or d.get("position_m")
-                if pos:
-                    c = int(round((pos[0] - minx) / grid_res))
-                    r = int(round((pos[1] - miny) / grid_res))
-                    # Find nearest walkable cell within 4 cells (40cm)
-                    for dr in range(-4, 5):
-                        for dc in range(-4, 5):
-                            nr, nc = r + dr, c + dc
-                            if 0 <= nr < rows and 0 <= nc < cols and grid[nr, nc] == 0:
-                                start_cells.append((nr, nc))
-                                break
-
-        if not start_cells:
-            # Fallback: start at center of room
-            cx, cy = room_poly.centroid.x, room_poly.centroid.y
-            cr, cc = int(round((cy - miny) / grid_res)), int(round((cx - minx) / grid_res))
-            if 0 <= cr < rows and 0 <= cc < cols and grid[cr, cc] == 0:
-                start_cells.append((cr, cc))
-
-        if not start_cells:
-            return True  # If room has no walkable cells, pass to other checks
-
-        # Run BFS flood fill
-        queue = deque(start_cells)
-        visited = set(start_cells)
-
-        while queue:
-            curr_r, curr_c = queue.popleft()
-            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nr, nc = curr_r + dr, curr_c + dc
-                if 0 <= nr < rows and 0 <= nc < cols:
-                    if grid[nr, nc] == 0 and (nr, nc) not in visited:
-                        visited.add((nr, nc))
-                        queue.append((nr, nc))
-
-        # Check reachability to the front of primary items
-        for it in items:
-            if it.category in ["rug", "plant"]:
+            if item.category == "desk" and has_desk_chair:
+                # The chair occupies the working position at the desk.
                 continue
-            # Point in front of item
-            px, py = it.position_m
-            rad = math.radians(it.rotation_deg)
-            # Forward vector in plan space: dx = sin(rad), dy = -cos(rad)
-            dx = math.sin(rad)
-            dy = -math.cos(rad)
-            front_x = px + dx * (it.dimensions_m[1] / 2.0 + 0.35)
-            front_y = py + dy * (it.dimensions_m[1] / 2.0 + 0.35)
+            if item.category == "dining_table" and has_dining_chair:
+                continue
+            access_points.append(self._access_zone(item, radius))
 
-            target_c = int(round((front_x - minx) / grid_res))
-            target_r = int(round((front_y - miny) / grid_res))
+        return any(
+            all(component.intersection(zone).area > .001 for zone in entrances)
+            and all(component.intersects(zone) for zone in access_points)
+            for component in components
+        )
 
-            # Check if any cell within 30cm of item front is reached
-            reached = False
-            for dr in range(-3, 4):
-                for dc in range(-3, 4):
-                    nr, nc = target_r + dr, target_c + dc
-                    if (nr, nc) in visited:
-                        reached = True
-                        break
-                if reached:
-                    break
-
-            if not reached and room_poly.contains(Point(front_x, front_y)):
-                return False  # An item is completely blocked by obstacles
-
-        return True
+    @staticmethod
+    def _access_zone(item, radius):
+        """Space where a person can stand to use the furniture."""
+        x, z = item.position_m
+        width, depth, _ = item.dimensions_m
+        angle = math.radians(item.rotation_deg)
+        forward = (math.sin(angle), -math.cos(angle))
+        lateral = (math.cos(angle), math.sin(angle))
+        front = (forward, lateral, depth, width)
+        left = ((-lateral[0], -lateral[1]), forward, width, depth)
+        right = (lateral, forward, width, depth)
+        back = ((-forward[0], -forward[1]), lateral, depth, width)
+        if item.category in {"dining_chair", "office_chair"}:
+            sides = (left, right, back)
+        elif item.category in {"bed", "dining_table", "bathtub"}:
+            sides = (front, left, right)
+        else:
+            sides = (front,)
+        zones = []
+        for normal, tangent, extent, span in sides:
+            offset = extent / 2 + radius + .05
+            center = (x + normal[0] * offset, z + normal[1] * offset)
+            half = span * .38
+            zones.append(LineString([
+                (center[0] - tangent[0] * half, center[1] - tangent[1] * half),
+                (center[0] + tangent[0] * half, center[1] + tangent[1] * half),
+            ]).buffer(.07))
+        return unary_union(zones)

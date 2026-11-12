@@ -32,6 +32,8 @@ class ExperimentalFacadeInference:
         self.supported_styles = self.metadata.get('supported_style_ids', [])
 
     def style_id(self, style):
+        if style is None:
+            return NEUTRAL_STYLE
         if style not in FACADE_STYLES:
             raise ValueError(f'Unknown facade style: {style}')
         requested = FACADE_STYLES.index(style)

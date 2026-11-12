@@ -11,12 +11,79 @@ Comprehensive test suite verifying the geometric and topological refinements:
 
 import pytest
 import numpy as np
-from shapely.geometry import Polygon
+import cv2
+from shapely.geometry import Point, Polygon
 from src.floorplan.vectorizer import FloorplanVectorizer, repair_polygon_to_single_polygon
 
 @pytest.fixture
 def vectorizer():
     return FloorplanVectorizer()
+
+def test_room_confidence_averages_assigned_class_inside_polygon(vectorizer):
+    mask = np.zeros((100, 100), dtype=np.uint8)
+    room_mask = np.zeros_like(mask)
+    room_mask[20:80, 20:80] = 2
+    probabilities = np.zeros((12, *mask.shape), dtype=np.float32)
+    probabilities[2, 20:80, 20:50] = 0.6
+    probabilities[2, 20:80, 50:80] = 0.9
+    probabilities[0] = 1.0 - probabilities[2]
+
+    options = {"room_mask": room_mask, "scale_override_m_per_px": 0.05}
+    room, = vectorizer.vectorize(mask, room_probabilities=probabilities, **options)["rooms"]
+    assert room["confidence"] == pytest.approx(0.75)
+    room, = vectorizer.vectorize(mask, **options)["rooms"]
+    assert room["confidence"] is None
+
+
+def test_reconstruction_preserves_doorways_and_separates_rooms_without_semantics(vectorizer):
+    mask = np.zeros((200, 200), dtype=np.uint8)
+    cv2.rectangle(mask, (20, 20), (180, 180), 1, 5)
+    cv2.line(mask, (100, 20), (100, 180), 1, 5)
+    mask[81:108, 97:104] = 2
+    mask[17:24, 42:70] = 3
+
+    layout = vectorizer.vectorize(mask, room_mask=np.zeros_like(mask), scale_override_m_per_px=.03)
+    assert len(layout["rooms"]) == 2
+    assert len(layout["envelope"]) == 1
+    assert len(layout["doors"]) == len(layout["windows"]) == 1
+    assert all(room["room_type"] == "Unclassified Room" and room["confidence"] is None for room in layout["rooms"])
+    walls = {wall["id"]: wall for wall in layout["walls"]}
+    for opening in layout["doors"] + layout["windows"]:
+        host = walls[opening["associated_wall"]]
+        assert opening in host["openings"]
+        assert len(host["axis_meters"]) == 2 and host["thickness_m"] > 0
+    for wall in walls.values():
+        polygon = Polygon(wall["polygon_meters"])
+        assert all(not polygon.covers(Point(room["centroid_meters"])) for room in layout["rooms"])
+
+
+def test_sparse_drawing_ink_rejects_openings_on_solid_strokes(vectorizer):
+    mask = np.zeros((256, 256), dtype=np.uint8)
+    mask[98:103, 30:225] = 1
+    source_gray = np.where(mask > 0, 30, 255).astype(np.uint8)
+    mask[98:103, 70:101] = 2
+    mask[98:103, 140:180] = 3
+
+    layout = vectorizer.vectorize(mask, source_gray=source_gray, scale_override_m_per_px=.03)
+    assert layout["walls"]
+    assert not layout["doors"]
+    assert not layout["windows"]
+
+
+def test_source_ink_repairs_an_angled_partition_joint(vectorizer):
+    mask = np.zeros((256, 256), dtype=np.uint8)
+    cv2.rectangle(mask, (20, 20), (220, 220), 1, 3)
+    cv2.line(mask, (20, 70), (220, 170), 1, 3)
+    source_gray = np.where(mask > 0, 30, 255).astype(np.uint8)
+    mask[53:85, 23:31] = 0
+
+    layout = vectorizer.vectorize(mask, room_mask=np.zeros_like(mask), source_gray=source_gray,
+                                  scale_override_m_per_px=.03)
+    assert len(layout["rooms"]) == 2
+    assert any(abs((end[1] - start[1]) / (end[0] - start[0]) - .5) < .05
+               for start, end in (wall["axis_meters"] for wall in layout["walls"])
+               if abs(end[0] - start[0]) > 2)
+
 
 def test_door_wall_proximity_gating(vectorizer):
     """Floating door detection far from any wall should be discarded."""

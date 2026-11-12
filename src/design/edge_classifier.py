@@ -11,6 +11,16 @@ from typing import List, Dict, Any, Optional, Tuple
 from shapely.geometry import Polygon, LineString, Point, box
 from src.design.types import WallSegment, OpeningSpan, UsableWallSegment
 
+def opening_position(opening: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    for key in ("position_meters", "center_meters", "position_m"):
+        coords = opening.get(key)
+        if coords is not None and len(coords) >= 2:
+            return tuple(coords[:2])
+    polygon = opening.get("polygon_meters")
+    if polygon:
+        return tuple(np.mean(polygon, axis=0)[:2])
+    return None
+
 def compute_inward_normal(p1: Tuple[float, float], p2: Tuple[float, float], room_poly: Polygon) -> Tuple[float, float]:
     """
     Computes the unit normal vector to edge (p1 -> p2) pointing INWARD into the room.
@@ -150,17 +160,25 @@ class EdgeClassifier:
             snapped_pts.append(p1)
 
         snapped_room_poly = room_poly
+        walls_by_id = {wall.get("id"): wall for wall in (wall_segments or []) if wall.get("id")}
+
+        def locate_opening(opening):
+            position = opening_position(opening)
+            if position is None:
+                return None, 0.0
+            wall = walls_by_id.get(opening.get("associated_wall"), {})
+            idx, distance, projection = self._find_nearest_edge(position, edge_info, wall.get("axis_meters"))
+            tolerance = self.door_snap_tolerance_m
+            if wall.get("thickness_m"):
+                tolerance = min(tolerance, wall["thickness_m"] / 2 + .20)
+            return (idx, projection) if distance <= tolerance else (None, 0.0)
 
         # 2. Snap doors onto edges & generate door clearance zones
         if doors:
             for door in doors:
-                door_pos = self._get_opening_position(door)
-                if door_pos is None:
-                    continue
-
-                best_edge_idx, best_dist, best_proj = self._find_nearest_edge(door_pos, edge_info)
-                if best_edge_idx is not None and best_dist <= self.door_snap_tolerance_m:
-                    door_width_m = door.get("width_m", 0.90)
+                best_edge_idx, best_proj = locate_opening(door)
+                if best_edge_idx is not None:
+                    door_width_m = door.get("width_m") or 0.90
                     e = edge_info[best_edge_idx]
                     e_len = e["length_m"]
 
@@ -191,12 +209,9 @@ class EdgeClassifier:
         # 3. Snap windows onto edges
         if windows:
             for win in windows:
-                win_pos = self._get_opening_position(win)
-                if win_pos is None:
-                    continue
-                best_edge_idx, best_dist, best_proj = self._find_nearest_edge(win_pos, edge_info)
-                if best_edge_idx is not None and best_dist <= self.door_snap_tolerance_m:
-                    win_width_m = win.get("width_m", 1.20)
+                best_edge_idx, best_proj = locate_opening(win)
+                if best_edge_idx is not None:
+                    win_width_m = win.get("width_m") or 1.20
                     e = edge_info[best_edge_idx]
                     e_len = e["length_m"]
 
@@ -316,26 +331,21 @@ class EdgeClassifier:
 
         return 0.05  # Default assumed close if no evidence
 
-    def _get_opening_position(self, opening: Dict[str, Any]) -> Optional[Tuple[float, float]]:
-        if "center_meters" in opening:
-            return tuple(opening["center_meters"][:2])
-        if "position_m" in opening:
-            return tuple(opening["position_m"][:2])
-        if "polygon_meters" in opening and len(opening["polygon_meters"]) > 0:
-            pts = opening["polygon_meters"]
-            xs = [p[0] for p in pts]
-            ys = [p[1] for p in pts]
-            return (sum(xs) / len(xs), sum(ys) / len(ys))
-        return None
-
-    def _find_nearest_edge(self, pt: Tuple[float, float], edges: List[Dict[str, Any]]) -> Tuple[Optional[int], float, float]:
+    def _find_nearest_edge(self, pt: Tuple[float, float], edges: List[Dict[str, Any]], wall_axis=None) -> Tuple[Optional[int], float, float]:
         p = Point(pt)
         best_idx = None
         best_dist = 999.0
         best_proj = 0.0
+        axis = np.subtract(wall_axis[1], wall_axis[0]) if wall_axis else None
+        axis_length = np.linalg.norm(axis) if axis is not None else 0
 
         for idx, e in enumerate(edges):
             ls = LineString([e["p1"], e["p2"]])
+            if axis_length > .01 and ls.length > .01:
+                direction = np.subtract(e["p2"], e["p1"]) / ls.length
+                along = np.dot(np.subtract(pt, e["p1"]), direction)
+                if abs(np.dot(direction, axis) / axis_length) < .93 or not -.15 <= along <= ls.length + .15:
+                    continue
             d = ls.distance(p)
             if d < best_dist:
                 best_dist = d

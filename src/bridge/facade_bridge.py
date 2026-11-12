@@ -22,6 +22,9 @@ import base64
 import os
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
+from src.bridge.facade_finish import apply_material_finish
+from src.data.facade_palette import FACADE_STYLES
+from src.floorplan.dimensions import DOOR_HEIGHT_M, WINDOW_HEIGHT_M, WINDOW_SILL_M
 
 # Exact CMP 12-Class Colormap matching trained generator distribution
 CMP_PALETTE = {
@@ -265,11 +268,11 @@ class FacadeBridge:
                      and any(op.get("type") == "door" for op in wall.get("openings", []))]
         return max(entrances, key=cls.calculate_wall_length_m) if entrances else longest
 
-    def synthesize_facade_sketch(self, wall, num_floors=1, floor_height_m=2.8, is_front=False, target_size=256):
+    def synthesize_facade_sketch(self, wall, num_floors=1, floor_height_m=None, is_front=False, target_size=256):
         image, bounds, _, _ = self._build_facade_sketch(wall, num_floors, floor_height_m, is_front, target_size)
         return image, bounds
 
-    def _build_facade_sketch(self, wall, num_floors=1, floor_height_m=2.8, is_front=False, target_size=256):
+    def _build_facade_sketch(self, wall, num_floors=1, floor_height_m=None, is_front=False, target_size=256):
         """Draw the semantic canvas and return the exact opening rectangles in meters.
 
         Geometry is derived from the rasterized rectangles (including pixel rounding),
@@ -279,6 +282,7 @@ class FacadeBridge:
         palette = EXPERIMENT_CMP_PALETTE if getattr(getattr(self, "inference_engine", None), "neural_style", False) else CMP_PALETTE
         frame = self.facade_frame(wall)
         wall_len_m = frame["length_m"]
+        floor_height_m = floor_height_m if floor_height_m is not None else wall.get("height_m", 2.8)
         total_height_m = num_floors * floor_height_m
 
         # Target dimensions inside 256x256 canvas with margins
@@ -359,19 +363,19 @@ class FacadeBridge:
                 "id": op.get("id", f"{kind}_{idx}"), "type": kind,
                 "position_along_wall_m": float(along),
                 "width_m": float(op.get("width_m", op.get("width", 1.15 if kind == "door" else 1.10))),
-                "height_m": float(op.get("height_m", op.get("height", 2.10 if kind == "door" else 1.40))),
-                "sill_m": float(op.get("sill_m", 0.0 if kind == "door" else 0.90)),
+                "height_m": float(op.get("height_m", op.get("height", DOOR_HEIGHT_M if kind == "door" else WINDOW_HEIGHT_M))),
+                "sill_m": float(op.get("sill_m", 0.0 if kind == "door" else WINDOW_SILL_M)),
             })
         # Procedural preview only when no measured openings were supplied.
         if not attached and not wall.get("geometry_fixed"):
             if is_front:
-                templates.append({"id": "facade_door", "type": "door", "position_along_wall_m": wall_len_m / 2, "width_m": 1.15, "height_m": 2.1, "sill_m": 0.0})
+                templates.append({"id": "facade_door", "type": "door", "position_along_wall_m": wall_len_m / 2, "width_m": 1.15, "height_m": DOOR_HEIGHT_M, "sill_m": 0.0})
             bays = max(int(round(wall_len_m / 2.8)), 1)
             for i in range(bays):
                 along = (i + 1) * wall_len_m / (bays + 1)
                 if is_front and abs(along - wall_len_m / 2) < 1.3:
                     continue
-                templates.append({"id": f"facade_window_{i}", "type": "window", "position_along_wall_m": along, "width_m": 1.1, "height_m": 1.4, "sill_m": 0.9})
+                templates.append({"id": f"facade_window_{i}", "type": "window", "position_along_wall_m": along, "width_m": 1.1, "height_m": WINDOW_HEIGHT_M, "sill_m": WINDOW_SILL_M})
 
         rendered_openings = []
         for fl in range(num_floors):
@@ -408,14 +412,28 @@ class FacadeBridge:
 
         return canvas, uv_bounds, frame, rendered_openings
 
+    def _finish_texture(self, image, sketch, bounds, style, material_finish=False):
+        engine = self.inference_engine
+        info = engine.describe(style) if hasattr(engine, "describe") else {
+            "model": "legacy_256", "resolution": 256, "style_conditioned": False,
+        }
+        if getattr(engine, "neural_style", False):
+            if material_finish and style in FACADE_STYLES and not info.get("style_conditioned"):
+                image = apply_material_finish(image, sketch, bounds, style)
+                info = {**info, "finish": style}
+        elif style:
+            image = apply_facade_style(image, style)
+        return image, info
+
     def render_wall_facade(
         self,
         wall: Dict[str, Any],
         num_floors: int = 1,
-        floor_height_m: float = 2.8,
+        floor_height_m: Optional[float] = None,
         is_front: bool = False,
-        style: str = "Modern Minimalist",
-        output_path: Optional[str] = None
+        style: Optional[str] = "Modern Minimalist",
+        output_path: Optional[str] = None,
+        material_finish: bool = False,
     ) -> Dict[str, Any]:
         """
         Renders photorealistic facade texture for a specific exterior wall.
@@ -451,9 +469,7 @@ class FacadeBridge:
             # Fallback mock texture if ONNX engine not loaded
             photo_img = sketch_img
 
-        # Apply style-specific architectural color grading and material enhancements
-        if style and not getattr(self.inference_engine, "neural_style", False):
-            photo_img = apply_facade_style(photo_img, style)
+        photo_img, model_info = self._finish_texture(photo_img, sketch_img, uv_bounds, style, material_finish)
 
         buf_enh = io.BytesIO()
         photo_img.save(buf_enh, format="PNG")
@@ -468,7 +484,7 @@ class FacadeBridge:
             "wall_id": wall.get("id", "unknown_wall"),
             "is_front": is_front,
             "style": style,
-            "model_info": self.inference_engine.describe(style) if hasattr(self.inference_engine, "describe") else {"model": "legacy_256", "resolution": 256, "style_conditioned": False},
+            "model_info": model_info,
             "sketch_image": sketch_img,
             "sketch_bytes": sketch_bytes,
             "photo_image": photo_img,
@@ -585,7 +601,7 @@ class FacadeBridge:
 
             for idx, (w, s_img, uv_bounds, frame, openings) in enumerate(wall_order):
                 w_id = w.get("id")
-                g_img = apply_facade_style(generated_imgs[idx], style) if style and not getattr(self.inference_engine, "neural_style", False) else generated_imgs[idx]
+                g_img, model_info = self._finish_texture(generated_imgs[idx], s_img, uv_bounds, style)
                 buf = io.BytesIO()
                 g_img.save(buf, format="PNG")
                 photo_bytes = buf.getvalue()
@@ -598,7 +614,7 @@ class FacadeBridge:
                 b64_str = base64.b64encode(photo_bytes).decode("ascii")
                 res = {
                     "wall_id": w_id,
-                    "model_info": self.inference_engine.describe(style) if hasattr(self.inference_engine, "describe") else {"model": "legacy_256", "resolution": 256, "style_conditioned": False},
+                    "model_info": model_info,
                     "is_front": (w_id == front_wall_id),
                     "sketch_image": s_img,
                     "photo_image": g_img,

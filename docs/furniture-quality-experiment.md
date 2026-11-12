@@ -103,6 +103,13 @@ https://github.com/microsoft/TRELLIS.2.
 
 ## Verification
 
+The Docker API forwards furniture generation to the native CUDA worker on port
+8001. Run `scripts/start_local_stack.ps1` to start the worker and Docker together.
+The default is high detail. Use `-FurnitureDetail balanced` when starting a new
+worker for lighter meshes. The script reuses an already running quality worker.
+Logs are in `outputs/furniture_worker/`. The saved model library stays in the
+Docker volume. Restart the worker with the stack after restarting Windows.
+
 `python -m pytest tests/ backend/tests/`, `npm test`, `npm run build`, and the actual
 studio/API smoke test (`node scripts/verify_furniture_studio.cjs`). GitHub Actions
 checks analytic geometry, coordinate/catalog contracts and the frontend without

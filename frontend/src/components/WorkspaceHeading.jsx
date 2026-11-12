@@ -1,7 +1,7 @@
 import React from 'react';
-import { Columns2, Layers, Box } from 'lucide-react';
+import { Columns2, Layers, Box, Paintbrush } from 'lucide-react';
 
-export default function WorkspaceHeading({ activeTab, setActiveTab, isAnalyzing, hasLayout }) {
+export default function WorkspaceHeading({ activeTab, setActiveTab, isAnalyzing, hasLayout, onEditFacades }) {
   return (
     <div className="workspace-heading">
       <div>
@@ -25,6 +25,12 @@ export default function WorkspaceHeading({ activeTab, setActiveTab, isAnalyzing,
               ? 'Select a room to start furnishing'
               : 'Upload a plan to get started'}
         </span>
+        {onEditFacades && (
+          <button type="button" onClick={onEditFacades}
+            className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-[#f0500f] px-3 py-2 text-xs font-bold text-white">
+            <Paintbrush size={15} /> Edit facades
+          </button>
+        )}
         <div className="view-switch" aria-label="Workspace view">
           {[
             ['split', Columns2, 'Split view'],

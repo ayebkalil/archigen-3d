@@ -1,11 +1,8 @@
-import React, { useState } from 'react';
-import { Sparkles, RefreshCw, Trash2, X, AlertCircle, AlertTriangle, CheckCircle2, ChevronRight, Info, Layers, Compass } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Sparkles, RefreshCw, Trash2, X, AlertCircle, AlertTriangle, CheckCircle2, ChevronRight, Info, Layers, Compass, Eye } from 'lucide-react';
+import { FURNITURE_FINISHES } from '../geometry/furnitureAppearance.js';
 
-const PRESET_OPTIONS = [
-  { id: 'contemporary_minimal', label: 'Contemporary Minimal', desc: 'Clean lines, neutral tones, light oak & steel' },
-  { id: 'warm_wood', label: 'Warm Wood', desc: 'Natural oak textures, warm fabric upholstery' },
-  { id: 'tailored_classic', label: 'Tailored Classic', desc: 'Structured profiles, richer tones, grounded proportions' }
-];
+const PRESET_OPTIONS = Object.entries(FURNITURE_FINISHES);
 
 const ROOM_TYPE_OPTIONS = [
   'Bedroom',
@@ -13,7 +10,11 @@ const ROOM_TYPE_OPTIONS = [
   'Kitchen',
   'Bathroom',
   'Office',
-  'Dining'
+  'Dining',
+  'Entry / Hall',
+  'Storage',
+  'Utility',
+  'Balcony / Terrace'
 ];
 
 // Minimum plausible physical room areas (in m²) for residential spaces
@@ -31,12 +32,17 @@ export default function RoomDesignPanel({
   onGenerateDesign,
   onRegenerateDesign,
   onClearDesign,
+  onInspectRoom,
+  onSelectFurniture,
+  onPresetChange,
   furnishingData,
   isDesigning,
   onRelabelRoom
 }) {
   const [selectedPreset, setSelectedPreset] = useState('contemporary_minimal');
   const [showRelabel, setShowRelabel] = useState(false);
+  const appliedPreset = furnishingData?.[selectedRoom?.id]?.preset;
+  useEffect(() => { setSelectedPreset(appliedPreset || 'contemporary_minimal'); }, [selectedRoom?.id, appliedPreset]);
 
   if (!selectedRoom) return null;
 
@@ -52,10 +58,12 @@ export default function RoomDesignPanel({
 
   // Fragment detection (< minimum plausible room area)
   const normType = (selectedRoom.room_type || '').toLowerCase();
-  const minPlausibleArea = MIN_PLAUSIBLE_ROOM_AREAS[normType] || 2.0;
-  const isFragment = (selectedRoom.surface_m2 !== undefined && selectedRoom.surface_m2 < minPlausibleArea) ||
-                     failureReason === 'ROOM_FRAGMENT' ||
-                     currentFurnishings?.status === 'not a room (fragment)';
+  const minPlausibleArea = MIN_PLAUSIBLE_ROOM_AREAS[normType] || 1.5;
+  const isSmallRoom = selectedRoom.surface_m2 !== undefined && selectedRoom.surface_m2 < minPlausibleArea;
+  const needsCompact = isSmallRoom || meta.compact_mode === true;
+  const isFragment = !isFurnished && (isSmallRoom || failureReason === 'ROOM_FRAGMENT' ||
+                     currentFurnishings?.status === 'not a room (fragment)');
+  const noticeReason = hasFailed ? failureReason : 'ROOM_FRAGMENT';
 
   // Approximate room width & depth from bounding box
   const poly = selectedRoom.polygon_meters || [];
@@ -73,15 +81,27 @@ export default function RoomDesignPanel({
     switch (reason) {
       case 'ROOM_FRAGMENT':
         return {
-          title: 'Not a Room (Fragment)',
-          desc: `Area (${selectedRoom.surface_m2} m²) is below the plausible threshold (${minPlausibleArea} m²) for standard ${selectedRoom.room_type} furnishings. This is an over-segmentation fragment.`,
-          action: 'Merge this fragment with an adjacent room in the 2D CAD editor, or relabel as a closet.'
+          title: 'Compact Room',
+          desc: `This ${selectedRoom.surface_m2} m² space is below the ${minPlausibleArea} m² threshold for standard ${selectedRoom.room_type} furnishings.`,
+          action: 'Check the plan scale, or try compact placement with smaller furniture.'
+        };
+      case 'REQUEST_FAILED':
+        return {
+          title: 'Room Design Service Unavailable',
+          desc: 'The placement request could not be completed.',
+          action: 'Try generating the layout again.'
         };
       case 'NO_USABLE_WALL':
         return {
-          title: 'No Usable Wall Detected',
-          desc: 'No continuous solid wall segment (>= required item width) was found unobstructed by door/window openings.',
-          action: 'Adjust door positions using the 2D CAD toolbar or enlarge wall span.'
+          title: 'No clear wall fits the furniture',
+          desc: 'The planner could not fit a suitable item along the available wall segments.',
+          action: 'Check the room boundary and detected door and window locations.'
+        };
+      case 'UNSUPPORTED_ROOM_TYPE':
+        return {
+          title: 'No furniture set for this room type',
+          desc: 'The catalog has no placement rules for this type of room.',
+          action: 'Relabel the room if the floorplan identified it incorrectly.'
         };
       case 'TOO_SMALL':
         return {
@@ -98,13 +118,13 @@ export default function RoomDesignPanel({
       case 'UNREACHABLE':
         return {
           title: 'Walking Corridor Blocked',
-          desc: 'Internal 0.50m BFS walking path from entrance is pinched by placed assets.',
+          desc: 'The furniture leaves no connected walking route from the entry to the items.',
           action: 'Adjust room boundaries in 2D to provide wider corridor clearance.'
         };
       default:
         return {
           title: 'Placement Verification Failed',
-          desc: 'Strict spatial constraints (0 collisions, door clearances) could not be satisfied safely.',
+          desc: 'The planner could not keep the furniture within the room while preserving access.',
           action: 'Try another preset or use the 2D editor to refine room shape.'
         };
     }
@@ -137,7 +157,7 @@ export default function RoomDesignPanel({
               </span>
               {isFragment && (
                 <span className="px-1.5 py-0.5 bg-[#b8452a]/15 text-[#b8452a] text-[9.5px] font-bold uppercase rounded-xs">
-                  fragment
+                  compact
                 </span>
               )}
             </div>
@@ -182,11 +202,11 @@ export default function RoomDesignPanel({
             <Compass className="w-3 h-3 text-[#b8452a]" /> Style Preset
           </label>
           <div className="space-y-1">
-            {PRESET_OPTIONS.map((opt) => (
+            {PRESET_OPTIONS.map(([id, opt]) => (
               <label
-                key={opt.id}
+                key={id}
                 className={`flex items-start gap-2 p-2 border rounded-sm cursor-pointer transition-all ${
-                  selectedPreset === opt.id
+                  selectedPreset === id
                     ? 'bg-[#1d1d1f]/10 border-[#1d1d1f] shadow-sm'
                     : 'bg-white/60 border-[#1d1d1f]/15 hover:bg-white/90'
                 }`}
@@ -194,18 +214,26 @@ export default function RoomDesignPanel({
                 <input
                   type="radio"
                   name="preset"
-                  value={opt.id}
-                  checked={selectedPreset === opt.id}
-                  onChange={() => setSelectedPreset(opt.id)}
+                  value={id}
+                  checked={selectedPreset === id}
+                  disabled={isDesigning}
+                  onChange={() => {
+                    setSelectedPreset(id);
+                    if (isFurnished) onPresetChange(selectedRoom.id, id);
+                  }}
                   className="mt-0.5 accent-[#b8452a]"
                 />
                 <div className="flex-1 leading-tight">
                   <div className="font-medium text-[11px] text-[#1d1d1f]">{opt.label}</div>
                   <div className="text-[9px] text-[#1d1d1f]/60 mt-0.5">{opt.desc}</div>
                 </div>
+                <span className="mt-1 flex gap-0.5" aria-hidden="true">
+                  {[opt.wood, opt.fabric, opt.metal].map(color => <i key={color} style={{ background: color }} className="h-2.5 w-2.5 rounded-full border border-black/10" />)}
+                </span>
               </label>
             ))}
           </div>
+          {isFurnished && <p className="text-[9.5px] text-[#1d1d1f]/65">Presets update finishes immediately. Generate a design to use the preset’s model choices.</p>}
         </div>
 
         {/* Failure / Fragment Notice / Guidance */}
@@ -214,13 +242,13 @@ export default function RoomDesignPanel({
             <div className="bg-[#b8452a]/10 border border-[#b8452a]/30 p-2.5 rounded-sm text-[#b8452a] space-y-1">
               <div className="flex items-center gap-1.5 font-semibold text-[11px]">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{getFailureMessage(isFragment ? 'ROOM_FRAGMENT' : failureReason).title}</span>
+                <span>{getFailureMessage(noticeReason).title}</span>
               </div>
               <p className="text-[10px] leading-relaxed text-[#1d1d1f]/80">
-                {getFailureMessage(isFragment ? 'ROOM_FRAGMENT' : failureReason).desc}
+                {getFailureMessage(noticeReason).desc}
               </p>
               <div className="pt-1 border-t border-[#b8452a]/20 text-[10px] font-medium text-[#b8452a]">
-                Tip: {getFailureMessage(isFragment ? 'ROOM_FRAGMENT' : failureReason).action}
+                Tip: {getFailureMessage(noticeReason).action}
               </div>
             </div>
 
@@ -249,30 +277,33 @@ export default function RoomDesignPanel({
             <div className="flex items-center justify-between text-[#2a7a6e] font-semibold text-[11px]">
               <div className="flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Collision-free (0 Collisions)</span>
+                <span>Clear doors and walking routes</span>
               </div>
               <span className="text-[10px]">{items.length} items</span>
             </div>
-            {items[0]?.scale && items[0].scale[0] < 0.99 && (
-              <div className="flex items-center justify-between text-[9.5px] font-semibold text-[#2a7a6e] bg-[#2a7a6e]/15 px-1.5 py-0.5 rounded-xs">
-                <span>Compact Proportional Mode</span>
-                <span>{Math.round(items[0].scale[0] * 100)}% scale</span>
-              </div>
-            )}
-            <ul className="text-[10px] text-[#1d1d1f]/80 space-y-0.5 max-h-24 overflow-y-auto">
-              {items.map((it, idx) => (
-                <li key={idx} className="flex justify-between items-center py-0.5 border-b border-[#1d1d1f]/5">
-                  <span className="font-medium">{it.name}</span>
-                  <span className="text-[#1d1d1f]/50 text-[9px]">{it.rotation_deg}°</span>
+            {meta.layout_options > 1 && <p className="text-[10px]">{meta.layout_options} validated layouts found</p>}
+            {items.some(item => item.scale?.[0] < .99) && <p className="text-[10px] text-[#2a7a6e]">Furniture sized to fit this room</p>}
+            <p className="text-[10px] text-[#1d1d1f]/70">Select a piece here or in 3D to open its catalog.</p>
+            <ul className="space-y-1 overflow-y-auto text-[10px] text-[#1d1d1f]/80 max-h-36">
+              {items.map(item => (
+                <li key={item.item_id}>
+                  <button type="button" disabled={isDesigning} onClick={() => onSelectFurniture(selectedRoom.id, item.item_id)}
+                    className="flex w-full items-center justify-between rounded border border-[#2a7a6e]/20 bg-white/70 px-2 py-1 text-left hover:border-[#2a7a6e]">
+                    <span><strong className="block">{item.name}</strong>{item.dimensions_m[0].toFixed(2)} m wide</span>
+                    <ChevronRight size={14} />
+                  </button>
                 </li>
               ))}
             </ul>
+            <button type="button" onClick={onInspectRoom} className="flex items-center gap-1 font-semibold text-[#2a7a6e] underline">
+              <Eye size={14} /> Inspect in 3D
+            </button>
           </div>
         )}
 
         {/* Action Controls */}
         <div className="space-y-1.5 pt-1">
-          {isFragment ? (
+          {needsCompact ? (
             <div className="space-y-1">
               <button
                 onClick={() => onGenerateDesign(selectedRoom, selectedPreset, 42, true)}
@@ -287,7 +318,7 @@ export default function RoomDesignPanel({
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Furnish Anyway (Compact Placement)</span>
+                    <span>{isFurnished ? 'Generate Compact Design' : 'Try Compact Placement'}</span>
                   </>
                 )}
               </button>
@@ -318,12 +349,12 @@ export default function RoomDesignPanel({
           <div className="grid grid-cols-2 gap-1.5">
             <button
               onClick={() => onRegenerateDesign(selectedRoom, selectedPreset)}
-              disabled={isDesigning || !isFurnished || isFragment}
+              disabled={isDesigning || !isFurnished || (meta.layout_options ?? 1) <= 1}
               className="bg-white/80 hover:bg-white text-[#1d1d1f] border border-[#1d1d1f]/25 py-1.5 px-2 rounded-sm font-medium text-[10px] uppercase tracking-wider flex items-center justify-center gap-1 transition-all disabled:opacity-40"
-              title="Regenerate with a new random seed"
+              title="Cycle through the validated layouts for this preset"
             >
               <RefreshCw className="w-3 h-3 text-[#1d1d1f]/70" />
-              <span>Regenerate</span>
+              <span>Try another layout</span>
             </button>
 
             <button
@@ -340,7 +371,7 @@ export default function RoomDesignPanel({
 
         {/* Offline Rule-Based Engine Note */}
         <div className="text-[9px] text-[#1d1d1f]/50 text-center tracking-tight pt-1">
-          Deterministic Rule-Based Placement Engine &bull; Offline &bull; Zero External APIs
+          Rule-based placement using the local furniture catalog
         </div>
       </div>
     </div>

@@ -14,10 +14,10 @@ import {
 } from 'lucide-react';
 
 const STYLES = [
-  { id: 'Modern Minimalist', label: 'Modern Minimalist', desc: 'White stucco, floor-to-ceiling glass' },
-  { id: 'Mediterranean Stone', label: 'Mediterranean Stone', desc: 'Warm sandstone, rustic masonry' },
-  { id: 'Traditional Brick', label: 'Traditional Brick', desc: 'Exposed clay brick, framed lintels' },
-  { id: 'Lush Vegetation', label: 'Lush Vegetation', desc: 'Biophilic facade, vertical greening' },
+  { id: 'Modern Minimalist', label: 'Modern Minimalist', desc: 'Warm white stucco' },
+  { id: 'Mediterranean Stone', label: 'Mediterranean Stone', desc: 'Staggered sandstone blocks' },
+  { id: 'Traditional Brick', label: 'Traditional Brick', desc: 'Terracotta brick and mortar' },
+  { id: 'Lush Vegetation', label: 'Lush Vegetation', desc: 'Leafy wall finish' },
 ];
 
 const CMP_LEGEND = [
@@ -35,6 +35,8 @@ export default function FacadeModal({
   facadeData,
   onSwitchStyle,
   isSwitchingStyle = false,
+  isApplied = false,
+  onApply,
   onFocusIn3D
 }) {
   const [activeTab, setActiveTab] = useState('side_by_side'); // 'side_by_side' | 'realistic' | 'sketch'
@@ -43,7 +45,7 @@ export default function FacadeModal({
 
   const {
     wall_id = 'Front Wall',
-    style = 'Modern Minimalist',
+    style = null,
     wall_length_m = 0,
     wall_height_m = 0,
     num_floors = 1,
@@ -52,12 +54,13 @@ export default function FacadeModal({
     device = 'ONNX Runtime',
     model_info
   } = facadeData;
+  const finishLabel = style == null ? 'Default facade' : model_info?.finish || model_info?.effective_style || style;
 
   const handleDownload = () => {
     if (!texture_base64) return;
     const link = document.createElement('a');
     link.href = texture_base64;
-    link.download = `facade_${style.toLowerCase().replace(/\s+/g, '_')}_${wall_id}.png`;
+    link.download = `facade_${(style ?? 'default').toLowerCase().replace(/\s+/g, '_')}_${wall_id}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -87,7 +90,7 @@ export default function FacadeModal({
               </div>
               <p className="font-mono text-xs text-[#1d1d1f]/65">
                 {model_info?.model === 'facade_residual_film_512_v1'
-                  ? `Experimental 512 facade · ${model_info.effective_style}`
+                  ? `Experimental 512 facade · ${finishLabel}`
                   : 'Semantic layout sketch translated into an architectural facade'}
               </p>
             </div>
@@ -225,7 +228,7 @@ export default function FacadeModal({
                     </span>
                   </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#f0500f]/10 text-[#f0500f] font-bold">
-                    {model_info?.effective_style || style}
+                    {finishLabel}
                   </span>
                 </div>
 
@@ -237,7 +240,7 @@ export default function FacadeModal({
                   {isSwitchingStyle ? (
                     <div className="flex flex-col items-center justify-center space-y-2 text-[#f0500f]">
                       <RefreshCw className="w-6 h-6 animate-spin" />
-                      <span className="font-mono text-xs">Synthesizing {style}...</span>
+                      <span className="font-mono text-xs">Generating facade preview…</span>
                     </div>
                   ) : texture_base64 ? (
                     <img
@@ -254,8 +257,8 @@ export default function FacadeModal({
 
                 {/* Synthesis Quality Badges */}
                 <div className="mt-3 pt-3 border-t border-[#1d1d1f]/10 flex items-center justify-between text-[10px] font-mono text-[#1d1d1f]/60">
-                  <span>Aspect-Ratio Preserved (P95 &lt; 35ms)</span>
-                  <span className="text-[#f0500f] font-semibold">Active Texture in 3D</span>
+                  <span>Wall proportions preserved</span>
+                  <span className="text-[#f0500f] font-semibold">{isApplied ? 'Applied in 3D' : 'Texture preview'}</span>
                 </div>
               </div>
             )}
@@ -270,7 +273,7 @@ export default function FacadeModal({
                 <span>SWITCH ARCHITECTURAL STYLE & RE-SYNTHESIZE</span>
               </label>
               <span className="font-mono text-[10px] text-[#1d1d1f]/60">
-                Click any style to generate instantly
+                {style == null ? 'Default facade selected.' : 'Click the selected material again to use the default facade.'}
               </span>
             </div>
 
@@ -278,7 +281,8 @@ export default function FacadeModal({
               {STYLES.map((st) => (
                 <button
                   key={st.id}
-                  onClick={() => onSwitchStyle && onSwitchStyle(st.id)}
+                  aria-pressed={style === st.id}
+                  onClick={() => onSwitchStyle?.(style === st.id ? null : st.id)}
                   disabled={isSwitchingStyle}
                   className={`p-2.5 rounded-lg border text-left transition-all ${
                     style === st.id
@@ -305,10 +309,16 @@ export default function FacadeModal({
         <div className="px-6 py-4 bg-[#e5e0d4] border-t border-[#1d1d1f]/20 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-2 text-xs font-mono text-[#1d1d1f]/65">
             <Info className="w-4 h-4 text-[#f0500f]" />
-            <span>The generated texture is already applied to the front wall in your 3D view.</span>
+            <span>{isApplied ? 'Finish applied to this wall.' : 'Apply this finish to the selected exterior wall.'}</span>
           </div>
 
           <div className="flex items-center space-x-3">
+            {!isApplied && (
+              <button onClick={onApply} disabled={isSwitchingStyle}
+                className="h-9 px-4 rounded-full bg-[#f0500f] text-white font-stencil text-xs uppercase flex items-center gap-2 disabled:opacity-50">
+                <Check className="w-4 h-4" /> Apply to 3D
+              </button>
+            )}
             <button
               onClick={handleDownload}
               className="h-9 px-4 rounded-full bg-white hover:bg-[#efebe2] border border-[#1d1d1f]/30 font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-2 transition-all shadow-sm"
@@ -317,7 +327,7 @@ export default function FacadeModal({
               <span>DOWNLOAD PNG</span>
             </button>
 
-            {onFocusIn3D && (
+            {isApplied && onFocusIn3D && (
               <button
                 onClick={() => {
                   onFocusIn3D();

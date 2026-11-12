@@ -44,7 +44,7 @@ except (ImportError, Exception):
 import onnxruntime as ort
 from scipy.special import softmax
 
-from src.floorplan.vectorizer import FloorplanVectorizer
+from src.floorplan.vectorizer import FloorplanVectorizer, ROOM_NAMES, score_room_polygon
 from src.floorplan.extruder_3d import Floorplan3DExtruder
 from src.bridge.facade_bridge import FacadeBridge
 
@@ -259,7 +259,8 @@ class FloorplanPipeline:
         style: Optional[str] = "Modern Minimalist",
         use_tta: bool = False,
         tta_mode: str = "none",
-        front_only: bool = True
+        front_only: bool = True,
+        reference_rooms=None,
     ) -> Dict[str, Any]:
         """
         Takes raw image bytes, runs multi-task segmentation, vectorizes to polygons,
@@ -284,8 +285,10 @@ class FloorplanPipeline:
         resized = raw_img.resize((nw, nh), Image.Resampling.BILINEAR)
         canvas = Image.new("RGB", (size, size), (255, 255, 255))
         canvas.paste(resized, (pad_x, pad_y))
+        source_gray = np.asarray(canvas.convert("L"))
 
         active_mode = "single_pass"
+        room_probabilities = None
         use_onnx = self.prefer_onnx or (not HAS_TORCH) or (self.multitask_model is None and self.baseline_model is None)
 
         if (not use_onnx) and HAS_TORCH:
@@ -362,6 +365,7 @@ class FloorplanPipeline:
 
                     struct_pred = torch.argmax(prob_s, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
                     room_pred = torch.argmax(prob_r, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
+                    room_probabilities = prob_r[0].cpu().numpy()
 
                     # Map 5-class structure (bg, wall_int, wall_ext, door, win) to 4-class for vectorizer
                     mask_4class = np.zeros_like(struct_pred)
@@ -421,6 +425,7 @@ class FloorplanPipeline:
 
             struct_pred = np.argmax(prob_s, axis=1).squeeze(0).astype(np.uint8)
             room_pred = np.argmax(prob_r, axis=1).squeeze(0).astype(np.uint8)
+            room_probabilities = prob_r[0]
 
             mask_4class = np.zeros_like(struct_pred)
             mask_4class[(struct_pred == 1) | (struct_pred == 2)] = 1
@@ -436,7 +441,9 @@ class FloorplanPipeline:
             mask=mask_4class,
             struct_mask=struct_pred,
             room_mask=room_pred,
-            scale_override_m_per_px=scale_override
+            scale_override_m_per_px=scale_override,
+            room_probabilities=room_probabilities,
+            source_gray=source_gray,
         )
 
         model_routed = "champion_v1_1"
@@ -464,17 +471,21 @@ class FloorplanPipeline:
                     fb_m4[fb_struct == 3] = 2
                     fb_m4[fb_struct == 4] = 3
 
+                    fb_room_probabilities = fb_prob_r[0].cpu().numpy()
                     fb_layout = self.vectorizer.vectorize(
                         mask=fb_m4,
                         struct_mask=fb_struct,
                         room_mask=fb_room,
-                        scale_override_m_per_px=scale_override
+                        scale_override_m_per_px=scale_override,
+                        room_probabilities=fb_room_probabilities,
+                        source_gray=source_gray,
                     )
                     fb_rooms = fb_layout.get("rooms", [])
                     fb_shell_valid = fb_layout.get("metadata", {}).get("is_building_shell_valid", False)
 
                     if len(fb_rooms) > len(primary_rooms) or (not is_shell_valid and fb_shell_valid):
                         layout = fb_layout
+                        room_probabilities = fb_room_probabilities
                         model_routed = getattr(self, "fallback_model_name", "fallback_adapted")
                         fallback_triggered = True
             elif self.onnx_fallback is not None:
@@ -500,13 +511,16 @@ class FloorplanPipeline:
                     mask=fb_m4,
                     struct_mask=fb_struct,
                     room_mask=fb_room,
-                    scale_override_m_per_px=scale_override
+                    scale_override_m_per_px=scale_override,
+                    room_probabilities=fb_prob_r[0],
+                    source_gray=source_gray,
                 )
                 fb_rooms = fb_layout.get("rooms", [])
                 fb_shell_valid = fb_layout.get("metadata", {}).get("is_building_shell_valid", False)
 
                 if len(fb_rooms) > len(primary_rooms) or (not is_shell_valid and fb_shell_valid):
                     layout = fb_layout
+                    room_probabilities = fb_prob_r[0]
                     model_routed = self.fallback_model_name or "floorplan_fallback"
                     fallback_triggered = True
 
@@ -529,8 +543,20 @@ class FloorplanPipeline:
         # 4. 3D Scene Generation
         threejs_scene = self.extruder.generate_threejs_scene_data(layout)
 
+        reference_confidences = None
+        if reference_rooms is not None:
+            room_classes = {name: index for index, name in ROOM_NAMES.items() if index}
+            reference_confidences = {}
+            for region in reference_rooms:
+                class_id = room_classes.get(region.room_type)
+                reference_confidences[region.id] = (
+                    score_room_polygon(room_probabilities, class_id, region.polygon_px)
+                    if room_probabilities is not None and class_id is not None else None
+                )
+
         return {
             "layout": layout,
+            "reference_room_confidences": reference_confidences,
             "threejs_scene": threejs_scene,
             "front_wall_id": facade_meta.get("front_wall_id"),
             "exterior_walls_count": facade_meta.get("exterior_walls_count", 0),

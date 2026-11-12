@@ -15,7 +15,8 @@ import random
 import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from shapely.geometry import Polygon, Point, box, LineString
-from src.design.types import PlacedItem, UsableWallSegment, MIN_PLAUSIBLE_ROOM_AREAS
+from src.design.edge_classifier import compute_inward_normal, normal_to_yaw_deg
+from src.design.types import PlacedItem, UsableWallSegment
 
 def compute_footprint_polygon(
     cx: float, cy: float, width_m: float, depth_m: float, yaw_deg: float
@@ -48,6 +49,13 @@ def compute_footprint_polygon(
 
 class RoomRuleEngine:
     """Applies architectural furnishing rules based on room type and preset."""
+
+    PRIMARY_CATEGORIES = {
+        "bedroom": {"bed"}, "living": {"sofa", "armchair"}, "kitchen": {"kitchen_sink"},
+        "bathroom": {"toilet"}, "dining": {"dining_table"}, "office": {"desk"},
+        "entry": {"sideboard", "plant"}, "storage": {"wardrobe", "bookcase", "sideboard"},
+        "utility": {"kitchen_counter", "sideboard"}, "balcony": {"dining_chair"},
+    }
 
     def __init__(self, catalog: Dict[str, Any]):
         self.catalog = catalog["items"]
@@ -92,7 +100,8 @@ class RoomRuleEngine:
         seed: int = 42,
         wall_dist_map_m: Optional[np.ndarray] = None,
         scale_m_per_px: float = 0.03,
-        force_furnish: bool = False
+        force_furnish: bool = False,
+        preferred_wall: Optional[UsableWallSegment] = None,
     ) -> Tuple[List[PlacedItem], Optional[str]]:
         """
         Generates candidate furniture placements according to room type rules.
@@ -101,6 +110,7 @@ class RoomRuleEngine:
         rng = random.Random(seed)
         norm_type = self._normalize_room_type(room_type)
         area = room_poly.area
+        usable_segments = sorted(usable_segments, key=lambda seg: (seg != preferred_wall, -seg.length_m))
 
         if norm_type == "bedroom":
             return self._furnish_bedroom(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px, force_furnish=force_furnish)
@@ -115,23 +125,88 @@ class RoomRuleEngine:
         elif norm_type == "office":
             return self._furnish_office(room_poly, usable_segments, door_clearance_zones, preset, area, rng, wall_dist_map_m, scale_m_per_px, force_furnish=force_furnish)
         else:
-            # Service room / balcony
-            return [], None
+            asset_choices = {
+                "entry": ("sideboard", "potted_plant"),
+                "storage": ("wardrobe", "bookcase", "sideboard"),
+                "utility": ("kitchen_counter", "sideboard"),
+                "balcony": ("dining_chair_scandi", "dining_chair"),
+            }
+            if norm_type not in asset_choices:
+                return [], "UNSUPPORTED_ROOM_TYPE"
+            scale = 1.0
+            if force_furnish and norm_type in {"storage", "utility"}:
+                scale = min(1.0, max(.65, math.sqrt(area / 1.6)))
+            for item_id in asset_choices[norm_type]:
+                item = self._place_wall_item(item_id, room_poly, usable_segments, door_clearance_zones, [],
+                                             wall_dist_map_m, scale_m_per_px, scale)
+                if item:
+                    return [item], None
+            return [], "NO_USABLE_WALL"
 
     def _normalize_room_type(self, rtype: str) -> str:
         s = rtype.lower().strip()
         if "bed" in s: return "bedroom"
         if "liv" in s: return "living"
         if "kitch" in s: return "kitchen"
-        if "bath" in s or "wc" in s: return "bathroom"
+        if "bath" in s or "wc" in s or "toilet" in s: return "bathroom"
         if "din" in s: return "dining"
         if "off" in s or "study" in s: return "office"
-        if "stor" in s or "clos" in s: return "storage"
+        if "stor" in s or "clos" in s or "pantry" in s: return "storage"
         if "balc" in s or "terr" in s: return "balcony"
+        if "entry" in s or "hall" in s or "corridor" in s: return "entry"
+        if "util" in s or "laundry" in s: return "utility"
         return "other"
 
     def _get_item_spec(self, item_id: str) -> Dict[str, Any]:
         return self.catalog.get(item_id, {})
+
+    def _place_wall_item(self, item_id, room, segments, door_zones, placed, wall_map, scale_m, scale=1.0):
+        """Try centered and end positions, with clear space to use the item."""
+        spec = self._get_item_spec(item_id)
+        width, depth, height = (dim * scale for dim in spec["dimensions_m"])
+        room_buffer = room.buffer(.02)
+        occupied = [Polygon(item.polygon_coords) for item in placed if item.category != "rug"]
+        front_space = 0 if spec["category"] in {"plant", "lamp"} else (.30 if scale < .99 else .42)
+        for seg in segments:
+            a, b = np.array(seg.start), np.array(seg.end)
+            length = float(np.linalg.norm(b - a))
+            margin = width / 2 + .05
+            if length < 2 * margin:
+                continue
+            direction = (b - a) / length
+            inward = np.array(seg.normal)
+            for along in (length / 2, margin, length - margin):
+                center = a + direction * along + inward * depth / 2
+                coords = compute_footprint_polygon(*center, width, depth, seg.yaw_deg)
+                poly = Polygon(coords)
+                access = Polygon(compute_footprint_polygon(*(center + inward * front_space / 2),
+                                                           width, depth + front_space, seg.yaw_deg))
+                if (not room_buffer.covers(access) or any(zone.intersection(poly).area > .0001 for zone in door_zones)
+                        or any(other.intersection(access).area > .0001 for other in occupied)
+                        or not self._check_back_edge_contact(coords, wall_map, scale_m)):
+                    continue
+                return PlacedItem(f"{item_id}_0", item_id, spec["name"], spec["category"], tuple(center), seg.yaw_deg,
+                                  (width, depth, height), spec["glb"], coords, "back_to_wall", scale=(scale,) * 3)
+        return None
+
+    def complete_room(self, room_type, room, segments, doors, placed, preset, wall_map, scale_m):
+        norm_type = self._normalize_room_type(room_type)
+        extras = []
+        if norm_type == "living" and room.area >= 10:
+            chair = {"contemporary_minimal": "armchair", "warm_wood": "armchair_scandi", "tailored_classic": "armchair_classic"}[preset]
+            extras = [chair, "floor_lamp"] if room.area >= 16 else ["floor_lamp"]
+        elif norm_type == "office" and room.area >= 6:
+            extras = ["bookcase"]
+        elif norm_type == "dining" and room.area >= 8:
+            extras = ["sideboard"]
+        elif norm_type == "kitchen":
+            extras = ["kitchen_counter", "refrigerator"]
+        for item_id in extras:
+            if any(item.catalog_id == item_id for item in placed):
+                continue
+            item = self._place_wall_item(item_id, room, segments, doors, placed, wall_map, scale_m, placed[0].scale[0])
+            if item:
+                placed.append(item)
 
     STANDARD_REF_AREAS = {
         "bedroom": 8.5,
@@ -142,19 +217,21 @@ class RoomRuleEngine:
         "office": 6.0,
     }
 
-    def _get_compact_scale(self, norm_type: str, area: float, force_furnish: bool) -> float:
-        """
-        Computes proportional scaling factor for furniture in sub-threshold / compact rooms.
-        When door estimation compresses pixel dimensions or a compact room is furnished,
-        furniture is scaled down proportionally to prevent oversized items crowding the space.
-        """
-        ref_area = self.STANDARD_REF_AREAS.get(norm_type, 8.0)
-        min_cutoff = MIN_PLAUSIBLE_ROOM_AREAS.get(norm_type, 4.0)
-        if force_furnish or area < min_cutoff:
-            if area < ref_area:
-                scale = float(np.sqrt(area / ref_area))
-                return float(np.clip(scale, 0.45, 0.90))
-        return 1.0
+    STANDARD_SHORT_SPANS = {
+        "bedroom": 2.45, "living": 2.8, "kitchen": 1.65,
+        "bathroom": 1.45, "dining": 2.6, "office": 2.15,
+    }
+
+    def room_scale(self, norm_type: str, room: Polygon, compact: bool) -> float:
+        """Size the catalog conservatively for small and narrow rooms."""
+        area_scale = math.sqrt(room.area / self.STANDARD_REF_AREAS.get(norm_type, 8.0))
+        if compact and area_scale < 1:
+            return round(min(.90, max(.45, area_scale)), 3)
+        rectangle = list(room.minimum_rotated_rectangle.exterior.coords)
+        short_span = min(math.dist(a, b) for a, b in zip(rectangle, rectangle[1:]))
+        span_scale = short_span / self.STANDARD_SHORT_SPANS.get(norm_type, 1.8)
+        minimum = .90 if norm_type in {"kitchen", "bathroom"} else .82
+        return round(min(1.0, max(minimum, min(area_scale, span_scale))), 3)
 
     def _synthesize_fallback_segments(self, room_poly: Polygon) -> List[UsableWallSegment]:
         coords = list(room_poly.exterior.coords)[:-1]
@@ -167,9 +244,8 @@ class RoomRuleEngine:
             edge_len = float(np.linalg.norm(edge_v))
             if edge_len < 0.4:
                 continue
-            tangent = edge_v / edge_len
-            inward_normal = (-float(tangent[1]), float(tangent[0]))
-            yaw_deg = float(np.degrees(np.arctan2(inward_normal[0], inward_normal[1])) % 360)
+            inward_normal = compute_inward_normal(p1, p2, room_poly)
+            yaw_deg = normal_to_yaw_deg(*inward_normal)
             segs.append(UsableWallSegment(
                 start=(float(p1[0]), float(p1[1])),
                 end=(float(p2[0]), float(p2[1])),
@@ -203,17 +279,19 @@ class RoomRuleEngine:
 
         placed = []
         # Sort usable wall segments by length descending
-        sorted_segs = sorted(usable_segments, key=lambda s: s.length_m, reverse=True)
+        sorted_segs = usable_segments
         if not sorted_segs and force_furnish:
             sorted_segs = self._synthesize_fallback_segments(room_poly)
         if not sorted_segs:
             return [], "NO_USABLE_WALL"
 
         # Determine bed size and compact scale
-        c_scale = self._get_compact_scale("bedroom", area, force_furnish)
+        c_scale = self.room_scale("bedroom", room_poly, force_furnish)
         scale_tuple = (round(c_scale, 3), round(c_scale, 3), round(c_scale, 3))
 
-        use_double = (area >= 7.5 and sorted_segs[0].length_m >= 1.80 and c_scale >= 0.95)
+        minx, miny, maxx, maxy = room_poly.bounds
+        use_double = (area >= 7.5 and min(maxx - minx, maxy - miny) >= 2.2
+                      and any(seg.length_m >= 1.8 for seg in sorted_segs) and c_scale >= .95)
         bed_id = "bed_double" if use_double else "bed_single"
         bed_spec = self._get_item_spec(bed_id)
         raw_bw, raw_bd, raw_bh = bed_spec["dimensions_m"]
@@ -337,43 +415,12 @@ class RoomRuleEngine:
                     scale=scale_tuple
                 ))
 
-        # 3. Wardrobe on Secondary Wall
-        ward_spec = self._get_item_spec("wardrobe")
-        raw_ww, raw_wd, raw_wh = ward_spec["dimensions_m"]
-        ww, wd, wh = raw_ww * c_scale, raw_wd * c_scale, raw_wh * c_scale
-
-        placed_polys = [Polygon(p.polygon_coords) for p in placed]
-
-        for seg in sorted_segs:
-            if seg == bed_seg:
-                continue
-            if seg.length_m >= (ww + 0.10):
-                w_p1 = np.array(seg.start)
-                w_u = (np.array(seg.end) - w_p1) / seg.length_m
-                w_nin = np.array(seg.normal)
-                w_center_s = ww / 2.0 + 0.10  # Placed near start of segment
-                w_back = w_p1 + w_u * w_center_s
-                w_c = w_back + w_nin * (wd / 2.0)
-
-                w_poly_coords = compute_footprint_polygon(float(w_c[0]), float(w_c[1]), ww, wd, seg.yaw_deg)
-                w_poly = Polygon(w_poly_coords)
-                if room_poly.buffer(0.02).contains(w_poly) and not any(dz.intersects(w_poly) for dz in door_zones):
-                    if self._check_back_edge_contact(w_poly_coords, wall_dist_map_m, scale_m_per_px):
-                        if not any(w_poly.intersects(pp) for pp in placed_polys):
-                            placed.append(PlacedItem(
-                                item_id="wardrobe_0",
-                                catalog_id="wardrobe",
-                                name=ward_spec["name"],
-                                category="wardrobe",
-                                position_m=(float(w_c[0]), float(w_c[1])),
-                                rotation_deg=seg.yaw_deg,
-                                dimensions_m=(round(ww, 3), round(wd, 3), round(wh, 3)),
-                                glb=ward_spec["glb"],
-                                polygon_coords=w_poly_coords,
-                                placement_rule="back_to_wall",
-                                scale=scale_tuple
-                            ))
-                            break
+        wardrobe = self._place_wall_item(
+            "wardrobe", room_poly, [seg for seg in sorted_segs if seg != bed_seg], door_zones, placed,
+            wall_dist_map_m, scale_m_per_px, c_scale,
+        )
+        if wardrobe:
+            placed.append(wardrobe)
 
         return placed, None
 
@@ -397,14 +444,14 @@ class RoomRuleEngine:
             return [], "TOO_SMALL"
 
         placed = []
-        sorted_segs = sorted(usable_segments, key=lambda s: s.length_m, reverse=True)
+        sorted_segs = usable_segments
         if not sorted_segs and force_furnish:
             sorted_segs = self._synthesize_fallback_segments(room_poly)
         if not sorted_segs:
             return [], "NO_USABLE_WALL"
 
         # Determine sofa scale for compact mode
-        c_scale = self._get_compact_scale("living", area, force_furnish)
+        c_scale = self.room_scale("living", room_poly, force_furnish)
         scale_tuple = (round(c_scale, 3), round(c_scale, 3), round(c_scale, 3))
 
         # Sofa selection based on preset
@@ -458,20 +505,11 @@ class RoomRuleEngine:
             if sofa_seg is not None:
                 break
 
-        if sofa_seg is None and force_furnish and sorted_segs:
-            seg = sorted_segs[0]
-            p1 = np.array(seg.start)
-            p2 = np.array(seg.end)
-            u_dir = (p2 - p1) / max(seg.length_m, 1e-6)
-            n_in = np.array(seg.normal)
-            s_c = (p1 + p2) / 2.0 + n_in * (sd / 2.0)
-            t_coords = compute_footprint_polygon(float(s_c[0]), float(s_c[1]), sw, sd, seg.yaw_deg)
-            sofa_seg = seg
-            sofa_center = s_c
-            sofa_poly = Polygon(t_coords)
-            sofa_poly_coords = t_coords
-
         if sofa_seg is None:
+            chair_id = {"contemporary_minimal": "armchair", "warm_wood": "armchair_scandi", "tailored_classic": "armchair_classic"}[preset]
+            chair = self._place_wall_item(chair_id, room_poly, sorted_segs, door_zones, [], wall_dist_map_m, scale_m_per_px)
+            if chair:
+                return [chair], None
             return [], "NO_USABLE_WALL"
 
         placed.append(PlacedItem(
@@ -536,21 +574,22 @@ class RoomRuleEngine:
                 scale=scale_tuple
             ))
 
-        # 4. TV Unit on facing or adjacent wall
+        # 4. TV unit on a facing wall within the sofa's viewing cone
         tv_spec = self._get_item_spec("tv_unit")
         raw_tw, raw_td, raw_th = tv_spec["dimensions_m"]
         tw, td, th = raw_tw * c_scale, raw_td * c_scale, raw_th * c_scale
         placed_polys = [Polygon(p.polygon_coords) for p in placed if p.category != "rug"]
 
         for seg in sorted_segs:
-            if seg == sofa_seg:
+            if np.dot(seg.normal, sofa_seg.normal) > -.75:
                 continue
             if seg.length_m >= (tw + 0.10):
                 # Check distance from sofa
                 seg_mid = (np.array(seg.start) + np.array(seg.end)) / 2.0
-                dist_to_sofa = np.linalg.norm(seg_mid - sofa_center)
+                delta = seg_mid - sofa_center
+                dist_to_sofa = np.linalg.norm(delta)
                 min_dist = 1.4 if force_furnish else 2.0
-                if dist_to_sofa >= min_dist:
+                if dist_to_sofa >= min_dist and np.dot(delta, sofa_seg.normal) >= .85 * dist_to_sofa:
                     t_p1 = np.array(seg.start)
                     t_u = (np.array(seg.end) - t_p1) / seg.length_m
                     t_nin = np.array(seg.normal)
@@ -599,14 +638,14 @@ class RoomRuleEngine:
             return [], "TOO_SMALL"
 
         placed = []
-        sorted_segs = sorted(usable_segments, key=lambda s: s.length_m, reverse=True)
+        sorted_segs = usable_segments
         if not sorted_segs and force_furnish:
             sorted_segs = self._synthesize_fallback_segments(room_poly)
         if not sorted_segs:
             return [], "NO_USABLE_WALL"
 
         # Determine kitchen scale for compact mode
-        c_scale = self._get_compact_scale("kitchen", area, force_furnish)
+        c_scale = self.room_scale("kitchen", room_poly, force_furnish)
         scale_tuple = (round(c_scale, 3), round(c_scale, 3), round(c_scale, 3))
 
         # Kitchen run components (depth 0.60m)
@@ -833,14 +872,14 @@ class RoomRuleEngine:
             return [], "TOO_SMALL"
 
         placed = []
-        sorted_segs = sorted(usable_segments, key=lambda s: s.length_m, reverse=True)
+        sorted_segs = usable_segments
         if not sorted_segs and force_furnish:
             sorted_segs = self._synthesize_fallback_segments(room_poly)
         if not sorted_segs:
             return [], "NO_USABLE_WALL"
 
         # Determine bathroom scale for compact mode
-        c_scale = self._get_compact_scale("bathroom", area, force_furnish)
+        c_scale = self.room_scale("bathroom", room_poly, force_furnish)
         scale_tuple = (round(c_scale, 3), round(c_scale, 3), round(c_scale, 3))
 
         toilet_spec = self._get_item_spec("toilet")
@@ -901,28 +940,17 @@ class RoomRuleEngine:
             if toilet_placed:
                 break
 
-        if not toilet_placed and force_furnish and sorted_segs:
-            t_seg = sorted_segs[0]
-            p1 = np.array(t_seg.start)
-            seg_len = t_seg.length_m
-            n_in = np.array(t_seg.normal)
-            t_c = (p1 + np.array(t_seg.end)) / 2.0 + n_in * (td / 2.0)
-            t_coords = compute_footprint_polygon(float(t_c[0]), float(t_c[1]), tw, td, t_seg.yaw_deg)
-            placed.append(PlacedItem(
-                item_id="toilet_0",
-                catalog_id="toilet",
-                name=toilet_spec["name"],
-                category="toilet",
-                position_m=(float(t_c[0]), float(t_c[1])),
-                rotation_deg=t_seg.yaw_deg,
-                dimensions_m=(round(tw, 3), round(td, 3), round(th, 3)),
-                glb=toilet_spec["glb"],
-                polygon_coords=t_coords,
-                placement_rule="back_to_wall",
-                scale=scale_tuple
-            ))
-            toilet_placed = True
-            toilet_seg_idx = 0
+        if not toilet_placed and force_furnish:
+            for fit_scale in (max(.45, c_scale * .90), max(.45, c_scale * .80)):
+                toilet = self._place_wall_item("toilet", room_poly, sorted_segs, door_zones, [],
+                                              wall_dist_map_m, scale_m_per_px, fit_scale)
+                if toilet:
+                    placed.append(toilet)
+                    toilet_placed = True
+                    break
+
+        if not toilet_placed:
+            return [], "NO_USABLE_WALL"
 
         # 2. Place Vanity Sink (on remaining walls or shared wall)
         placed_polys = [Polygon(p.polygon_coords) for p in placed]
@@ -996,7 +1024,7 @@ class RoomRuleEngine:
         # 3. Bathtub if room is spacious (>= 4.5 m²)
         if area >= 4.5:
             bt_spec = self._get_item_spec("bathtub")
-            bw, bd, bh = bt_spec["dimensions_m"]
+            bw, bd, bh = (value * c_scale for value in bt_spec["dimensions_m"])
             placed_polys = [Polygon(p.polygon_coords) for p in placed]
 
             for seg in sorted_segs:
@@ -1022,7 +1050,8 @@ class RoomRuleEngine:
                                     dimensions_m=(bw, bd, bh),
                                     glb=bt_spec["glb"],
                                     polygon_coords=b_coords,
-                                    placement_rule="corner_or_wall"
+                                    placement_rule="corner_or_wall",
+                                    scale=scale_tuple,
                                 ))
                                 break
 
@@ -1050,69 +1079,51 @@ class RoomRuleEngine:
         if area < min_area:
             return [], "TOO_SMALL"
 
-        placed = []
-        c_scale = self._get_compact_scale("dining", area, force_furnish)
-        scale_tuple = (round(c_scale, 3), round(c_scale, 3), round(c_scale, 3))
+        scale = self.room_scale("dining", room_poly, force_furnish)
+        table_id = {"warm_wood": "dining_table_round", "tailored_classic": "dining_table_cloth"}.get(preset, "dining_table")
+        chair_id = {"warm_wood": "dining_chair_scandi", "tailored_classic": "dining_chair_classic"}.get(preset, "dining_chair")
+        yaw = usable_segments[0].yaw_deg % 180 if usable_segments else 0.0
+        angle = math.radians(yaw)
+        forward = np.array([math.sin(angle), -math.cos(angle)])
+        lateral = np.array([math.cos(angle), math.sin(angle)])
+        available = room_poly.buffer(.02)
+        centroid = np.array(room_poly.centroid.coords[0])
+        interior = np.array(room_poly.representative_point().coords[0])
+        centers = [centroid, interior]
+        centers.extend(interior + direction * shift for direction in (forward, lateral) for shift in (-.65, -.3, .3, .65))
 
-        table_id = "dining_table_round" if preset == "warm_wood" else ("dining_table_cloth" if preset == "tailored_classic" else "dining_table")
-        t_spec = self._get_item_spec(table_id)
-        raw_tw, raw_td, raw_th = t_spec["dimensions_m"]
-        tw, td, th = raw_tw * c_scale, raw_td * c_scale, raw_th * c_scale
+        def place(item_id, instance, center, rotation, rule):
+            spec = self._get_item_spec(item_id)
+            dimensions = tuple(dim * scale for dim in spec["dimensions_m"])
+            coords = compute_footprint_polygon(*center, *dimensions[:2], rotation)
+            poly = Polygon(coords)
+            if not available.covers(poly) or any(zone.intersection(poly).area > .0001 for zone in door_zones):
+                return None
+            return PlacedItem(instance, item_id, spec["name"], spec["category"], tuple(center), rotation,
+                              dimensions, spec["glb"], coords, rule, scale=(scale,) * 3)
 
-        # Center table in room centroid
-        cx, cy = room_poly.centroid.x, room_poly.centroid.y
-        t_poly = Polygon(compute_footprint_polygon(cx, cy, tw, td, 0.0))
-
-        if not force_furnish:
-            if not room_poly.buffer(0.02).contains(t_poly) or any(dz.intersects(t_poly) for dz in door_zones):
-                return [], "TOO_SMALL"
-
-        placed.append(PlacedItem(
-            item_id="dining_table_0",
-            catalog_id=table_id,
-            name=t_spec["name"],
-            category="dining_table",
-            position_m=(cx, cy),
-            rotation_deg=0.0,
-            dimensions_m=(round(tw, 3), round(td, 3), round(th, 3)),
-            glb=t_spec["glb"],
-            polygon_coords=list(t_poly.exterior.coords)[:-1],
-            placement_rule="center",
-            scale=scale_tuple
-        ))
-
-        # Dining Chairs (4 chairs around table)
-        chair_id = "dining_chair_scandi" if preset == "warm_wood" else ("dining_chair_classic" if preset == "tailored_classic" else "dining_chair")
-        c_spec = self._get_item_spec(chair_id)
-        raw_cw, raw_cd, raw_ch = c_spec["dimensions_m"]
-        cw, cd, ch = raw_cw * c_scale, raw_cd * c_scale, raw_ch * c_scale
-
-        # 4 chair positions: North (facing South 180 deg), South (facing North 0 deg), West (facing East 90 deg), East (facing West 270 deg)
-        chair_configs = [
-            ("chair_north", (cx, cy - td / 2.0 - cd / 2.0 - 0.08 * c_scale), 180.0),
-            ("chair_south", (cx, cy + td / 2.0 + cd / 2.0 + 0.08 * c_scale), 0.0),
-            ("chair_west", (cx - tw / 2.0 - cd / 2.0 - 0.08 * c_scale, cy), 90.0),
-            ("chair_east", (cx + tw / 2.0 + cd / 2.0 + 0.08 * c_scale, cy), 270.0)
-        ]
-
-        for cid, c_pos, c_yaw in chair_configs:
-            c_poly = Polygon(compute_footprint_polygon(c_pos[0], c_pos[1], cw, cd, c_yaw))
-            if room_poly.buffer(0.02).contains(c_poly) and not any(dz.intersects(c_poly) for dz in door_zones):
-                placed.append(PlacedItem(
-                    item_id=cid,
-                    catalog_id=chair_id,
-                    name=c_spec["name"],
-                    category="dining_chair",
-                    position_m=c_pos,
-                    rotation_deg=c_yaw,
-                    dimensions_m=(round(cw, 3), round(cd, 3), round(ch, 3)),
-                    glb=c_spec["glb"],
-                    polygon_coords=list(c_poly.exterior.coords)[:-1],
-                    placement_rule="around_anchor",
-                    scale=scale_tuple
-                ))
-
-        return placed, None
+        best = []
+        chair_depth = self._get_item_spec(chair_id)["dimensions_m"][1] * scale
+        for center in centers:
+            table = place(table_id, "dining_table_0", center, yaw, "center")
+            if table is None:
+                continue
+            tw, td, _ = table.dimensions_m
+            candidate = [table]
+            for index, (direction, extent, chair_yaw) in enumerate((
+                (forward, td, yaw + 180), (-forward, td, yaw),
+                (lateral, tw, yaw - 90), (-lateral, tw, yaw + 90),
+            )):
+                chair = place(chair_id, f"dining_chair_{index}",
+                              center + direction * (extent / 2 + chair_depth / 2 + .08), chair_yaw % 360,
+                              "around_anchor")
+                if chair:
+                    candidate.append(chair)
+            if len(candidate) > len(best):
+                best = candidate
+                if len(best) == 5:
+                    break
+        return (best, None) if len(best) >= 2 else ([], "TOO_SMALL")
 
     # =========================================================================
     # 6. OFFICE (User Relabel Only)
@@ -1134,13 +1145,13 @@ class RoomRuleEngine:
             return [], "TOO_SMALL"
 
         placed = []
-        sorted_segs = sorted(usable_segments, key=lambda s: s.length_m, reverse=True)
+        sorted_segs = usable_segments
         if not sorted_segs and force_furnish:
             sorted_segs = self._synthesize_fallback_segments(room_poly)
         if not sorted_segs:
             return [], "NO_USABLE_WALL"
 
-        c_scale = self._get_compact_scale("office", area, force_furnish)
+        c_scale = self.room_scale("office", room_poly, force_furnish)
         scale_tuple = (round(c_scale, 3), round(c_scale, 3), round(c_scale, 3))
 
         desk_id = "desk_corner" if (preset == "tailored_classic" and area >= 9.0) else "desk"

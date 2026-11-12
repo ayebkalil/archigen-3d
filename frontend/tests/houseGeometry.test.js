@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { alignDrawingLevels, buildingLevels, clipRoomFloor, compileWallAssembly, floorFootprints, floorSurfaceGeometry,
+import { alignDrawingLevels, buildingLevels, clipRoomFloor, compileWallAssembly, fitHouseOpenings, floorFootprints, floorSurfaceGeometry,
   wallAssemblyGeometry, wallStrip } from '../src/geometry/houseGeometry.js';
 import { createSampleHouse } from '../src/geometry/sampleHousePlan.js';
 import { createFacadeGeometry, facadeBounds } from '../src/geometry/facadeGeometry.js';
@@ -76,14 +76,33 @@ test('sample storeys align in the scene, keep sheet coordinates, and host all tr
   const sample = createSampleHouse();
   const [ground, upper] = buildingLevels(sample, 3);
   assert.equal(upper.elevation, ground.height);
-  assert.equal(upper.height, 2.8);
+  assert.equal(upper.height, 2.5);
   assert.ok(upper.offset[0] < -7, 'upper drawing moves from sheet position onto the house');
   assert.ok(upper.walls[0].axis_meters[0][0] > ground.walls[0].axis_meters[0][0]);
   for (const level of [ground, upper]) {
-    const assembly = compileWallAssembly(level.walls, [...level.doors, ...level.windows], level.height);
+    const assembly = compileWallAssembly(level.walls, fitHouseOpenings(level), level.height);
     assert.deepEqual(assembly.unresolved, []);
   }
   assert.equal(buildingLevels({ walls: [{ height_m: 2.8 }] }, 2)[0].floorElevations[1], 2.8);
+});
+
+test('reconstructed openings use livable proportions and keep the adjoining wall joint', () => {
+  const [ground] = buildingLevels(createSampleHouse());
+  const fitted = fitHouseOpenings(ground);
+  const source = ground.doors.find(door => door.id === 'ground_east_door_0');
+  const door = fitted.find(item => item.id === source.id);
+  assert.ok(source.width_m < .5 && door.width_m >= .84);
+  assert.equal(door.height_m, 1.9);
+  const adjoiningWall = ground.walls.find(item => item.id === 'ground_bath_north');
+  const doorEnd = door.position_meters[1] + door.width_m / 2;
+  assert.ok(doorEnd < adjoiningWall.axis_meters[1][1] - adjoiningWall.thickness_m / 2);
+  const windows = fitted.filter(item => item.type === 'window' && item.associated_wall === 'ground_east')
+    .sort((a, b) => a.position_meters[1] - b.position_meters[1]);
+  assert.ok(windows.every(window => window.height_m / window.width_m <= 1.09));
+  for (let i = 1; i < windows.length; i++) {
+    const a = windows[i - 1], b = windows[i];
+    assert.ok(b.position_meters[1] - a.position_meters[1] >= (a.width_m + b.width_m) / 2);
+  }
 });
 
 test('two detected footprints stay separate until the user aligns corresponding anchors', () => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import FacadeWallSelect from './FacadeWallSelect.jsx';
 import axios from 'axios';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -35,11 +36,17 @@ const FURNITURE_PRESETS = [
   }
 ];
 
+const ROOM_LIBRARY_TYPES = {
+  chair: [['dining_chair', 'Dining chair'], ['armchair', 'Armchair'], ['office_chair', 'Office chair']],
+  table: [['coffee_table', 'Coffee table'], ['dining_table', 'Dining table'], ['desk', 'Desk']],
+  storage: [['wardrobe', 'Wardrobe'], ['bookcase', 'Bookcase'], ['sideboard', 'Sideboard'], ['nightstand', 'Nightstand']],
+};
+
 const FACADE_STYLES = [
-  { id: 'Modern Minimalist', label: 'Modern Minimalist', desc: 'White stucco, floor-to-ceiling glass, black aluminum' },
-  { id: 'Mediterranean Stone', label: 'Mediterranean Stone', desc: 'Warm sandstone masonry, terracotta tiles, rustic arches' },
-  { id: 'Traditional Brick', label: 'Traditional Brick', desc: 'Exposed red clay brickwork, framed structural lintels' },
-  { id: 'Lush Vegetation', label: 'Lush Vegetation', desc: 'Biophilic vertical greening, climbing ivy, living facade' },
+  { id: 'Modern Minimalist', label: 'Modern Minimalist', desc: 'Warm white stucco' },
+  { id: 'Mediterranean Stone', label: 'Mediterranean Stone', desc: 'Sandstone blocks with staggered joints' },
+  { id: 'Traditional Brick', label: 'Traditional Brick', desc: 'Terracotta brick with mortar courses' },
+  { id: 'Lush Vegetation', label: 'Lush Vegetation', desc: 'Leafy wall finish with irregular coverage' },
 ];
 
 const CMP_LEGEND = [
@@ -52,12 +59,20 @@ const CMP_LEGEND = [
 ];
 
 export default function GenerativeStudio({
+  initialTab = 'furniture',
   layout,
   frontWallId,
+  onSelectWall,
+  selectedStyle,
+  setSelectedStyle,
+  numFloors,
+  setNumFloors,
+  requestFacade,
   onApplyFacadeTexture,
+  onViewFacadeIn3D,
   onNavigateToFloorplan
 }) {
-  const [studioTab, setStudioTab] = useState('furniture'); // 'furniture' | 'facade'
+  const [studioTab, setStudioTab] = useState(initialTab);
 
   // --- 2D-to-3D Furniture State ---
   const [furnitureImageBase64, setFurnitureImageBase64] = useState(FURNITURE_PRESETS[0].preview_url);
@@ -68,17 +83,20 @@ export default function GenerativeStudio({
   const [isGenerating3D, setIsGenerating3D] = useState(false);
   const [generatedModel, setGeneratedModel] = useState(null);
   const [customLibrary, setCustomLibrary] = useState([]);
+  const [libraryType, setLibraryType] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
   const [wireframe3D, setWireframe3D] = useState(false);
   const [autoRotate3D, setAutoRotate3D] = useState(true);
 
   // --- Facade Synthesis State ---
-  const [selectedStyle, setSelectedStyle] = useState('Modern Minimalist');
-  const [numFloors, setNumFloors] = useState(1);
   const [isGeneratingFacade, setIsGeneratingFacade] = useState(false);
-  const [facadeResult, setFacadeResult] = useState(null);
-  const [appliedNotice, setAppliedNotice] = useState(false);
+  const [facadeDraft, setFacadeDraft] = useState(null);
   const [studioError, setStudioError] = useState(null);
+  const targetWall = layout?.walls.find(wall => wall.id === frontWallId && wall.is_exterior);
+  const appliedFacade = targetWall?.facade_texture;
+  const facadeResult = facadeDraft && facadeDraft.wall_id === frontWallId && facadeDraft.style === selectedStyle
+    ? facadeDraft : appliedFacade?.style === selectedStyle ? appliedFacade : null;
+  const isApplied = Boolean(facadeResult && facadeResult === appliedFacade);
 
   const fileInputRef = useRef(null);
   const canvas3DRef = useRef(null);
@@ -385,6 +403,7 @@ export default function GenerativeStudio({
       const res = await axios.post('/furniture/generate-3d', payload);
       if (res.data?.status === 'success') {
         setGeneratedModel(res.data);
+        setLibraryType('');
       }
     } catch (err) {
       console.error('Furniture generation error:', err);
@@ -402,6 +421,7 @@ export default function GenerativeStudio({
         id: generatedModel.id,
         name: generatedModel.name,
         category: generatedModel.category,
+        furniture_type: libraryType || undefined,
         dimensions_m: generatedModel.dimensions_m,
         bounds: generatedModel.bounds,
         glb_base64: generatedModel.model_glb_base64
@@ -409,12 +429,13 @@ export default function GenerativeStudio({
 
       const res = await axios.post('/furniture/save-to-library', payload);
       if (res.data?.status === 'success') {
-        setSaveSuccessMsg(`Saved "${generatedModel.name}" to Room Design Library!`);
+        setSaveSuccessMsg(`Saved to Custom in the room catalog.`);
         setCustomLibrary(prev => [...prev.filter(item => item.id !== generatedModel.id), res.data.item]);
       }
     } catch (err) {
       console.error('Save error:', err);
-      setStudioError('Could not save this model. Please try again.');
+      const detail = err.response?.data?.detail;
+      setStudioError(typeof detail === 'string' ? detail : 'Could not save this model. Please try again.');
     }
   };
 
@@ -430,26 +451,15 @@ export default function GenerativeStudio({
   };
 
   // Trigger Facade Generation
-  const handleGenerateFacade = async (overrideStyle = null) => {
-    const targetStyle = overrideStyle || selectedStyle;
+  const handleGenerateFacade = async () => {
     setIsGeneratingFacade(true);
     setStudioError(null);
-    setAppliedNotice(false);
     try {
-      const payload = {
-        layout: layout,
-        wall_id: frontWallId,
-        style: targetStyle,
-        num_floors: layout?.storeys?.length ? 1 : numFloors
-      };
-
-      const res = await axios.post('/facade/generate', payload);
-      if (res.data?.status === 'success') {
-        setFacadeResult(res.data);
-      }
+      const draft = await requestFacade(selectedStyle);
+      if (draft) setFacadeDraft(draft);
     } catch (err) {
       console.error('Facade generation error:', err);
-      setStudioError(err.response?.data?.detail || 'Facade generation failed. Please try again.');
+      setStudioError(err.response?.data?.detail || err.message || 'Facade generation failed.');
     } finally {
       setIsGeneratingFacade(false);
     }
@@ -458,10 +468,7 @@ export default function GenerativeStudio({
   // Apply Facade to Active 3D Building Floorplan
   const handleApplyFacadeTo3D = () => {
     if (!facadeResult?.texture_base64) return;
-    if (onApplyFacadeTexture) {
-      onApplyFacadeTexture(facadeResult.texture_base64, facadeResult);
-      setAppliedNotice(true);
-    }
+    onApplyFacadeTexture(facadeResult);
   };
 
   return (
@@ -763,12 +770,25 @@ export default function GenerativeStudio({
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
                   {saveSuccessMsg && (
                     <span className="text-xs text-emerald-700 font-bold flex items-center space-x-1 animate-in fade-in">
                       <BookmarkCheck className="w-4 h-4 text-emerald-600" />
                       <span>{saveSuccessMsg}</span>
                     </span>
+                  )}
+
+                  {ROOM_LIBRARY_TYPES[generatedModel.category] && (
+                    <label className="grid gap-1 text-[10px] text-[#1d1d1f]/70">
+                      Room catalog type
+                      <select value={libraryType} onChange={event => setLibraryType(event.target.value)}
+                        className="rounded border border-[#1d1d1f]/20 bg-white px-2 py-1 text-xs">
+                        <option value="">Auto</option>
+                        {ROOM_LIBRARY_TYPES[generatedModel.category].map(([id, label]) => (
+                          <option key={id} value={id}>{label}</option>
+                        ))}
+                      </select>
+                    </label>
                   )}
 
                   <button
@@ -825,13 +845,16 @@ export default function GenerativeStudio({
             <div>
               <label className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-1.5 mb-1.5">
                 <Building2 className="w-3.5 h-3.5 text-[#f0500f]" />
-                <span>01 / Building details</span>
+                <span>01 / Choose an exterior wall</span>
               </label>
               <div className="p-3 bg-white rounded-xl border border-[#1d1d1f]/15 space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-[#1d1d1f]/60">Target Wall:</span>
-                  <span className="font-bold">{frontWallId || 'Exterior Front Wall'}</span>
-                </div>
+                <p className="text-[#1d1d1f]/70">Click a wall on the map or choose one from the list.</p>
+                <FacadeWallSelect layout={layout} value={frontWallId} disabled={isGeneratingFacade} showMap
+                  onChange={wallId => {
+                    setFacadeDraft(null);
+                    setStudioError(null);
+                    onSelectWall(wallId);
+                  }} />
                 <div className="flex justify-between">
                   <span className="text-[#1d1d1f]/60">{layout?.storeys?.length ? 'Facade level' : 'Storeys'}</span>
                   {layout?.storeys?.length ? <span>{layout.storeys.find(level => level.id === layout.walls.find(wall => wall.id === frontWallId)?.level_id)?.label || 'Selected wall'}</span> : (
@@ -839,7 +862,11 @@ export default function GenerativeStudio({
                     {[1, 2, 3].map(fl => (
                       <button
                         key={fl}
-                        onClick={() => setNumFloors(fl)}
+                        disabled={isGeneratingFacade}
+                        onClick={() => {
+                          setFacadeDraft(null);
+                          setNumFloors(fl);
+                        }}
                         className={`w-6 h-6 rounded text-xs font-mono font-bold transition-all ${
                           numFloors === fl ? 'bg-[#f0500f] text-white' : 'bg-[#efebe2] text-[#1d1d1f]/70'
                         }`}
@@ -859,14 +886,13 @@ export default function GenerativeStudio({
                 <Palette className="w-3.5 h-3.5 text-[#f0500f]" />
                 <span>02 / Material direction</span>
               </label>
+              <p className="text-xs text-[#1d1d1f]/70">{selectedStyle ? 'Click the selected material again to use the default facade.' : 'Default facade selected.'}</p>
 
               <div className="space-y-2">
                 {FACADE_STYLES.map(st => (
                   <button type="button" aria-pressed={selectedStyle === st.id} disabled={isGeneratingFacade}
                     key={st.id}
-                    onClick={() => {
-                      setSelectedStyle(st.id);
-                    }}
+                    onClick={() => setSelectedStyle(current => current === st.id ? null : st.id)}
                     className={`studio-style-card p-3 rounded-xl border cursor-pointer transition-all ${
                       selectedStyle === st.id
                         ? 'bg-white border-[#f0500f] shadow-sm ring-1 ring-[#f0500f]'
@@ -884,12 +910,12 @@ export default function GenerativeStudio({
               </div>
             </div>
 
-            {/* Generate Button */}
+            <div className="sticky bottom-0 z-10 space-y-2 bg-[#efebe2] py-2">
             <button
               data-testid="generate-facade"
-              onClick={() => handleGenerateFacade(selectedStyle)}
-              disabled={isGeneratingFacade}
-              className="w-full h-11 px-5 rounded-full bg-[#f0500f] hover:bg-[#d8450a] text-white font-stencil text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#f0500f]/20 disabled:opacity-50 mt-auto"
+              onClick={handleGenerateFacade}
+              disabled={!targetWall || isGeneratingFacade}
+              className="w-full h-11 px-5 rounded-full bg-[#f0500f] hover:bg-[#d8450a] text-white font-stencil text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#f0500f]/20 disabled:opacity-50"
             >
               {isGeneratingFacade ? (
                 <>
@@ -903,6 +929,22 @@ export default function GenerativeStudio({
                 </>
               )}
             </button>
+            {!isApplied && facadeResult?.texture_base64 && (
+              <button type="button" onClick={handleApplyFacadeTo3D} data-testid="apply-facade"
+                disabled={isGeneratingFacade}
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#1d1d1f] px-3 text-xs font-bold text-white disabled:opacity-40">
+                <Check size={16} /> Apply to this wall
+              </button>
+            )}
+            {isApplied && (
+              <div className="rounded-lg border border-emerald-700/30 bg-emerald-50 p-2 text-xs text-emerald-900" role="status">
+                <p><strong>Applied to this wall.</strong> Pick another wall to continue.</p>
+                <button type="button" onClick={onViewFacadeIn3D} className="mt-1 inline-flex items-center gap-1 font-bold underline">
+                  <Eye size={15} /> View this wall in 3D
+                </button>
+              </div>
+            )}
+            </div>
           </aside>
 
           {/* Center: Side-by-Side Semantic Sketch vs Realistic Output */}
@@ -970,7 +1012,7 @@ export default function GenerativeStudio({
                     </span>
                   </div>
                   <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#f0500f]/10 text-[#f0500f]">
-                    {facadeResult?.model_info?.effective_style || facadeResult?.style || selectedStyle}
+                    {selectedStyle == null ? 'Default facade' : facadeResult?.model_info?.finish || facadeResult?.model_info?.effective_style || selectedStyle}
                   </span>
                 </div>
 
@@ -1001,8 +1043,8 @@ export default function GenerativeStudio({
                   <span>{facadeResult ? `Aspect ratio preserved · ${facadeResult.model_info?.resolution || 256}px` : 'Ready to generate'}</span>
                   {facadeResult && <span className="text-[#f0500f] font-semibold">Texture preview</span>}
                 </div>
-                {facadeResult?.model_info?.model === 'facade_residual_film_512_v1' && !facadeResult.model_info.style_conditioned && (
-                  <p className="mt-2 text-xs text-amber-800">Experimental CMP model: neutral appearance. The selected architectural style has not been trained.</p>
+                {facadeResult?.model_info?.finish && (
+                  <p className="mt-2 text-xs text-[#1d1d1f]/70">Material finish applied over the neutral neural texture.</p>
                 )}
               </div>
 
@@ -1012,31 +1054,14 @@ export default function GenerativeStudio({
             <div className="facade-result-bar mt-6 p-4 bg-white rounded-2xl border border-[#1d1d1f]/15 flex flex-wrap items-center justify-between gap-3 shadow-md">
               <div className="flex items-center space-x-2 text-xs font-mono text-[#1d1d1f]/70">
                 <Info className="w-4 h-4 text-[#f0500f]" />
-                <span>{layout ? 'Review the finish, then apply it to your 3D house.' : 'Create a floorplan to apply this finish to a house.'}</span>
+                <span>{layout ? 'Each exterior wall keeps its own finish.' : 'Create a floorplan to apply a finish to your house.'}</span>
               </div>
 
               <div className="flex items-center space-x-3">
-                {appliedNotice && (
-                  <span className="text-xs font-bold text-emerald-700 flex items-center space-x-1 animate-in fade-in">
-                    <Check className="w-4 h-4 text-emerald-600" />
-                    <span>Applied to 3D Floorplan!</span>
-                  </span>
-                )}
-
-                <button
-                  onClick={handleApplyFacadeTo3D}
-                  data-testid="apply-facade"
-                  disabled={!facadeResult?.texture_base64 || !layout || isGeneratingFacade}
-                  className="h-10 px-5 rounded-full bg-[#1d1d1f] hover:bg-black text-[#efebe2] font-stencil text-xs uppercase tracking-wider flex items-center space-x-2 transition-all shadow-sm disabled:opacity-40"
-                >
-                  <Eye className="w-3.5 h-3.5 text-[#f0500f]" />
-                  <span>Apply to house</span>
-                </button>
-
                 {facadeResult?.texture_base64 && (
                   <a
                     href={facadeResult.texture_base64}
-                    download={`facade_${selectedStyle.toLowerCase().replace(/\s+/g, '_')}.png`}
+                    download={`facade_${(selectedStyle ?? 'default').toLowerCase().replace(/\s+/g, '_')}.png`}
                     className="h-10 px-4 rounded-full bg-white hover:bg-[#efebe2] border border-[#1d1d1f]/30 font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-1.5 transition-all shadow-xs"
                   >
                     <Download className="w-3.5 h-3.5 text-[#f0500f]" />

@@ -5,22 +5,26 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { createRoofGeometries } from '../geometry/roofGeometry.js';
 import { buildingLevels, clipRoomFloor, compileWallAssembly, exposedRoof, floorFootprints,
-  floorSurfaceGeometry, tileFloor, wallAssemblyGeometry } from '../geometry/houseGeometry.js';
+  floorSurfaceGeometry, tileFloor, wallAssemblyGeometry, fitHouseOpenings } from '../geometry/houseGeometry.js';
 import { createFacadeGeometry, wallFacadeFrame, facadeOpeningPosition, facadeBounds } from '../geometry/facadeGeometry.js';
+import { STOREY_HEIGHT_M } from '../geometry/buildingDimensions.js';
+import { applyFurnitureFinish } from '../geometry/furnitureAppearance.js';
+import { buildFurnitureShape } from '../geometry/furnitureShapes.js';
+import { fitCustomFurnitureAsset } from '../geometry/customFurnitureAsset.js';
 import { RotateCcw, Box, Eye, Layers, Sun, Sparkles, Compass, Maximize2, Activity, Home } from 'lucide-react';
 
 export default function Viewer3D({
   layout,
   frontWallId,
-  facadeTextureUrl,
-  facadeData = null,
   numFloors = 1,
   isSplit = false,
   selectedRoom = null,
   onSelectRoom = null,
+  onSelectFurniture = null,
   furnishingData = {},
   onClearRoomFurnishings = null,
-  facadeFocusTrigger = 0
+  facadeFocusTrigger = 0,
+  roomFocusTrigger = 0
 }) {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -30,6 +34,8 @@ export default function Viewer3D({
   const furnitureGroupRef = useRef(null);
   const roofGroupRef = useRef(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
+  const onSelectFurnitureRef = useRef(onSelectFurniture);
+  useEffect(() => { onSelectFurnitureRef.current = onSelectFurniture; }, [onSelectFurniture]);
 
   const [wireframe, setWireframe] = useState(false);
   const [activeLevel, setActiveLevel] = useState('all');
@@ -262,7 +268,7 @@ export default function Viewer3D({
     };
 
     const handleClick = (e) => {
-      if (!containerRef.current || !cameraRef.current || !sceneRef.current) return;
+      if (e.button !== 0 || !containerRef.current || !cameraRef.current || !sceneRef.current) return;
       const dist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
       if (dist > 6) return; // User was dragging to rotate or pan, not clicking
 
@@ -273,7 +279,17 @@ export default function Viewer3D({
       raycaster.setFromCamera(mouse, cameraRef.current);
       const intersects = raycaster.intersectObjects(sceneRef.current.children, true);
 
+      let behindWall = false;
       for (const hit of intersects) {
+        if (['wall_assembly', 'facade'].includes(hit.object.userData.type)) behindWall = true;
+        if (!behindWall && onSelectFurnitureRef.current) {
+          for (let object = hit.object; object; object = object.parent) {
+            if (object.userData.isFurnitureMesh) {
+              onSelectFurnitureRef.current(object.userData.roomId, object.userData.itemId);
+              return;
+            }
+          }
+        }
         if (hit.object.userData?.isFloorMesh && hit.object.userData?.room) {
           if (onSelectRoom) {
             onSelectRoom(hit.object.userData.room);
@@ -517,10 +533,8 @@ export default function Viewer3D({
       const facadeSpecs = new Map();
       const textureLoader = new THREE.TextureLoader();
       walls.forEach(wall => {
-        const isFront = wall.id === frontWallId || (!frontWallId && wall.is_front);
-        const own = wall.facade_texture || {};
-        const data = isFront && facadeTextureUrl && (!facadeData?.wall_id || facadeData.wall_id === wall.id) ? { ...own, ...(facadeData || {}), texture_base64: facadeTextureUrl } : own;
-        if (!data.texture_base64) return;
+        const data = wall.facade_texture;
+        if (!data?.texture_base64) return;
         const frame = data.facade_frame || wallFacadeFrame(wall);
         if (!frame) return;
         facadeSpecs.set(wall.id, { ...data, frame });
@@ -569,18 +583,13 @@ export default function Viewer3D({
         }
       });
       const byWallId = new Map(walls.map(wall => [wall.id, wall]));
-      for (const [type, openings] of [['door', level.doors || []], ['window', level.windows || []]]) {
-        for (const opening of openings) {
-          if (hostedByFacade.has(`${opening.associated_wall}:${opening.id}`)) continue;
-          const position = opening.position_meters || opening.position_px?.map(value => value * scaleMperPx);
-          for (const elevation of level.floorElevations) {
-            if (elevation > 0 && type === 'door' && byWallId.get(opening.associated_wall)?.is_exterior) continue;
-            openingCandidates.push({ ...opening, type, position_meters: position,
-              id: elevation === 0 ? opening.id : `${opening.id}-${elevation}`,
-              width_m: opening.width_m || (type === 'door' ? .9 : 1.1),
-              sill_m: elevation + (type === 'door' ? 0 : opening.sill_m ?? .9),
-              height_m: opening.height_m || (type === 'door' ? 2.1 : 1.4) });
-          }
+      for (const opening of fitHouseOpenings(level, scaleMperPx)) {
+        if (hostedByFacade.has(`${opening.associated_wall}:${opening.id}`)) continue;
+        for (const elevation of level.floorElevations) {
+          if (elevation > 0 && opening.type === 'door' && byWallId.get(opening.associated_wall)?.is_exterior) continue;
+          openingCandidates.push({ ...opening,
+            id: elevation === 0 ? opening.id : `${opening.id}-${elevation}`,
+            sill_m: elevation + opening.sill_m });
         }
       }
       const assembly = compileWallAssembly(walls, openingCandidates, wallHeight);
@@ -631,7 +640,7 @@ export default function Viewer3D({
           roughness: 0.65,
           metalness: 0.08
         });
-        const frameThick = 0.045;
+        const frameThick = Math.min(.045, doorWidth * .08);
         const frameDepth = wallThick + 0.02;
 
         // Left Jamb
@@ -687,11 +696,11 @@ export default function Viewer3D({
         });
         const leverGeo = new THREE.BoxGeometry(0.10, 0.02, 0.02);
         const leverF = new THREE.Mesh(leverGeo, handleMat);
-        leverF.position.set(leafWidth - 0.07, 0.98, leafThick / 2 + 0.02);
+        leverF.position.set(leafWidth - 0.07, doorHeight * .51, leafThick / 2 + 0.02);
         hingePivot.add(leverF);
 
         const leverB = new THREE.Mesh(leverGeo, handleMat);
-        leverB.position.set(leafWidth - 0.07, 0.98, -leafThick / 2 - 0.02);
+        leverB.position.set(leafWidth - 0.07, doorHeight * .51, -leafThick / 2 - 0.02);
         hingePivot.add(leverB);
 
         doorGroup.add(hingePivot);
@@ -725,8 +734,9 @@ export default function Viewer3D({
           metalness: 0.65,
           roughness: 0.35
         });
-        const frameThick = 0.04;
+        const frameThick = Math.min(.035, winWidth * .075, winHeight * .075);
         const frameDepth = wallThick * 0.70;
+        const paneCount = winWidth >= .82 ? 2 : 1;
 
         // Frame profiles (bottom, top, left, right)
         const botGeo = new THREE.BoxGeometry(winWidth, frameThick, frameDepth);
@@ -749,11 +759,12 @@ export default function Viewer3D({
         rightMesh.position.set(winWidth / 2 - frameThick / 2, sillHeight + winHeight / 2, 0);
         winGroup.add(rightMesh);
 
-        // Center Vertical Mullion
-        const mullGeo = new THREE.BoxGeometry(0.035, winHeight - frameThick * 2, frameDepth);
-        const mullMesh = new THREE.Mesh(mullGeo, frameMat);
-        mullMesh.position.set(0, sillHeight + winHeight / 2, 0);
-        winGroup.add(mullMesh);
+        if (paneCount === 2) {
+          const mullGeo = new THREE.BoxGeometry(frameThick, winHeight - frameThick * 2, frameDepth);
+          const mullMesh = new THREE.Mesh(mullGeo, frameMat);
+          mullMesh.position.set(0, sillHeight + winHeight / 2, 0);
+          winGroup.add(mullMesh);
+        }
 
         // Exterior Sill Shelf (protruding drip lip)
         const shelfGeo = new THREE.BoxGeometry(winWidth + 0.08, 0.035, wallThick + 0.06);
@@ -786,17 +797,16 @@ export default function Viewer3D({
               side: THREE.DoubleSide
             });
 
-        const paneWidth = (winWidth - frameThick * 3) / 2;
+        const paneWidth = (winWidth - frameThick * (paneCount + 1)) / paneCount;
         const paneHeight = winHeight - frameThick * 2;
         const paneGeo = new THREE.BoxGeometry(paneWidth, paneHeight, 0.01);
 
-        const paneL = new THREE.Mesh(paneGeo, glassMat);
-        paneL.position.set(-winWidth / 4 + frameThick / 4, sillHeight + winHeight / 2, 0);
-        winGroup.add(paneL);
-
-        const paneR = new THREE.Mesh(paneGeo, glassMat);
-        paneR.position.set(winWidth / 4 - frameThick / 4, sillHeight + winHeight / 2, 0);
-        winGroup.add(paneR);
+        for (let paneIndex = 0; paneIndex < paneCount; paneIndex++) {
+          const pane = new THREE.Mesh(paneGeo, glassMat);
+          pane.position.set(-winWidth / 2 + frameThick + paneWidth / 2 + paneIndex * (paneWidth + frameThick),
+            sillHeight + winHeight / 2, 0);
+          winGroup.add(pane);
+        }
 
         winGroup.userData = { isBuildingMesh: true, type: 'window', winId: win.id || `win_${wIdx}`, facadeOpening: win.facadeFrame ? win : null };
         scene.add(winGroup);
@@ -871,7 +881,7 @@ export default function Viewer3D({
     if (roofGroupRef.current) bounds.expandByObject(roofGroupRef.current);
     buildingBoundsRef.current = bounds;
     if (['perspective', 'top', 'isometric'].includes(viewPreset)) fitCamera(viewPreset);
-  }, [layout, frontWallId, facadeTextureUrl, facadeData, numFloors, wireframe, activeLevel, selectedRoom, graphicsQuality, roofStyle, floorStyle]);
+  }, [layout, numFloors, wireframe, activeLevel, selectedRoom, graphicsQuality, roofStyle, floorStyle]);
 
   // Update 3D Furniture Assets when furnishingData changes
   useEffect(() => {
@@ -923,53 +933,62 @@ export default function Viewer3D({
       const roomItems = designResult.items;
       roomItems.forEach((item) => {
         if (!item.glb) return;
+        const custom = item.source === 'custom';
+        const addModel = (model, sized = false) => {
+          if (!current) { disposeHierarchy(model); return; }
 
-        loader.load(
-          item.glb,
-          (gltf) => {
-            const model = gltf.scene;
-            if (!current) { disposeHierarchy(model); return; }
+          // Shared unmirrored transform: X_three = x_plan - centerX, Z_three = y_plan - centerZ
+          const posX = item.position_m[0] + offsetX - centerX;
+          const posZ = item.position_m[1] + offsetZ - centerZ;
+          const isRug = item.category === 'rug' || item.item_id?.includes('rug');
+          // Floor slab is at y = 0.02.
+          // Furniture sits on top of floor slab (y = 0.02).
+          // Rug is elevated to y = 0.023 with polygonOffset to strictly eliminate z-fighting with floor meshes.
+          const posY = baseY + (isRug ? 0.023 : 0.02);
+          model.position.set(posX, posY, posZ);
 
-            // Shared unmirrored transform: X_three = x_plan - centerX, Z_three = y_plan - centerZ
-            const posX = item.position_m[0] + offsetX - centerX;
-            const posZ = item.position_m[1] + offsetZ - centerZ;
-            const isRug = item.category === 'rug' || item.item_id?.includes('rug');
-            // Floor slab is at y = 0.02.
-            // Furniture sits on top of floor slab (y = 0.02).
-            // Rug is elevated to y = 0.023 with polygonOffset to strictly eliminate z-fighting with floor meshes.
-            const posY = baseY + (isRug ? 0.023 : 0.02);
-            model.position.set(posX, posY, posZ);
+          // Rotation convention: rotation.y = (180.0 - alpha_deg) * (pi / 180)
+          model.rotation.y = (180.0 - item.rotation_deg) * (Math.PI / 180.0);
 
-            // Rotation convention: rotation.y = (180.0 - alpha_deg) * (pi / 180)
-            model.rotation.y = (180.0 - item.rotation_deg) * (Math.PI / 180.0);
+          // Apply compact scale if specified
+          if (!sized && item.scale && Array.isArray(item.scale) && item.scale.length === 3) {
+            model.scale.set(item.scale[0], item.scale[1], item.scale[2]);
+          }
+          if (!custom) applyFurnitureFinish(model, item.finish || designResult.preset, item.category, item.colors);
 
-            // Apply compact scale if specified
-            if (item.scale && Array.isArray(item.scale) && item.scale.length === 3) {
-              model.scale.set(item.scale[0], item.scale[1], item.scale[2]);
-            }
-
-            model.traverse((child) => {
-              if (child.isMesh) {
-                child.castShadow = (graphicsQuality === 'high' && !isRug);
-                child.receiveShadow = (graphicsQuality === 'high');
-                if (child.material) {
-                  child.material.envMapIntensity = (graphicsQuality === 'high' ? 1.0 : 0.0);
-                  if (isRug) {
-                    child.material.polygonOffset = true;
-                    child.material.polygonOffsetFactor = -2.0;
-                    child.material.polygonOffsetUnits = -4.0;
-                  }
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = (graphicsQuality === 'high' && !isRug);
+              child.receiveShadow = (graphicsQuality === 'high');
+              if (child.material) {
+                child.material.envMapIntensity = (graphicsQuality === 'high' ? 1.0 : 0.0);
+                if (isRug) {
+                  child.material.polygonOffset = true;
+                  child.material.polygonOffsetFactor = -2.0;
+                  child.material.polygonOffsetUnits = -4.0;
                 }
               }
-            });
+            }
+          });
 
-            model.userData = {
-              isFurnitureMesh: true,
-              roomId: roomId,
-              itemId: item.item_id
-            };
+          model.userData = {
+            isFurnitureMesh: true,
+            roomId: roomId,
+            itemId: item.item_id
+          };
 
-            furnitureGroup.add(model);
+          furnitureGroup.add(model);
+        };
+        const configured = custom ? null : buildFurnitureShape(item);
+        if (configured) {
+          addModel(configured, true);
+          return;
+        }
+        loader.load(
+          item.glb,
+          gltf => {
+            if (!current) { disposeHierarchy(gltf.scene); return; }
+            addModel(custom ? fitCustomFurnitureAsset(gltf.scene, item.dimensions_m) : gltf.scene, custom);
           },
           undefined,
           (err) => {
@@ -1009,20 +1028,25 @@ export default function Viewer3D({
     if (!cameraRef.current || !controlsRef.current || !selectedRoom) return;
     const pts = selectedRoom.polygon_meters || [];
     if (!pts.length) return;
-    let rx = 0, rz = 0;
-    pts.forEach(([x, z]) => { rx += x; rz += z; });
-    rx /= pts.length;
-    rz /= pts.length;
+    const xs = pts.map(([x]) => x), zs = pts.map(([, z]) => z);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
+    const span = Math.hypot(maxX - minX, maxZ - minZ);
     const { centerX, centerZ } = centersRef.current;
     const level = layout?.storeys?.find(item => item.id === selectedRoom.level_id);
     const [offsetX, offsetZ] = level?.offset || [0, 0];
     const baseY = level?.elevation || 0;
-    const targetX = rx + offsetX - centerX;
-    const targetZ = rz + offsetZ - centerZ;
+    const targetX = (minX + maxX) / 2 + offsetX - centerX;
+    const targetZ = (minZ + maxZ) / 2 + offsetZ - centerZ;
     if (level) setActiveLevel(level.id);
-    controlsRef.current.target.set(targetX, baseY + 0.8, targetZ);
-    cameraRef.current.position.set(targetX + 5.0, baseY + 4.2, targetZ + 5.0);
-    cameraRef.current.up.set(0, 1, 0);
+    setShowRoof(false);
+    setShowFurniture(true);
+    const camera = cameraRef.current;
+    const fov = Math.tan(THREE.MathUtils.degToRad(camera.getEffectiveFOV() / 2));
+    const wallHeight = level?.height || (layout?.walls?.[0]?.height_m || STOREY_HEIGHT_M) * numFloors;
+    const altitude = Math.max(wallHeight + 1, .70 * span / (fov * Math.min(1, camera.aspect)));
+    controlsRef.current.target.set(targetX, baseY + .35, targetZ);
+    camera.position.set(targetX + span * .22, baseY + altitude, targetZ + span * .22);
+    camera.up.set(0, 1, 0);
     controlsRef.current.update();
     setViewPreset('room');
   };
@@ -1034,23 +1058,25 @@ export default function Viewer3D({
     if (!targetWall || !targetWall.polygon_meters || targetWall.polygon_meters.length < 2) return;
 
     const { centerX = 0, centerZ = 0 } = centersRef.current || {};
-    const frame = (targetWall.id === frontWallId && facadeData?.facade_frame)
-      || targetWall.facade_texture?.facade_frame || wallFacadeFrame(targetWall);
+    const frame = targetWall.facade_texture?.facade_frame || wallFacadeFrame(targetWall);
     if (!frame) return;
     const level = layout.storeys?.find(item => item.id === targetWall.level_id);
     const [offsetX, offsetZ] = level?.offset || [0, 0];
     const baseY = level?.elevation || 0;
-    const height = level?.height || numFloors * (targetWall.height_m || 2.8);
+    const height = level?.height || numFloors * (targetWall.height_m || STOREY_HEIGHT_M);
     if (level && activeLevel !== 'all' && activeLevel !== level.id) setActiveLevel(level.id);
     const len = frame.length_m;
     const targetX = frame.origin[0] + frame.direction[0] * len / 2 + offsetX - centerX;
     const targetZ = frame.origin[1] + frame.direction[1] * len / 2 + offsetZ - centerZ;
     const [nx, nz] = frame.outward;
 
-    const camDist = Math.max(len * 1.3, 7.5);
-    cameraRef.current.position.set(targetX + nx * camDist, baseY + height * 0.6, targetZ + nz * camDist);
-    cameraRef.current.up.set(0, 1, 0);
-    controlsRef.current.target.set(targetX, baseY + height * 0.45, targetZ);
+    const camera = cameraRef.current;
+    const halfVerticalFov = Math.tan(THREE.MathUtils.degToRad(camera.getEffectiveFOV() / 2));
+    const camDist = 1.15 * Math.max(height, len / camera.aspect) / (2 * halfVerticalFov);
+    const targetY = baseY + height / 2;
+    camera.position.set(targetX + nx * camDist, targetY, targetZ + nz * camDist);
+    camera.up.set(0, 1, 0);
+    controlsRef.current.target.set(targetX, targetY, targetZ);
     controlsRef.current.update();
     setViewPreset('facade');
   };
@@ -1060,6 +1086,10 @@ export default function Viewer3D({
       setCameraFacadeFocus();
     }
   }, [facadeFocusTrigger]);
+
+  useEffect(() => {
+    if (roomFocusTrigger > 0) setCameraRoomFocus();
+  }, [roomFocusTrigger]);
 
   return (
     <div className="viewer-panel viewport-panel flex-1 min-w-0 flex flex-col h-full bg-[#f1ede4] relative overflow-hidden select-none font-mono" aria-label="3D house viewer">
@@ -1227,10 +1257,10 @@ export default function Viewer3D({
                 ? 'bg-[#f0500f] text-white border-[#f0500f] shadow-sm'
                 : 'bg-white/60 text-[#f0500f] border-[#f0500f]/30 hover:bg-[#f0500f]/10'
             }`}
-            title="Focus camera directly on Front Facade wall"
+            title="Face the selected exterior wall"
           >
             <Sparkles className="w-3 h-3 text-[#f0500f]" />
-            <span>Facade</span>
+            <span>Wall view</span>
           </button>
 
           {/* Graphics Quality Toggle (High: PBR/HDRI/Shadows vs Low: Fast unshadowed diffuse for low-spec/CPU) */}

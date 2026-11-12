@@ -11,6 +11,7 @@ from pathlib import Path
 import math
 import numpy as np
 from shapely.geometry import Polygon
+from src.floorplan.dimensions import STOREY_HEIGHT_M, DOOR_HEIGHT_M, WINDOW_HEIGHT_M, WINDOW_SILL_M
 
 class Floorplan3DExtruder:
     """
@@ -18,10 +19,10 @@ class Floorplan3DExtruder:
     """
     def __init__(
         self,
-        wall_height_m: float = 2.80,
-        door_height_m: float = 2.10,
-        window_height_m: float = 1.40,
-        window_sill_m: float = 0.90
+        wall_height_m: float = STOREY_HEIGHT_M,
+        door_height_m: float = DOOR_HEIGHT_M,
+        window_height_m: float = WINDOW_HEIGHT_M,
+        window_sill_m: float = WINDOW_SILL_M
     ):
         self.wall_height_m = wall_height_m
         self.door_height_m = door_height_m

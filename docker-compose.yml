@@ -12,6 +12,7 @@ services:
       - ENVIRONMENT=production
       - ARCHIGEN_FACADE_EXPERIMENT=/app/models/saved/facade512_experiment/generator.onnx
       - ARCHIGEN_CUSTOM_LIBRARY=/app/library
+      - ARCHIGEN_FURNITURE_SERVICE_URL=${ARCHIGEN_FURNITURE_SERVICE_URL-http://host.docker.internal:8001}
       - OMP_NUM_THREADS=2
       - MKL_NUM_THREADS=2
     volumes:

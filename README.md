@@ -269,9 +269,18 @@ et `ARCHIGEN_API_PORT` si une instance native utilise déjà les ports 3000 et 8
 Le service backend monte les poids DVC de `models/saved` en lecture seule. Récupérez
 ces fichiers avant le démarrage et conservez-les dans ce dossier.
 
-Le conteneur utilise ONNX Runtime CPU pour le plan et la façade 512, et le mode
-volumétrique CPU pour le mobilier. Pour TripoSR CUDA, voir
-[l'environnement natif du mobilier](docs/furniture-quality-experiment.md).
+Le conteneur utilise ONNX Runtime CPU pour le plan et la façade 512. Le mobilier
+est reconstruit par le worker TripoSR CUDA natif sur le port 8001. Préparez
+[l'environnement natif du mobilier](docs/furniture-quality-experiment.md), puis
+démarrez le worker et les conteneurs ensemble depuis PowerShell.
+
+```powershell
+.\scripts\start_local_stack.ps1
+```
+
+Le script utilise le mode haute qualité (grille 384³ et texture 2048 px).
+Après redémarrage de Windows, relancez ce script pour démarrer également le worker.
+Une indisponibilité du worker produit une erreur explicite dans le studio.
 
 ---
 

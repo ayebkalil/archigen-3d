@@ -1,4 +1,6 @@
 import React, { useRef, useState } from 'react';
+import FacadeWallSelect from './FacadeWallSelect.jsx';
+import { STOREY_HEIGHT_M } from '../geometry/buildingDimensions.js';
 import {
   Upload,
   Sparkles,
@@ -30,9 +32,10 @@ export default function ControlPanel({
   setNumFloors,
   selectedStyle,
   setSelectedStyle,
-  hasLayout,
-  facadeTextureUrl,
-  facadeModelInfo,
+  layout,
+  frontWallId,
+  onSelectWall,
+  appliedFacade,
   isCalibrating,
   setIsCalibrating,
   onOpenFacadeModal,
@@ -41,7 +44,6 @@ export default function ControlPanel({
   imageUrl,
   referenceLevels,
   isTracedSample,
-  onShowReference,
 }) {
   const input = useRef(null);
   const [dragging, setDragging] = useState(false);
@@ -94,7 +96,6 @@ export default function ControlPanel({
         </div>
         <p className="field-help">Drop a drawing here, or click to browse.</p>
         {referenceLevels?.length > 0 && <p className="field-help">{isTracedSample ? 'Traced sample · ' : ''}{referenceLevels.length} aligned levels</p>}
-        {onShowReference && <button className="secondary-action full-width mt-2" onClick={onShowReference}>Show traced sample</button>}
       </section>
       <section className="control-section">
         <h2>
@@ -127,7 +128,7 @@ export default function ControlPanel({
         {referenceLevels?.length ? <p className="field-help mt-3">Inspect each storey with the level selector in the 3D view.</p> : <>
           <div className="field-row storey-label">
             <span>Repeat this level</span>
-            <small>{(numFloors * 2.8).toFixed(1)} m high</small>
+            <small>{(numFloors * (layout?.walls[0]?.height_m || STOREY_HEIGHT_M)).toFixed(1)} m high</small>
           </div>
           <div className="storey-options" aria-label="Building storeys">
             {[1, 2, 3].map((f) => (
@@ -143,7 +144,9 @@ export default function ControlPanel({
           disabled={isAnalyzing}
         >
           {isAnalyzing ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />}
-          {isAnalyzing ? 'Detecting your rooms…' : 'Detect rooms & build 3D'}
+          {isTracedSample
+            ? (isAnalyzing ? 'Scoring room labels…' : 'Refresh room confidence')
+            : (isAnalyzing ? 'Detecting your rooms…' : 'Detect rooms & build 3D')}
           {!isAnalyzing && <ArrowRight size={16} />}
         </button>
       </section>
@@ -154,14 +157,17 @@ export default function ControlPanel({
           </h2>
           <ChevronDown size={16} />
         </summary>
-        <p className="field-help">Choose a direction for your facade.</p>
+        <p className="field-help">Select a wall and choose its finish.</p>
+        <FacadeWallSelect layout={layout} value={frontWallId} onChange={onSelectWall} disabled={isGeneratingFacade} />
+        <p className="field-help">{selectedStyle ? 'Click the selected material again to use the default facade.' : 'Default facade selected.'}</p>
         <div className="material-options">
           {STYLES.map((style) => (
             <button
               key={style.id}
               className="material-option"
               aria-pressed={selectedStyle === style.id}
-              onClick={() => setSelectedStyle(style.id)}
+              disabled={isGeneratingFacade}
+              onClick={() => setSelectedStyle(current => current === style.id ? null : style.id)}
             >
               <span className={`material-swatch ${style.swatch}`} />
               <span>
@@ -172,18 +178,18 @@ export default function ControlPanel({
             </button>
           ))}
         </div>
-        {facadeTextureUrl && (
+        {appliedFacade?.texture_base64 && (
           <button className="facade-current" onClick={onOpenFacadeModal}>
-            <img src={facadeTextureUrl} alt="Current facade texture" />
+            <img src={appliedFacade.texture_base64} alt="Current facade texture" />
             <span>
-              Current facade<small>{facadeModelInfo?.effective_style || selectedStyle}</small>
+              Applied finish<small>{appliedFacade.style == null ? 'Default facade' : appliedFacade.model_info?.finish || appliedFacade.model_info?.effective_style || appliedFacade.style}</small>
             </span>
             <ArrowUpRight size={16} />
           </button>
         )}
         <button
           className="secondary-action full-width"
-          disabled={!hasLayout || isGeneratingFacade}
+          disabled={!frontWallId || isGeneratingFacade}
           onClick={() => onGenerateFacade()}
         >
           {isGeneratingFacade ? (

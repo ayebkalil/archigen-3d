@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { STOREY_HEIGHT_M } from '../geometry/buildingDimensions.js';
 import {
   Eye,
   EyeOff,
@@ -18,6 +19,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { alignDrawingLevels, drawingLevelAt, separateDrawingLevels, wallStrip } from '../geometry/houseGeometry.js';
+import { placeRoomBadge } from '../geometry/roomBadgeGeometry.js';
 
 const ROOM_COLORS = {
   'Living Room': { fill: 'rgba(28, 78, 128, 0.20)', stroke: '#1c4e80' },
@@ -69,6 +71,7 @@ export default function Floorplan2DCanvas({
   const [showRooms, setShowRooms] = useState(true);
   const [showWalls, setShowWalls] = useState(true);
   const [showOpenings, setShowOpenings] = useState(true);
+  const wallsOnly = showWalls && !showRooms && !showOpenings;
   const [hoveredWall, setHoveredWall] = useState(null);
 
   // Active CAD Tool: 'select' | 'add_door' | 'delete' | 'relabel'
@@ -161,6 +164,20 @@ export default function Floorplan2DCanvas({
   const rooms = layout?.rooms || [];
   const doors = layout?.doors || [];
   const windows = layout?.windows || [];
+  const scaleMperPx = layout?.metadata?.scale_meters_per_pixel || 0.03;
+  const roomOverlays = React.useMemo(() => {
+    const placed = [];
+    return rooms.map(room => {
+      const ring = (room.polygon_meters || []).map(point => point.map(value => value / scaleMperPx));
+      const area = `${room.surface_m2} m²`;
+      const confidence = Number.isFinite(room.confidence) ? `Model ${Math.round(room.confidence * 100)}%` : 'Model n/a';
+      const width = 12 + 6.5 * Math.max(room.room_type.length, area.length, confidence.length);
+      const height = 36;
+      const badge = placeRoomBadge(ring, width, height, placed);
+      if (badge) placed.push(badge);
+      return { room, points: ring.map(point => point.join(',')).join(' '), area, confidence, width, height, badge };
+    });
+  }, [rooms, scaleMperPx]);
 
   const triggerFeedback = (msg) => {
     setEditFeedback(msg);
@@ -230,7 +247,7 @@ export default function Floorplan2DCanvas({
       const polygon = wallStrip(wallStart.map((value, i) => value - extension[i]),
         end.map((value, i) => value + extension[i]), thickness);
       const newWall = { id: `wall_manual_${Date.now()}`, level_id: level?.id, is_exterior: drawExterior,
-        axis_meters: [wallStart, end], thickness_m: thickness, height_m: level?.height || layout.walls[0]?.height_m || 2.8,
+        axis_meters: [wallStart, end], thickness_m: thickness, height_m: level?.height || layout.walls[0]?.height_m || STOREY_HEIGHT_M,
         polygon_meters: polygon, polygon_px: polygon.map(p => p.map(value => value / scale)), openings: [] };
       onUpdateLayout({ ...layout, walls: [...walls, newWall], metadata: { ...layout.metadata, num_walls: walls.length + 1 } });
       setWallStart(null);
@@ -330,7 +347,7 @@ export default function Floorplan2DCanvas({
     if (!selectedRoomForRelabel || !onUpdateLayout || !layout) return;
     const updatedRooms = layout.rooms.map((r) => {
       if (r.id === selectedRoomForRelabel.id) {
-        return { ...r, room_type: newType };
+        return { ...r, room_type: newType, confidence: newType === r.room_type ? r.confidence : null };
       }
       return r;
     });
@@ -372,6 +389,31 @@ export default function Floorplan2DCanvas({
   else if (activeTool === 'draw_wall' || activeTool === 'align_levels') canvasCursor = 'cursor-crosshair';
   else if (activeTool === 'delete') canvasCursor = 'cursor-pointer';
   else if (activeTool === 'relabel') canvasCursor = 'cursor-pointer';
+
+  const layers = [
+    ['Rooms', showRooms, () => setShowRooms(value => !value)],
+    ['Walls', showWalls, () => setShowWalls(value => !value)],
+    ['Openings', showOpenings, () => setShowOpenings(value => !value)],
+    ['Walls only', wallsOnly, () => {
+      setShowWalls(true);
+      setShowRooms(wallsOnly);
+      setShowOpenings(wallsOnly);
+    }],
+  ];
+  const layerButtons = layers.map(([label, enabled, toggle]) => (
+    <button
+      key={label}
+      type="button"
+      onClick={toggle}
+      aria-pressed={enabled}
+      className={`${isSplit ? 'px-2.5 py-1' : 'h-7 px-3'} rounded-full border transition-all whitespace-nowrap shrink-0 ${
+        enabled ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
+          : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
+      }`}
+    >
+      {label}
+    </button>
+  ));
 
   return (
     <div className="plan-panel viewport-panel flex-1 flex flex-col h-full bg-[#efebe2] relative overflow-hidden border-r border-[#1d1d1f]/15 drafting-grid" aria-label="2D floorplan editor">
@@ -504,36 +546,7 @@ export default function Floorplan2DCanvas({
         {/* Right: In 2D-only full view (!isSplit), keep layer toggles in the top bar! */}
         {!isSplit && (
           <div className="flex items-center space-x-1 font-stencil text-[10px] uppercase tracking-wider shrink-0">
-            <button
-              onClick={() => setShowRooms(!showRooms)}
-              className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap ${
-                showRooms
-                  ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
-                  : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-              }`}
-            >
-              ROOMS
-            </button>
-            <button
-              onClick={() => setShowWalls(!showWalls)}
-              className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap ${
-                showWalls
-                  ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
-                  : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-              }`}
-            >
-              WALLS
-            </button>
-            <button
-              onClick={() => setShowOpenings(!showOpenings)}
-              className={`h-7 px-3 rounded-full border transition-all whitespace-nowrap ${
-                showOpenings
-                  ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
-                  : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-              }`}
-            >
-              DOORS
-            </button>
+            {layerButtons}
           </div>
         )}
       </div>
@@ -564,36 +577,7 @@ export default function Floorplan2DCanvas({
               <span className="font-semibold hidden sm:inline">LAYERS</span>
             </div>
             <div className="flex items-center space-x-1 font-stencil text-[9.5px] uppercase tracking-wider">
-              <button
-                onClick={() => setShowRooms(!showRooms)}
-                className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
-                  showRooms
-                    ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
-                    : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-                }`}
-              >
-                ROOMS
-              </button>
-              <button
-                onClick={() => setShowWalls(!showWalls)}
-                className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
-                  showWalls
-                    ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
-                    : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-                }`}
-              >
-                WALLS
-              </button>
-              <button
-                onClick={() => setShowOpenings(!showOpenings)}
-                className={`px-2.5 py-1 rounded-full border transition-all whitespace-nowrap shrink-0 ${
-                  showOpenings
-                    ? 'bg-[#1d1d1f] text-[#efebe2] border-[#1d1d1f]'
-                    : 'bg-white/60 text-[#1d1d1f]/50 border-[#1d1d1f]/20 hover:text-[#1d1d1f]'
-                }`}
-              >
-                DOORS
-              </button>
+              {layerButtons}
             </div>
           </div>
         )}
@@ -606,7 +590,6 @@ export default function Floorplan2DCanvas({
         )}
 
         <div
-          onClick={handleCanvasClick}
           className={`relative rounded-xl overflow-hidden shadow-xl border border-[#1d1d1f]/25 bg-white ${canvasCursor} ${
             isCalibrating ? 'ring-2 ring-[#b8452a]' : activeTool !== 'select' ? 'ring-1 ring-[#1d1d1f]/40' : ''
           }`}
@@ -619,7 +602,7 @@ export default function Floorplan2DCanvas({
           }}
         >
           {/* Base Image */}
-          {imageUrl && (
+          {imageUrl && (!wallsOnly || isCalibrating) && (
             <img
               src={imageUrl}
               alt="Floorplan"
@@ -631,78 +614,28 @@ export default function Floorplan2DCanvas({
           <svg
             className="absolute inset-0 w-full h-full"
             viewBox={`0 0 ${canvasSize[0]} ${canvasSize[1]}`}
+            onClick={handleCanvasClick}
           >
             {/* 1. Room Polygons */}
             {showRooms &&
-              rooms.map((room, idx) => {
+              roomOverlays.map(({ room, points, area, confidence }) => {
                 const style = getRoomStyle(room.room_type);
-                const scaleMperPx = layout.metadata?.scale_meters_per_pixel || 0.03;
-                const pointsStr = room.polygon_meters
-                  ? room.polygon_meters
-                      .map((p) => `${p[0] / scaleMperPx},${p[1] / scaleMperPx}`)
-                      .join(' ')
-                  : '';
-                const centroid = room.centroid_meters
-                  ? [room.centroid_meters[0] / scaleMperPx, room.centroid_meters[1] / scaleMperPx]
-                  : [0, 0];
-
                 const isSelected = selectedRoom?.id === room.id;
                 return (
-                  <g key={`room-${idx}`} data-room-id={room.id} className="room-group">
-                    <polygon
-                      data-room-id={room.id}
-                      points={pointsStr}
-                      fill={isSelected ? 'rgba(2, 132, 199, 0.28)' : style.fill}
-                      stroke={isSelected ? '#0284c7' : style.stroke}
-                      strokeWidth={isSelected ? '2.5' : '1.5'}
-                      className={`room-polygon transition-all cursor-pointer ${
-                        activeTool === 'relabel' ? 'hover:stroke-purple-400 hover:fill-purple-500/30' : 'hover:stroke-sky-500'
-                      }`}
-                      onClick={(e) => handleRoomClick(room, e)}
-                    />
-                    {/* Centroid Tag */}
-                    {centroid[0] > 0 && (
-                      <g
-                        data-room-id={room.id}
-                        transform={`translate(${centroid[0]}, ${centroid[1]})`}
-                        className="room-centroid-badge cursor-pointer select-none"
-                        onClick={(e) => handleRoomClick(room, e)}
-                      >
-                        <rect
-                          x="-50"
-                          y="-14"
-                          width="100"
-                          height="28"
-                          rx="4"
-                          fill="rgba(247, 244, 237, 0.95)"
-                          stroke={isSelected ? '#0284c7' : activeTool === 'relabel' ? '#b8452a' : style.stroke}
-                          strokeWidth={isSelected ? '2' : '1.2'}
-                        />
-                        <text
-                          x="0"
-                          y="-2"
-                          textAnchor="middle"
-                          fill="#1d1d1f"
-                          fontSize="9"
-                          fontWeight="600"
-                          fontFamily="'Geist', sans-serif"
-                        >
-                          {room.room_type}
-                        </text>
-                        <text
-                          x="0"
-                          y="9"
-                          textAnchor="middle"
-                          fill="#b8452a"
-                          fontSize="8.5"
-                          fontWeight="bold"
-                          fontFamily="'Geist Mono', monospace"
-                        >
-                          {room.surface_m2} m²
-                        </text>
-                      </g>
-                    )}
-                  </g>
+                  <polygon
+                    key={room.id}
+                    data-room-id={room.id}
+                    points={points}
+                    fill={isSelected ? 'rgba(2, 132, 199, 0.28)' : style.fill}
+                    stroke={isSelected ? '#0284c7' : style.stroke}
+                    strokeWidth={isSelected ? '2.5' : '1.5'}
+                    className={`room-polygon transition-all cursor-pointer ${
+                      activeTool === 'relabel' ? 'hover:stroke-purple-400 hover:fill-purple-500/30' : 'hover:stroke-sky-500'
+                    }`}
+                    onClick={(e) => handleRoomClick(room, e)}
+                  >
+                    <title>{`${room.room_type} · ${area} · ${confidence}`}</title>
+                  </polygon>
                 );
               })}
 
@@ -720,7 +653,8 @@ export default function Floorplan2DCanvas({
                 const isSelected = wall.id === frontWallId;
                 const isExterior = wall.is_exterior;
 
-                const pts = wall.polygon_px || [];
+                const pts = wall.polygon_px?.length ? wall.polygon_px
+                  : (wall.polygon_meters || []).map(point => point.map(value => value / scaleMperPx));
                 const pointsStr = pts.map((p) => `${p[0]},${p[1]}`).join(' ');
 
                 let strokeColor = '#1d1d1f'; // Interior drafting ink
@@ -743,8 +677,9 @@ export default function Floorplan2DCanvas({
                 return (
                   <polygon
                     key={wall.id}
+                    data-wall-id={wall.id}
                     points={pointsStr}
-                    fill={fillColor}
+                    fill={wallsOnly ? strokeColor : fillColor}
                     stroke={strokeColor}
                     strokeWidth={isSelected ? '3' : isExterior ? '2' : '1.5'}
                     className={`cursor-pointer transition-all ${
@@ -767,6 +702,7 @@ export default function Floorplan2DCanvas({
                 return (
                   <circle
                     key={`door-${idx}`}
+                    data-opening-type="door"
                     cx={cx}
                     cy={cy}
                     r="5"
@@ -789,6 +725,7 @@ export default function Floorplan2DCanvas({
                 return (
                   <rect
                     key={`win-${idx}`}
+                    data-opening-type="window"
                     x={cx - 4}
                     y={cy - 4}
                     width="8"
@@ -843,6 +780,28 @@ export default function Floorplan2DCanvas({
                 )}
               </g>
             )}
+            {showRooms && roomOverlays.map(({ room, area, confidence, width, height, badge }) => badge && (
+              <g
+                key={room.id}
+                data-room-id={room.id}
+                transform={`translate(${badge.x}, ${badge.y}) scale(${badge.scale})`}
+                className="room-centroid-badge cursor-pointer select-none"
+                onClick={(e) => handleRoomClick(room, e)}
+              >
+                <title>{`${room.room_type} · ${area} · ${confidence}`}</title>
+                <rect
+                  x={-width / 2} y={-height / 2} width={width} height={height} rx="4"
+                  fill="#f7f4ed"
+                  stroke={selectedRoom?.id === room.id ? '#0284c7' : getRoomStyle(room.room_type).stroke}
+                  strokeWidth={selectedRoom?.id === room.id ? 2 : 1.2}
+                />
+                <text textAnchor="middle" fontFamily="monospace" fontSize="9" fill="#1d1d1f">
+                  <tspan x="0" y="-6" fontSize="10" fontWeight="700">{room.room_type}</tspan>
+                  <tspan x="0" y="4" fill="#96351e">{area}</tspan>
+                  <tspan x="0" y="14" fill="#3c465a">{confidence}</tspan>
+                </text>
+              </g>
+            ))}
           </svg>
 
           {/* Unresolved Rooms Domain Warning */}

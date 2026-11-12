@@ -23,8 +23,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 import io
 import base64
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from typing import Annotated, Optional, List, Dict, Any
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from PIL import Image
 
 from app.schemas import (
@@ -32,9 +32,12 @@ from app.schemas import (
     ModelMetadataResponse,
     FloorPlanAnalysisResponse,
     RoomSegment,
+    RoomScoreRegion,
     RoomDesignRequest,
     LayoutDesignRequest
 )
+from app.schemas import FurnitureChoicesRequest, FurnitureGenerateRequest
+from src.floorplan.dimensions import STOREY_HEIGHT_M, DOOR_HEIGHT_M, WINDOW_HEIGHT_M
 
 app = FastAPI(
     title="ArchiGen 3D REST API",
@@ -58,6 +61,9 @@ def preload_models():
         except Exception as e:
             print(f"[STARTUP] FloorplanPipeline warmup deferred: {e}")
         try:
+            if os.getenv("ARCHIGEN_FURNITURE_SERVICE_URL"):
+                print("[STARTUP] Furniture generation uses the native GPU worker.")
+                return
             from src.furniture.image_to_3d import ImageTo3DGenerator
             gen = ImageTo3DGenerator.get_instance()
             print(f"[STARTUP] ImageTo3DGenerator pre-warmed on {gen.device_name}!")
@@ -200,6 +206,8 @@ async def get_model_metadata():
         checkpoint_hashes=chk_hashes
     )
 
+room_score_regions = TypeAdapter(Annotated[List[RoomScoreRegion], Field(max_length=100)])
+
 @app.post("/predict/floorplan", response_model=FloorPlanAnalysisResponse, tags=["Vision Inference"])
 async def analyze_floorplan(
     file: UploadFile = File(...),
@@ -209,7 +217,8 @@ async def analyze_floorplan(
     style: Optional[str] = Form(default="Modern Minimalist"),
     use_tta: bool = Form(default=False),
     tta_mode: str = Form(default="none"),
-    front_only: bool = Form(default=True)
+    front_only: bool = Form(default=True),
+    reference_rooms: Optional[str] = Form(default=None),
 ):
     """
     Parses an uploaded 2D floor plan image, segments walls/doors/windows/rooms using Deep Learning,
@@ -235,6 +244,11 @@ async def analyze_floorplan(
         )
 
     try:
+        score_regions = room_score_regions.validate_json(reference_rooms) if reference_rooms is not None else None
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail="Invalid reference room polygons.") from exc
+
+    try:
         from app.floorplan_engine import FloorplanPipeline
         pipeline = FloorplanPipeline.get_instance()
         result = pipeline.process_image(
@@ -245,7 +259,8 @@ async def analyze_floorplan(
             style=style,
             use_tta=use_tta,
             tta_mode=tta_mode,
-            front_only=front_only
+            front_only=front_only,
+            reference_rooms=score_regions,
         )
         layout = result["layout"]
         threejs_scene = result["threejs_scene"]
@@ -255,6 +270,7 @@ async def analyze_floorplan(
                 id=r.get("id"),
                 room_type=r["room_type"],
                 surface_m2=r["surface_m2"],
+                confidence=r.get("confidence"),
                 polygon_points=r["polygon_meters"],
                 edges=r.get("edges"),
                 wall_backed_edge_count=r.get("wall_backed_edge_count")
@@ -267,7 +283,10 @@ async def analyze_floorplan(
             WallSegment(
                 id=w["id"],
                 polygon_meters=w["polygon_meters"],
-                height_m=w.get("height_m", 2.8),
+                axis_meters=w.get("axis_meters"),
+                thickness_m=w.get("thickness_m"),
+                facade_frame=w.get("facade_frame"),
+                height_m=w.get("height_m", STOREY_HEIGHT_M),
                 is_exterior=w.get("is_exterior", False),
                 is_front=w.get("is_front", False),
                 openings=w.get("openings", []),
@@ -280,6 +299,7 @@ async def analyze_floorplan(
             total_area_m2=layout["metadata"].get("total_area_m2", layout["metadata"].get("total_surface_m2", 0.0)),
             num_rooms=len(rooms),
             rooms=rooms,
+            reference_room_confidences=result.get("reference_room_confidences"),
             walls=walls,
             doors=layout.get("doors", []),
             windows=layout.get("windows", []),
@@ -355,33 +375,42 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
             walls = request.layout.get("walls", [])
             if request.wall_id:
                 wall = next((w for w in walls if w.get("id") == request.wall_id), None)
-            if wall is None:
-                wall = bridge.select_front_wall(walls) or (walls[0] if walls else None)
-            if wall is not None:
-                wall = {**wall, "geometry_fixed": True}
+                if wall is None:
+                    raise HTTPException(status_code=404, detail="The selected exterior wall was not found.")
+            else:
+                wall = bridge.select_front_wall(walls)
+                if wall is None:
+                    raise HTTPException(status_code=422, detail="The floorplan has no exterior wall to finish.")
+
+        if wall is not None:
+            if wall.get("is_exterior") is False:
+                raise HTTPException(status_code=422, detail="Choose an exterior wall for the facade.")
+            wall = {**wall, "geometry_fixed": True}
 
         if wall is None:
-            # Fallback to standard architectural front facade wall (8.5m x 2.8m with entrance door & windows)
+            # Standalone preview for callers that have not provided a floorplan.
             wall = {
                 "id": request.wall_id or "wall_front_default",
                 "is_exterior": True,
                 "is_front": True,
+                "height_m": STOREY_HEIGHT_M,
                 "polygon_meters": [[0.0, 0.0], [8.5, 0.0], [8.5, 0.25], [0.0, 0.25]],
                 "openings": [
-                    {"type": "door", "position_along_wall_m": 4.25, "width": 1.15, "height": 2.2},
-                    {"type": "window", "position_along_wall_m": 1.8, "width": 1.4, "height": 1.4},
-                    {"type": "window", "position_along_wall_m": 6.7, "width": 1.4, "height": 1.4}
+                    {"type": "door", "position_along_wall_m": 4.25, "width": 1.15, "height": DOOR_HEIGHT_M},
+                    {"type": "window", "position_along_wall_m": 1.8, "width": 1.4, "height": WINDOW_HEIGHT_M},
+                    {"type": "window", "position_along_wall_m": 6.7, "width": 1.4, "height": WINDOW_HEIGHT_M}
                 ]
             }
 
         num_floors = 1 if wall.get("level_id") else request.num_floors or 1
-        style = request.style or "Modern Minimalist"
+        style = request.style
 
         res = bridge.render_wall_facade(
             wall=wall,
             num_floors=num_floors,
             is_front=True,
-            style=style
+            style=style,
+            material_finish=True,
         )
 
         import base64
@@ -403,6 +432,8 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
             "sketch_base64": f"data:image/png;base64,{sketch_b64}",
             "device": bridge.device_name
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -411,17 +442,11 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
 
 # --- 2D-to-3D Furniture Synthesizer (TripoSR / Volumetric) ---
 
-class FurnitureGenerateRequest(BaseModel):
-    image_base64: str
-    name: Optional[str] = "Custom Furniture"
-    category: Optional[str] = "chair"
-    remove_bg: Optional[bool] = True
-    target_height_m: Optional[float] = None
-
 class FurnitureSaveRequest(BaseModel):
-    id: str
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
     name: str
     category: str
+    furniture_type: Optional[str] = None
     dimensions_m: List[float]
     bounds: Dict[str, Any]
     glb_base64: str
@@ -443,61 +468,59 @@ async def generate_furniture_3d_endpoint(request: FurnitureGenerateRequest):
     Synthesizes a textured 3D furniture model (.glb) from a 2D image.
     Supports RTX 3050 CUDA hardware with VRAM guards and automated background isolation.
     """
+    service_url = os.getenv("ARCHIGEN_FURNITURE_SERVICE_URL")
+    if service_url:
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=840, trust_env=False) as client:
+                response = await client.post(
+                    service_url.rstrip("/") + "/furniture/generate-3d",
+                    json=request.model_dump(),
+                )
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="The GPU furniture worker is unavailable. Start it with scripts/start_local_stack.ps1.",
+            ) from exc
+        if not response.is_success:
+            raise HTTPException(status_code=response.status_code, detail=response.json().get("detail", "GPU reconstruction failed."))
+        result = response.json()
+        if result.get("quality", {}).get("checkpoint_loading") != "strict":
+            raise HTTPException(status_code=502, detail="The furniture worker did not return a TripoSR quality reconstruction.")
+        return result
+
     try:
         from src.furniture.image_to_3d import ImageTo3DGenerator
-        generator = ImageTo3DGenerator.get_instance()
+        from src.furniture.service import generate_furniture_response
 
-        raw_b64 = request.image_base64
-        if "," in raw_b64:
-            raw_b64 = raw_b64.split(",", 1)[1]
-        img_bytes = base64.b64decode(raw_b64)
-        input_image = Image.open(io.BytesIO(img_bytes))
-        if input_image.mode not in ("RGB", "RGBA"):
-            input_image = input_image.convert("RGBA")
-
-        res = generator.generate_from_image(
-            image=input_image,
-            name=request.name or "Custom Furniture",
-            category=request.category or "chair",
-            remove_bg=bool(request.remove_bg),
-            target_height_m=request.target_height_m
-        )
-
-        return {
-            "status": "success",
-            "id": res["id"],
-            "name": res["name"],
-            "category": res["category"],
-            "dimensions_m": res["dimensions_m"],
-            "bounds": res["bounds"],
-            "num_vertices": res["num_vertices"],
-            "num_faces": res["num_faces"],
-            "roughness": res.get("roughness", 0.35),
-            "engine": res["engine"],
-            "device": res["device"],
-            "model_glb_base64": res["glb_base64"],
-            "preview_image_base64": res["preview_image_base64"],
-            "quality": res.get("quality")
-        }
-    except Exception as e:
+        return generate_furniture_response(request, ImageTo3DGenerator.get_instance())
+    except Exception as exc:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"3D furniture generation error: {e}")
+        raise HTTPException(status_code=500, detail=f"3D furniture generation error: {exc}") from exc
 
 @app.post("/furniture/save-to-library", tags=["Generative AI"])
 async def save_furniture_to_library_endpoint(request: FurnitureSaveRequest):
     """
     Persists a generated 3D model into the custom furniture catalog for use in Room Design.
     """
+    from src.design.custom_catalog import FURNITURE_TYPES, valid_glb_header
     try:
         import json
+        if request.furniture_type and request.furniture_type not in FURNITURE_TYPES.get(request.category, ()):
+            raise HTTPException(status_code=422, detail="Choose a room catalog type that matches this furniture category.")
         glb_filename = f"{request.id}.glb"
         glb_path = CUSTOM_FURNITURE_DIR / glb_filename
 
         raw_b64 = request.glb_base64
         if "," in raw_b64:
             raw_b64 = raw_b64.split(",", 1)[1]
-        glb_bytes = base64.b64decode(raw_b64)
+        try:
+            glb_bytes = base64.b64decode(raw_b64, validate=True)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="The model file is not valid base64.") from exc
+        if not valid_glb_header(glb_bytes[:20], len(glb_bytes)):
+            raise HTTPException(status_code=422, detail="The model file is not a valid GLB.")
         glb_path.write_bytes(glb_bytes)
 
         custom_items = {}
@@ -517,6 +540,8 @@ async def save_furniture_to_library_endpoint(request: FurnitureSaveRequest):
             "scaling_type": "strict_uniform",
             "scale_factors": [1.0, 1.0, 1.0]
         }
+        if request.furniture_type:
+            item_entry["furniture_type"] = request.furniture_type
         custom_items[request.id] = item_entry
         CUSTOM_CATALOG_FILE.write_text(json.dumps(custom_items, indent=2), encoding="utf-8")
 
@@ -525,6 +550,8 @@ async def save_furniture_to_library_endpoint(request: FurnitureSaveRequest):
             "item": item_entry,
             "message": f"Saved {request.name} to custom furniture library!"
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save furniture: {e}")
 
@@ -561,6 +588,7 @@ async def design_room_endpoint(request: RoomDesignRequest):
             windows=request.windows,
             preset=request.preset,
             seed=request.seed if request.seed is not None else 42,
+            scale_m_per_px=request.scale_m_per_px,
             force_furnish=bool(request.force_furnish)
         )
         return result.to_dict()
@@ -569,6 +597,24 @@ async def design_room_endpoint(request: RoomDesignRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Room design failed: {str(e)}"
         )
+
+
+@app.post("/design/furniture-choices", tags=["Room Design"])
+async def furniture_choices_endpoint(request: FurnitureChoicesRequest):
+    """Find alternative catalog models that fit a placed item's location."""
+    from src.design.engine import RoomDesignEngine
+    from src.design.custom_catalog import load_custom_catalog
+    try:
+        choices = RoomDesignEngine().furniture_choices(
+            room_polygon_meters=request.polygon_meters, room_type=request.room_type,
+            items=[item.model_dump() for item in request.items], item_id=request.item_id,
+            wall_segments=request.wall_segments, doors=request.doors, windows=request.windows,
+            scale_m_per_px=request.scale_m_per_px, force_furnish=bool(request.force_furnish),
+            custom_catalog=load_custom_catalog(CUSTOM_CATALOG_FILE, CUSTOM_FURNITURE_DIR),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"choices": choices}
 
 
 @app.post("/design/layout", tags=["Room Design"])
