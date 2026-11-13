@@ -38,16 +38,21 @@ CATEGORY_DIMENSIONS = {
 
 
 class ImageTo3DGenerator:
+    volumetric_resolution = 72
     _instance = None
     _instance_lock = threading.Lock()
 
-    def __init__(self, use_gpu: bool = True):
+    def __init__(self, use_gpu: bool = True, engine_mode: str = 'auto'):
+        if engine_mode not in ('auto', 'volumetric'):
+            raise ValueError('engine_mode must be auto or volumetric')
+        if engine_mode == 'volumetric' and use_gpu:
+            raise ValueError('The volumetric baseline requires use_gpu=False')
         self.use_gpu = use_gpu
         self.tsr_model = None
         self.device_name = "CPU"
         self.rembg_session = None
         self._quality_engine = None
-        if os.environ.get('ARCHIGEN_FURNITURE_QUALITY') == '1':
+        if engine_mode == 'auto' and os.environ.get('ARCHIGEN_FURNITURE_QUALITY') == '1':
             from .quality_engine import QualityFurnitureEngine
             self._quality_engine = QualityFurnitureEngine(use_gpu=use_gpu)
             self.device = self._quality_engine.device
@@ -68,7 +73,8 @@ class ImageTo3DGenerator:
             self.device_name = "CPU"
 
         # 2. Try loading TripoSR if checkpoint exists
-        self._init_triposr()
+        if engine_mode == 'auto':
+            self._init_triposr()
 
     def _init_triposr(self):
         """Attempts to load TripoSR onto GPU if local model checkpoint is available."""
@@ -271,7 +277,7 @@ class ImageTo3DGenerator:
         cropped_alpha = alpha[y0:y1 + 1, x0:x1 + 1]
 
         # Resolution for voxel marching cubes
-        res = 72
+        res = self.volumetric_resolution
         dist = cv2.distanceTransform(cropped_alpha, cv2.DIST_L2, 5)
         norm_dist = cv2.resize(dist, (res, res))
         norm_dist = norm_dist / max(1.0, norm_dist.max())

@@ -30,44 +30,77 @@ that the previous extraction and texture projection discarded.
   account for other allocations again before inference, sample device memory, and
   clear unused CUDA cache on completion/failure.
 
-## Run locally
+## Installation on a fresh Windows machine
 
-This checkout already has CUDA PyTorch 2.6.0+cu124 and the TripoSR source/weights.
-The isolated environment inherits those installed packages; it is not a complete
-clean-machine environment specification. Do not install the experiment's older
-Transformers version into the main project or facade diffusion environment.
+Requirements: an NVIDIA CUDA-capable GPU, its working driver (`nvidia-smi`), Git,
+Node.js, and a Python installation for bootstrapping uv. The installer downloads
+several GB. CUDA inference runs in an independent Python 3.11 environment; do not
+reuse the CPU-only Python 3.14 environment or --system-site-packages.
 
-```powershell
-python -m venv --system-site-packages .venv-furniture-quality
-.\.venv-furniture-quality\Scripts\python.exe -m pip install -r requirements-furniture-quality.txt
-.\.venv-furniture-quality\Scripts\python.exe scripts/benchmark_furniture_quality.py --mode high --output outputs/furniture_quality/new-run
-node scripts/render_furniture_quality.cjs outputs/furniture_quality/new-run/model.glb outputs/furniture_quality/new-run/views
-```
-
-For a fresh source checkout, use upstream TripoSR revision
-`107cefdc244c39106fa830359024f6a2f1c78871` in the ignored `TripoSR/` directory and
-the `stabilityai/TripoSR` config/model checkpoint. The tested checkpoint SHA256 is
-`429e2c6b22a0923967459de24d67f05962b235f79cde6b032aa7ed2ffcd970ee`.
-Upstream imports torchmcubes even when its extractor is unused. If torchmcubes is
-unavailable, apply the tracked import-only patch to a clean upstream checkout:
-`git -C TripoSR apply --unidiff-zero --ignore-space-change ../patches/triposr-optional-marching-cubes.patch`.
-The existing local vendor tree already has a compatible import fallback; do not
-apply the patch on top of it. Quality mode bypasses the vendor extractor and its
-modified `from_pretrained`, so neither implementation controls geometry or loading.
-
-With port 8000 free, enable the experiment in a new shell:
+From the repository root in PowerShell:
 
 ```powershell
-$env:ARCHIGEN_FURNITURE_QUALITY='1'
-$env:ARCHIGEN_FURNITURE_DETAIL='high' # balanced is faster/lighter for room design
-$env:ARCHIGEN_FACADE_EXPERIMENT='models/saved/facade512_experiment/generator.pth'
-.\.venv-furniture-quality\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+python -m pip install uv
+.\scripts\setup_furniture_gpu.ps1
 ```
 
-Open the existing Vite app on port 3000, select **AI Generative Studio**, and generate
-the chair or upload a photograph. Download the GLB or explicitly save it to the room
-library. Verification scripts do not write to the library. Unset
-`ARCHIGEN_FURNITURE_QUALITY` and restart to use the original implementation.
+The script locates uv on PATH or inside .venv/Scripts, installs project-local
+Python 3.11 under outputs/runtime/python, and creates .venv-furniture-quality.
+It installs PyTorch 2.6.0 / torchvision 0.21.0 from the official CUDA 12.4 wheel
+index, then the standalone dependencies in `requirements-furniture-quality.txt`.
+It pins TripoSR source revision 107cefdc244c39106fa830359024f6a2f1c78871, applies
+the tracked optional-torchmcubes import patch, and uses ArchiGen's scikit-image
+surface extractor rather than compiling torchmcubes.
+
+The official stabilityai/TripoSR configuration and checkpoint are downloaded to
+TripoSR/. The installer verifies checkpoint SHA256
+429e2c6b22a0923967459de24d67f05962b235f79cde6b032aa7ed2ffcd970ee, caches the
+DINO configuration and u2netp mask model, and checks CUDA with a real GPU tensor
+operation. The encoder weights are already included in the TripoSR checkpoint.
+Caches and models stay in ignored project directories. No training is required.
+
+For a fresh checkout, prepare the ordinary API and frontend once as well:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+cd frontend
+npm ci
+cd ..
+```
+
+## Start the native GPU studio
+
+```powershell
+.\scripts\start_native_gpu.ps1
+```
+
+Open http://127.0.0.1:3000/#studio. The default is **high**: 384 cubed density
+and a 2048 px neural texture atlas. Use -FurnitureDetail balanced for 256 cubed /
+1024 px. The launcher restarts this checkout's worker to apply the requested
+preset, waits for CUDA readiness, then restarts this checkout's API with
+ARCHIGEN_FURNITURE_SERVICE_URL=http://127.0.0.1:8001. An existing ArchiGen Vite
+frontend is reused; otherwise it is started. Unrelated port occupants are rejected.
+The API and frontend remain on ports 8000 and 3000; the worker listens only on
+127.0.0.1:8001. The startup timeout is 300 seconds and can be overridden with
+-StartupTimeoutSeconds.
+
+Logs and process IDs are in outputs/native_gpu/. Processes run in the background;
+restart with the same command after Windows restarts. If CUDA, weights, or the
+worker are unavailable, startup or generation reports an explicit error; the
+configured API never substitutes the local volumetric synthesizer. Neural inference
+and color queries use CUDA with FP16 large-model weights and FP32 density/color
+decoding. Mask removal, surface extraction, UV packing, and GLB export use CPU.
+The existing conservative 3500 MiB device-memory guard remains enabled.
+
+Select the chair reference or upload a complete furniture photo. Download the GLB
+or explicitly save it to the room library. Verification scripts do not save models
+to the user library. The general API /health describes the floorplan runtime;
+check http://127.0.0.1:8001/health for the furniture CUDA worker.
+
+For Docker API/frontend with the same native worker, use the existing
+scripts/start_local_stack.ps1 after setup. Its library is stored in the Docker
+volume rather than the native frontend directory.
 
 ## Evaluation and limitations
 
@@ -103,6 +136,19 @@ https://github.com/microsoft/TRELLIS.2.
 
 ## Verification
 
+For the native stack, run the following from the repository root:
+
+```powershell
+.\.venv-furniture-quality\Scripts\python.exe scripts/verify_furniture_gpu.py
+```
+
+This submits two consecutive requests through the public API: the transparent
+chair reference, then the same photo composited on an opaque white background
+to exercise u2netp. It checks CUDA provenance, strict checkpoint loading, the high
+preset, valid textured GLBs, metric height, and the existing device-memory guard.
+GLBs, input masks, timings, and memory measurements are saved under
+`outputs/furniture_quality/rtx4050/`; the user's catalog is untouched.
+
 The Docker API forwards furniture generation to the native CUDA worker on port
 8001. Run `scripts/start_local_stack.ps1` to start the worker and Docker together.
 The default is high detail. Use `-FurnitureDetail balanced` when starting a new
@@ -115,7 +161,30 @@ studio/API smoke test (`node scripts/verify_furniture_studio.cjs`). GitHub Actio
 checks analytic geometry, coordinate/catalog contracts and the frontend without
 requiring model weights or a GPU. It does not evaluate learned reconstruction quality.
 
-## Verified final result
+## Verified RTX 4050 native result (2026-11-13)
+
+The standalone Python 3.11.18 environment runs PyTorch 2.6.0+cu124 on the RTX 4050
+Laptop GPU (6141 MiB). The setup script completed successfully, verified the
+checkpoint hash, and performed a CUDA tensor operation. The native launcher
+started the strict TripoSR worker and routed the public API to it.
+
+Two consecutive public API requests passed with the high preset (384 cubed,
+2048 px atlas), FP16 encoder/transformer and FP32 field decoding:
+
+| Input | Generation | Sampled device peak | Faces | GLB size |
+| --- | --- | --- | --- | --- |
+| Transparent chair reference | 6.67 s | 1583 MiB | 189092 | 6691948 bytes |
+| Same photo on opaque white background, u2netp masking | 5.95 s | 1577 MiB | 181362 | 6361076 bytes |
+
+Both outputs loaded successfully with trimesh, contain a 2048 x 2048 embedded
+texture, measure 0.85 m high, and report a watertight, one-component surface.
+PyTorch peak allocated/reserved memory was 971.5/1044 MiB in both runs. Evidence
+is saved locally in `outputs/furniture_quality/rtx4050/verification.json` and the
+adjacent GLBs and masks. These are single-run observations, not a latency benchmark.
+The browser automation tool stopped before visual verification, so interactive
+preview and the browser download button were not verified in this session.
+
+## Previously verified result on the original environment
 
 The actual studio request returned a watertight, one-component chair with 189,116
 triangles and a 2048 px texture. Generation took 282.7 seconds; the sampled total

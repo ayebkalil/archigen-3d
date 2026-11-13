@@ -2,15 +2,28 @@
 
 import base64
 import io
+import time
 
 from PIL import Image
+from .tracking import GenerationRun
 
 
-def generate_furniture_response(request, generator):
+def generate_furniture_response(request, generator, *, tracking_tags=None):
+    run = GenerationRun(request, generator, tags=tracking_tags)
+    try:
+        return _generate(request, generator, run)
+    except Exception as exc:
+        run.fail(exc)
+        raise
+
+
+def _generate(request, generator, run):
     image_bytes = base64.b64decode(request.image_base64.split(",")[-1])
     image = Image.open(io.BytesIO(image_bytes))
     if image.mode not in ("RGB", "RGBA"):
         image = image.convert("RGBA")
+    run.input(image_bytes, image)
+    started = time.perf_counter()
     result = generator.generate_from_image(
         image=image,
         name=request.name or "Custom Furniture",
@@ -18,6 +31,8 @@ def generate_furniture_response(request, generator):
         remove_bg=bool(request.remove_bg),
         target_height_m=request.target_height_m,
     )
+    duration = time.perf_counter() - started
+    run.finish(result, duration)
     return {
         "status": "success",
         "id": result["id"],

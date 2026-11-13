@@ -1,0 +1,2 @@
+# Full local tracking server and UI; inference uses mlflow-skinny only.
+mlflow==3.17.1

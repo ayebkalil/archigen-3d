@@ -241,6 +241,38 @@ Le benchmark sur 50 plans réels (architecturaux, CubiCasa5k, plans externes ; *
 
 ---
 
+## Démarrage local sans Docker (PowerShell)
+
+Pour la reconstruction neuronale des meubles sur GPU NVIDIA, suivez
+[l'installation CUDA complète](docs/furniture-quality-experiment.md), puis lancez
+`.\scripts\start_native_gpu.ps1`. Ce lancement raccorde l'API au worker TripoSR
+sur le port 8001, avec le préréglage haute qualité par défaut.
+
+Le lancement natif active également le [suivi MLflow des reconstructions](docs/furniture-mlflow.md)
+sur `http://127.0.0.1:5000` : runs, durées, mémoire GPU, images et fichiers GLB.
+Installez le serveur avec `requirements-tracking.txt` avant le premier lancement.
+
+Après un `git pull`, installez les dépendances dans le même environnement Python
+que celui du serveur. Un simple `pip install` peut utiliser le Python utilisateur
+et laisser le backend sans les paquets nécessaires, notamment `trimesh`.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+Dans un second terminal :
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+Ouvrez `http://localhost:3000`. Redémarrez le backend après une mise à jour du
+code ou des dépendances. Le mobilier local utilise la reconstruction volumétrique ;
+le moteur neuronal TripoSR nécessite l'environnement dédié décrit plus bas.
+
 ## ⚡ Démarrage Rapide (Production Docker Compose)
 
 ```bash

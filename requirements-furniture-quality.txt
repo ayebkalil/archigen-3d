@@ -1,4 +1,10 @@
-# Isolated venv with --system-site-packages reuses existing CUDA Torch 2.6.
+# Standalone Python 3.11 environment. Install CUDA Torch first; see setup script.
+-r backend/requirements.txt
+numpy==1.26.4
 transformers==4.46.3
 huggingface-hub==0.36.2
 xatlas==0.0.11
+omegaconf==2.3.0
+einops==0.7.0
+rembg[cpu]==2.0.61
+imageio[ffmpeg]>=2.33

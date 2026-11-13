@@ -56,6 +56,8 @@ def test_custom_room_catalog_uses_saved_models_that_match_and_fit(monkeypatch, t
 
 @pytest.mark.parametrize("available", [True, False])
 def test_furniture_uses_configured_gpu_worker(monkeypatch, available):
+    monkeypatch.setattr('src.furniture.service.generate_furniture_response',
+                        lambda *args, **kwargs: pytest.fail('Proxy must not reconstruct or create a second run'))
     monkeypatch.setenv("ARCHIGEN_FURNITURE_SERVICE_URL", "http://furniture-worker:8001")
     result = {"status": "success", "engine": "TripoSR Quality", "quality": {"checkpoint_loading": "strict"}}
 

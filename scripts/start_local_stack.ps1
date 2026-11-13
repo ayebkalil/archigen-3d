@@ -30,11 +30,15 @@ if (!$workerHealth) {
         ARCHIGEN_FURNITURE_DETAIL = $env:ARCHIGEN_FURNITURE_DETAIL
         OMP_NUM_THREADS = $env:OMP_NUM_THREADS
         MKL_NUM_THREADS = $env:MKL_NUM_THREADS
+        HF_HOME = $env:HF_HOME
+        U2NET_HOME = $env:U2NET_HOME
     }
     try {
         $env:ARCHIGEN_FURNITURE_DETAIL = $FurnitureDetail
         $env:OMP_NUM_THREADS = '2'
         $env:MKL_NUM_THREADS = '2'
+        $env:HF_HOME = Join-Path $projectRoot 'outputs/runtime/huggingface'
+        $env:U2NET_HOME = Join-Path $projectRoot 'outputs/runtime/rembg'
         $processOptions = @{
             FilePath = $python
             WorkingDirectory = $projectRoot
