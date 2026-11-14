@@ -1,6 +1,3 @@
-[core]
-    remote = onedrive_backup
-['remote "local_storage"']
-    url = ../../dvc_storage
-['remote "onedrive_backup"']
-    url = C:\Users\ayebk\OneDrive\archigen_dvc_remote_backup
+# Production ONNX weights use versioned HTTPS imports in their .dvc pointers.
+# Configure training-data/research-checkpoint storage locally, for example:
+# dvc remote add --local -d training-data /path/to/team-shared-storage

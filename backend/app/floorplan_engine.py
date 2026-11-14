@@ -11,6 +11,7 @@ Performs:
 
 import sys
 import threading
+import os
 from pathlib import Path
 
 def get_project_root() -> Path:
@@ -47,6 +48,7 @@ from scipy.special import softmax
 from src.floorplan.vectorizer import FloorplanVectorizer, ROOM_NAMES, score_room_polygon
 from src.floorplan.extruder_3d import Floorplan3DExtruder
 from src.bridge.facade_bridge import FacadeBridge
+from src.models.artifacts import require_artifacts, verify_model, ModelArtifactError
 
 class FloorplanPipeline:
     _instance = None
@@ -59,6 +61,8 @@ class FloorplanPipeline:
         device: Optional[str] = None,
         prefer_onnx: bool = False
     ):
+        # A clean checkout must never infer from missing, stale or partial weights.
+        require_artifacts('runtime', PROJECT_ROOT)
         self.device = None
         self.baseline_model = None
         self.multitask_model = None
@@ -67,7 +71,7 @@ class FloorplanPipeline:
         self.onnx_multitask = None
         self.onnx_fallback = None
         self.is_multitask = False
-        self.prefer_onnx = prefer_onnx or (not HAS_TORCH)
+        self.prefer_onnx = prefer_onnx or (not HAS_TORCH) or os.getenv('ARCHIGEN_FLOORPLAN_BACKEND') == 'onnx'
         self.checkpoint_hashes = {}
 
         import hashlib
@@ -115,8 +119,6 @@ class FloorplanPipeline:
             if multitask_weights_path is None:
                 candidates = [
                     PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
-                    PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_best.pth",
-                    PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_best_backup_25ep.pth"
                 ]
                 chosen_mt = None
                 for cand in candidates:
@@ -133,11 +135,14 @@ class FloorplanPipeline:
                 base_file = PROJECT_ROOT / baseline_weights_path
             if base_file.exists():
                 try:
-                    self.baseline_model = smp.Unet(encoder_name="resnet34", classes=4).to(self.device)
+                    verify_model(base_file, PROJECT_ROOT)
+                    baseline = smp.Unet(encoder_name="resnet34", encoder_weights=None, classes=4).to(self.device)
                     state_dict = load_file(str(base_file))
-                    self.baseline_model.load_state_dict(state_dict)
-                    self.baseline_model.eval()
+                    baseline.load_state_dict(state_dict)
+                    self.baseline_model = baseline.eval()
                     print(f"[FLOORPLAN ENGINE] Loaded baseline structure model from {base_file}")
+                except ModelArtifactError:
+                    raise
                 except Exception as e:
                     print(f"[FLOORPLAN ENGINE] Error loading baseline weights: {e}")
 
@@ -145,41 +150,48 @@ class FloorplanPipeline:
             mt_file = Path(multitask_weights_path)
             if mt_file.exists():
                 try:
+                    verify_model(mt_file, PROJECT_ROOT)
                     ckpt = torch.load(str(mt_file), map_location=self.device, weights_only=False)
-                    self.multitask_model = MultiTaskFloorplanUNet(
+                    multitask = MultiTaskFloorplanUNet(
                         encoder_name="resnet34",
+                        encoder_weights=None,
                         num_struct_classes=5,
                         num_room_classes=12
                     ).to(self.device)
-                    self.multitask_model.load_state_dict(ckpt["model_state_dict"])
-                    self.multitask_model.eval()
+                    multitask.load_state_dict(ckpt["model_state_dict"])
+                    self.multitask_model = multitask.eval()
                     self.is_multitask = True
                     print(f"[FLOORPLAN ENGINE] Loaded MultiTask UNet++ from {mt_file} on {self.device}")
+                except ModelArtifactError:
+                    raise
                 except Exception as e:
                     print(f"[FLOORPLAN ENGINE] Warning loading multitask weights: {e}")
 
             # Load Fallback Routing Model
             fallback_candidates = [
                 PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
-                PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_restyled_challenger.pth"
             ]
             chosen_fb = None
             for fb_cand in fallback_candidates:
                 if fb_cand.exists():
                     try:
+                        verify_model(fb_cand, PROJECT_ROOT)
                         ckpt_fb = torch.load(str(fb_cand), map_location=self.device, weights_only=False)
-                        self.fallback_model = MultiTaskFloorplanUNet(
+                        fallback = MultiTaskFloorplanUNet(
                             encoder_name="resnet34",
+                            encoder_weights=None,
                             num_struct_classes=5,
                             num_room_classes=12
                         ).to(self.device)
                         sd_fb = ckpt_fb.get("model_state_dict", ckpt_fb)
-                        self.fallback_model.load_state_dict(sd_fb)
-                        self.fallback_model.eval()
+                        fallback.load_state_dict(sd_fb)
+                        self.fallback_model = fallback.eval()
                         self.fallback_model_name = fb_cand.stem
                         chosen_fb = fb_cand
                         print(f"[FLOORPLAN ENGINE] Loaded Fallback Router model from {fb_cand.name}")
                         break
+                    except ModelArtifactError:
+                        raise
                     except Exception as e:
                         print(f"[FLOORPLAN ENGINE] Warning loading fallback model: {e}")
 
@@ -215,18 +227,10 @@ class FloorplanPipeline:
         self.vectorizer = FloorplanVectorizer()
         self.extruder = Floorplan3DExtruder()
 
-        # Find best available facade models
+        # A missing native checkpoint uses the same champion ONNX, not an older model.
         facade_onnx = PROJECT_ROOT / "models/saved/generator_perceptual_ema.onnx"
-        if not facade_onnx.exists():
-            facade_onnx = PROJECT_ROOT / "models/saved/generator_perceptual.onnx"
-        if not facade_onnx.exists():
-            facade_onnx = PROJECT_ROOT / "models/saved/generator.onnx"
 
         facade_pth = PROJECT_ROOT / "models/saved/generator_perceptual_ema_best.pth"
-        if not facade_pth.exists():
-            facade_pth = PROJECT_ROOT / "models/saved/generator_perceptual_best.pth"
-        if not facade_pth.exists():
-            facade_pth = PROJECT_ROOT / "models/saved/generator_best.pth"
 
         self.bridge = FacadeBridge(
             onnx_model_path=str(facade_onnx),
@@ -234,6 +238,15 @@ class FloorplanPipeline:
             prefer_cuda=(self.device is not None and getattr(self.device, "type", None) == "cuda")
         )
         facade_engine = self.bridge.inference_engine
+        if self.multitask_model is None and self.onnx_multitask is not None:
+            self.checkpoint_hashes.update(engine_mode='ONNX Runtime CPU',
+                primary_model=chosen_onnx.name, primary_sha256=file_sha256(chosen_onnx),
+                fallback_loaded=self.onnx_fallback is not None,
+                fallback_model=chosen_fb_onnx.name if chosen_fb_onnx else None,
+                fallback_sha256=file_sha256(chosen_fb_onnx))
+        if facade_engine is not None:
+            facade_path = self.bridge.pytorch_model_path if self.bridge.device_name.startswith('PyTorch') else self.bridge.onnx_model_path
+            self.checkpoint_hashes.update(facade_model=facade_path.name, facade_sha256=file_sha256(facade_path))
         if getattr(facade_engine, "neural_style", False):
             self.checkpoint_hashes["facade_model"] = facade_engine.path.name
             self.checkpoint_hashes["facade_sha256"] = file_sha256(facade_engine.path)
@@ -417,6 +430,22 @@ class FloorplanPipeline:
                     softmax(out_hv[1], axis=1)[:, :, ::-1, ::-1]
                 ) / 4.0
                 active_mode = "onnx_4_fold_tta"
+            elif effective_tta == "8_fold":
+                # Same D4 transforms/inverses as the CUDA implementation.
+                accumulated = None
+                for transpose in (False, True):
+                    for vertical, horizontal in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+                        augmented = tensor_np[:, :, ::vertical, ::horizontal]
+                        if transpose:
+                            augmented = augmented.swapaxes(2, 3)
+                        outputs = self.onnx_multitask.run(None, {'input': np.ascontiguousarray(augmented)})
+                        probabilities = [softmax(value, axis=1) for value in outputs]
+                        if transpose:
+                            probabilities = [value.swapaxes(2, 3) for value in probabilities]
+                        probabilities = [value[:, :, ::vertical, ::horizontal] for value in probabilities]
+                        accumulated = probabilities if accumulated is None else [a + b for a, b in zip(accumulated, probabilities)]
+                prob_s, prob_r = [value / 8.0 for value in accumulated]
+                active_mode = "onnx_8_fold_tta"
             else:
                 outs = self.onnx_multitask.run(None, {'input': tensor_np})
                 prob_s = softmax(outs[0], axis=1)
@@ -432,9 +461,7 @@ class FloorplanPipeline:
             mask_4class[struct_pred == 3] = 2
             mask_4class[struct_pred == 4] = 3
         else:
-            mask_4class = np.zeros((size, size), dtype=np.uint8)
-            struct_pred = None
-            room_pred = None
+            raise ModelArtifactError('No trained floorplan model loaded. Run `python scripts/models.py pull --profile runtime`.')
 
         # 2. Geometric Vectorization
         layout = self.vectorizer.vectorize(

@@ -26,6 +26,7 @@ import base64
 from typing import Annotated, Optional, List, Dict, Any
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from PIL import Image
+from src.models.artifacts import ModelArtifactError
 
 from app.schemas import (
     HealthResponse,
@@ -48,6 +49,10 @@ app = FastAPI(
 )
 
 import threading
+
+@app.exception_handler(ModelArtifactError)
+async def missing_model_handler(request: Request, exc: ModelArtifactError):
+    return JSONResponse(status_code=503, content={"detail": str(exc), "error": "model_artifact_unavailable"})
 
 @app.on_event("startup")
 def preload_models():
@@ -131,25 +136,39 @@ async def health_check():
     fb_loaded = False
     fb_name = None
     engine_mode = None
+    model_loaded = False
+    facade_loaded = False
+    errors = []
     try:
         from app.floorplan_engine import FloorplanPipeline
         pipeline = FloorplanPipeline.get_instance()
         fb_loaded = (pipeline.fallback_model is not None) or (pipeline.onnx_fallback is not None)
         fb_name = getattr(pipeline, "fallback_model_name", None)
         engine_mode = pipeline.checkpoint_hashes.get("engine_mode")
-    except Exception:
-        pass
+        model_loaded = pipeline.multitask_model is not None or pipeline.onnx_multitask is not None
+        facade_loaded = pipeline.bridge.inference_engine is not None
+        if not model_loaded:
+            errors.append('Floorplan champion is not loaded')
+        if not fb_loaded:
+            errors.append('Floorplan fallback router is not loaded')
+        if not facade_loaded:
+            errors.append('Facade generator is not loaded')
+    except Exception as exc:
+        errors.append(str(exc))
 
-    return HealthResponse(
-        status="healthy",
-        model_loaded=True,
+    result = HealthResponse(
+        status="healthy" if not errors else "not_ready",
+        model_loaded=model_loaded,
         gpu_available=gpu_avail,
         version="1.0.0",
         fallback_router_loaded=fb_loaded,
         fallback_loaded=fb_loaded,
         fallback_model_name=fb_name,
-        engine_mode=engine_mode
+        engine_mode=engine_mode,
+        facade_model_loaded=facade_loaded,
+        readiness_errors=errors,
     )
+    return result if not errors else JSONResponse(status_code=503, content=result.model_dump())
 
 @app.get("/metrics", tags=["Production Monitoring"])
 async def get_monitoring_metrics():
@@ -310,6 +329,8 @@ async def analyze_floorplan(
     except Exception as e:
         import traceback
         traceback.print_exc()
+        if isinstance(e, ModelArtifactError):
+            raise
         print(f"[FLOORPLAN INFERENCE ERROR]: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -345,10 +366,10 @@ async def generate_photorealistic_render(
         inference_engine = ArchiGenONNXInference()
         generated_png_bytes = inference_engine.generate(content)
         return Response(content=generated_png_bytes, media_type="image/png")
+    except ModelArtifactError:
+        raise
     except Exception as e:
-        # Fallback if running in lightweight test mode without weights
-        print(f"[INFERENCE WARNING] ONNX Runtime error: {e}")
-        return Response(content=content, media_type="image/png")
+        raise HTTPException(status_code=500, detail=f'Facade inference failed: {e}') from e
 
 
 class FacadeGenerateRequest(BaseModel):
@@ -437,6 +458,8 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        if isinstance(e, ModelArtifactError):
+            raise
         raise HTTPException(status_code=500, detail=f"Facade generation error: {e}")
 
 
@@ -494,6 +517,8 @@ async def generate_furniture_3d_endpoint(request: FurnitureGenerateRequest):
         from src.furniture.service import generate_furniture_response
 
         return generate_furniture_response(request, ImageTo3DGenerator.get_instance())
+    except ModelArtifactError:
+        raise
     except Exception as exc:
         import traceback
         traceback.print_exc()

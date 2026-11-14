@@ -1,0 +1,21 @@
+name: Clean teammate model installation
+on:
+  push:
+    branches: [codex/fix-model-distribution]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clean-restore:
+    runs-on: ubuntu-latest
+    env:
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r backend/requirements.txt dvc
+      - name: Restore in a second fresh clone and execute actual models
+        run: python scripts/verify_team_install.py --ref "$GITHUB_REF_NAME"

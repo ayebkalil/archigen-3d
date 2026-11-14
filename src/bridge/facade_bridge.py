@@ -159,6 +159,11 @@ class FacadeBridge:
     ):
         self.onnx_model_path = Path(onnx_model_path)
         self.pytorch_model_path = Path(pytorch_model_path)
+        from src.models.artifacts import PROJECT_ROOT
+        if not self.onnx_model_path.is_absolute():
+            self.onnx_model_path = PROJECT_ROOT / self.onnx_model_path
+        if not self.pytorch_model_path.is_absolute():
+            self.pytorch_model_path = PROJECT_ROOT / self.pytorch_model_path
         self.prefer_cuda = prefer_cuda
         self.enhance_textures = enhance_textures
         self.inference_engine = None
@@ -166,6 +171,7 @@ class FacadeBridge:
         self._init_inference_engine()
 
     def _init_inference_engine(self):
+        from src.models.artifacts import verify_model, ModelArtifactError
         # Explicit experiment switch. Never silently relabel a legacy model as 512.
         experiment_path = os.environ.get("ARCHIGEN_FACADE_EXPERIMENT")
         if experiment_path:
@@ -184,6 +190,7 @@ class FacadeBridge:
             try:
                 import torch
                 if torch.cuda.is_available() and self.pytorch_model_path.exists():
+                    verify_model(self.pytorch_model_path)
                     from src.models.architecture import UNetGenerator
                     gen = UNetGenerator(in_channels=3, out_channels=3, upsample_mode="nearest")
                     ckpt = torch.load(self.pytorch_model_path, map_location="cuda", weights_only=True)
@@ -198,6 +205,8 @@ class FacadeBridge:
                     self.device_name = f"PyTorch CUDA ({torch.cuda.get_device_name(0)})"
                     print(f"[FACADE BRIDGE] Accelerated with {self.device_name} (~10ms latency)")
                     return
+            except ModelArtifactError:
+                raise
             except Exception as e:
                 print(f"[FACADE BRIDGE] PyTorch CUDA acceleration skipped ({e}), attempting ONNX...")
 
@@ -209,19 +218,15 @@ class FacadeBridge:
                 from backend.app.inference import ArchiGenONNXInference
             
             onnx_target = self.onnx_model_path
-            if not onnx_target.exists():
-                for alt_name in ["generator_perceptual_ema.onnx", "generator_perceptual.onnx", "generator.onnx"]:
-                    alt_path = onnx_target.parent / alt_name
-                    if alt_path.exists():
-                        onnx_target = alt_path
-                        break
 
             if onnx_target.exists():
                 self.inference_engine = ArchiGenONNXInference(str(onnx_target))
                 self.device_name = "ONNX Runtime (CPU)"
                 print(f"[FACADE BRIDGE] Loaded ONNX facade generator from {onnx_target}")
             else:
-                print(f"[FACADE BRIDGE] Warning: ONNX model not found at {self.onnx_model_path}, mock mode active.")
+                print(f"[FACADE BRIDGE] Model missing at {self.onnx_model_path}; neural generation is unavailable. Run python scripts/models.py pull.")
+        except ModelArtifactError:
+            raise
         except Exception as e:
             print(f"[FACADE BRIDGE] Inference engine init deferred: {e}")
 
@@ -466,8 +471,8 @@ class FacadeBridge:
             if self.enhance_textures and not isinstance(self.inference_engine, PyTorchFacadeInference):
                 photo_img = enhance_facade_details(photo_img)
         else:
-            # Fallback mock texture if ONNX engine not loaded
-            photo_img = sketch_img
+            from src.models.artifacts import ModelArtifactError
+            raise ModelArtifactError('Facade model is unavailable. Run `python scripts/models.py pull --profile runtime`.')
 
         photo_img, model_info = self._finish_texture(photo_img, sketch_img, uv_bounds, style, material_finish)
 
@@ -591,7 +596,8 @@ class FacadeBridge:
                 generated_imgs = []
                 for sketch in sketches:
                     if self.inference_engine is None:
-                        generated_imgs.append(sketch)
+                        from src.models.artifacts import ModelArtifactError
+                        raise ModelArtifactError('Facade model is unavailable. Run `python scripts/models.py pull --profile runtime`.')
                     else:
                         buffer = io.BytesIO()
                         sketch.save(buffer, format="PNG")
