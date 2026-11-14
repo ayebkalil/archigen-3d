@@ -1,0 +1,201 @@
+{
+  "run_id": "68de00bb44c242a4b3ffa9cf1d7c9cf7",
+  "source_commit": "f6a9bd4e7ab35cdf05e77bc7f0f3b47389822ff0",
+  "dataset_manifest_sha256": "ed32d4cd052e2ac2b3314d962faacbb4dfe1adbfd7470796dc9346f305ae42f8",
+  "selected_step": 750,
+  "selection_subset_size": 4,
+  "training_steps": 1500,
+  "evaluation": {
+    "split": "val",
+    "n": 100,
+    "means": {
+      "diffusion_seconds": 27.09294455831002,
+      "candidate_psnr": 10.3954162775781,
+      "candidate_ssim": 0.19812396195780554,
+      "candidate_opening_edge_mae": 0.31931698083877563,
+      "candidate_lpips": 0.5607432636618614,
+      "baseline_psnr": 12.996279781955197,
+      "baseline_ssim": 0.2743090119281603,
+      "baseline_opening_edge_mae": 0.2756309322267771,
+      "baseline_lpips": 0.5989854145050049
+    },
+    "protocol": "512 paired evaluation; baseline raw 256 output resized with bicubic; fixed seed per sorted ID. Opening edge MAE is a proxy, not opening IoU.",
+    "paired_lpips_delta_ci95": [
+      -0.05333008387684822,
+      -0.024514605119824416
+    ]
+  },
+  "weights_sha256_from_export_metadata": "d55c08f221c658e11743a248ebc4154ec16ea715ef84cf8129e10ae69fa782f2",
+  "archive_sha256_from_kaggle_log": "3ca2eb3fbe1d9d231bdadc008fbe897ac1d7721f92f07e540655f4da41964360",
+  "validation_history": [
+    {
+      "type": "metric",
+      "key": "val_psnr",
+      "value": 10.893154193737056,
+      "step": 250,
+      "timestamp": 1794685696630
+    },
+    {
+      "type": "metric",
+      "key": "val_ssim",
+      "value": 0.1947522405300458,
+      "step": 250,
+      "timestamp": 1794685696630
+    },
+    {
+      "type": "metric",
+      "key": "val_opening_edge_mae",
+      "value": 0.3020329475402832,
+      "step": 250,
+      "timestamp": 1794685696630
+    },
+    {
+      "type": "metric",
+      "key": "val_lpips",
+      "value": 0.5847221612930298,
+      "step": 250,
+      "timestamp": 1794685696630
+    },
+    {
+      "type": "metric",
+      "key": "val_psnr",
+      "value": 10.779720709787448,
+      "step": 500,
+      "timestamp": 1794686376873
+    },
+    {
+      "type": "metric",
+      "key": "val_ssim",
+      "value": 0.19616655574099018,
+      "step": 500,
+      "timestamp": 1794686376873
+    },
+    {
+      "type": "metric",
+      "key": "val_opening_edge_mae",
+      "value": 0.30344973504543304,
+      "step": 500,
+      "timestamp": 1794686376873
+    },
+    {
+      "type": "metric",
+      "key": "val_lpips",
+      "value": 0.5487189292907715,
+      "step": 500,
+      "timestamp": 1794686376873
+    },
+    {
+      "type": "metric",
+      "key": "val_psnr",
+      "value": 10.885708315384898,
+      "step": 750,
+      "timestamp": 1794687053141
+    },
+    {
+      "type": "metric",
+      "key": "val_ssim",
+      "value": 0.20159050882100155,
+      "step": 750,
+      "timestamp": 1794687053141
+    },
+    {
+      "type": "metric",
+      "key": "val_opening_edge_mae",
+      "value": 0.29431838542222977,
+      "step": 750,
+      "timestamp": 1794687053141
+    },
+    {
+      "type": "metric",
+      "key": "val_lpips",
+      "value": 0.5441685616970062,
+      "step": 750,
+      "timestamp": 1794687053141
+    },
+    {
+      "type": "metric",
+      "key": "val_psnr",
+      "value": 11.609707063993802,
+      "step": 1000,
+      "timestamp": 1794687729183
+    },
+    {
+      "type": "metric",
+      "key": "val_ssim",
+      "value": 0.2331156827797834,
+      "step": 1000,
+      "timestamp": 1794687729183
+    },
+    {
+      "type": "metric",
+      "key": "val_opening_edge_mae",
+      "value": 0.28671297430992126,
+      "step": 1000,
+      "timestamp": 1794687729183
+    },
+    {
+      "type": "metric",
+      "key": "val_lpips",
+      "value": 0.5480107888579369,
+      "step": 1000,
+      "timestamp": 1794687729183
+    },
+    {
+      "type": "metric",
+      "key": "val_psnr",
+      "value": 11.28914350209175,
+      "step": 1250,
+      "timestamp": 1794688402331
+    },
+    {
+      "type": "metric",
+      "key": "val_ssim",
+      "value": 0.21881221807746848,
+      "step": 1250,
+      "timestamp": 1794688402331
+    },
+    {
+      "type": "metric",
+      "key": "val_opening_edge_mae",
+      "value": 0.2937970608472824,
+      "step": 1250,
+      "timestamp": 1794688402331
+    },
+    {
+      "type": "metric",
+      "key": "val_lpips",
+      "value": 0.5500824376940727,
+      "step": 1250,
+      "timestamp": 1794688402331
+    },
+    {
+      "type": "metric",
+      "key": "val_psnr",
+      "value": 11.28271692902105,
+      "step": 1500,
+      "timestamp": 1794689075293
+    },
+    {
+      "type": "metric",
+      "key": "val_ssim",
+      "value": 0.22270987062530884,
+      "step": 1500,
+      "timestamp": 1794689075293
+    },
+    {
+      "type": "metric",
+      "key": "val_opening_edge_mae",
+      "value": 0.2928212657570839,
+      "step": 1500,
+      "timestamp": 1794689075293
+    },
+    {
+      "type": "metric",
+      "key": "val_lpips",
+      "value": 0.5478803664445877,
+      "step": 1500,
+      "timestamp": 1794689075293
+    }
+  ],
+  "decision": "Not promoted: sharper rendering with worse paired structural similarity and opening-edge proxy; visible layout/style deviations."
+}
