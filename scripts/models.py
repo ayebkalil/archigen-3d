@@ -22,11 +22,24 @@ def main():
         needed = {item['path'] for item in before if item['status'] != 'ok'}
         targets = [item['dvc'] for item in manifest['artifacts'] if item['path'] in needed]
         if targets:
+            originals = {target: (ROOT / target).read_bytes() for target in targets}
             try:
+                # DVC's hydrated import metadata can otherwise require a cache
+                # remote after its cache is lost. Recreate a no-download import
+                # against the pinned URL, then let DVC fetch from that source.
+                for item in manifest['artifacts']:
+                    if item['path'] in needed:
+                        subprocess.run([sys.executable, '-m', 'dvc', 'import-url', '--no-download', '--force',
+                                        item['url'], item['path']], cwd=ROOT, check=True)
                 subprocess.run([sys.executable, '-m', 'dvc', 'pull', '--force', *targets], cwd=ROOT, check=True)
             except subprocess.CalledProcessError:
                 print('Model restore failed. Install DVC (`python -m pip install dvc`) and check access to the versioned release URLs.', file=sys.stderr)
                 return 1
+            finally:
+                # Installation is not a model-version change: keep Git metadata
+                # unchanged after DVC fills in its local content hashes.
+                for target, content in originals.items():
+                    (ROOT / target).write_bytes(content)
     results = inspect_artifacts(args.profile, ROOT)
     if args.json:
         print(json.dumps({'profile': args.profile, 'artifacts': results}, indent=2))
