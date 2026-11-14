@@ -1,5 +1,9 @@
 # ArchiGen 3D (AI-Powered BIM & Floorplan-to-3D Platform)
 
+**Kaggle facade experiment:** [SD1.5 ControlNet training, MLflow and local deployment](experiments/facade_sd15_controlnet/README.md).
+The experiment is isolated on `codex/facade-controlnet-kaggle-mlflow`; production
+Pix2Pix remains the default. [Training notebook](experiments/facade_sd15_controlnet/train_facade_controlnet.ipynb).
+
 [![CI Pipeline](https://github.com/ayebk/archigen-3d/actions/workflows/ci-tests.yml/badge.svg)](https://github.com/ayebk/archigen-3d/actions)
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)

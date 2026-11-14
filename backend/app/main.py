@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 import io
 import base64
 from typing import Annotated, Optional, List, Dict, Any
@@ -175,6 +176,8 @@ async def get_model_metadata():
     fb_name = None
     chk_hashes = {}
     resolution = 256
+    facade_axis = "Axe 2 - Generative AI (Pix2Pix / cGAN)"
+    framework = "PyTorch + ONNX Runtime"
     supported_styles = ["Modern Minimalist", "Mediterranean Stone", "Traditional Brick", "Lush Vegetation"]
     try:
         from app.floorplan_engine import FloorplanPipeline
@@ -182,18 +185,22 @@ async def get_model_metadata():
         fb_loaded = (pipeline.fallback_model is not None) or (pipeline.onnx_fallback is not None)
         fb_name = getattr(pipeline, "fallback_model_name", None)
         chk_hashes = pipeline.checkpoint_hashes
-        if chk_hashes.get("facade_experimental"):
+        if chk_hashes.get("facade_experimental") or os.getenv("ARCHIGEN_FACADE_CONTROLNET_URL"):
             info = pipeline.bridge.inference_engine.describe("Modern Minimalist")
             resolution = info["resolution"]
             supported_styles = info["supported_styles"]
+            if info.get("model") == "sd15_controlnet_cmp_edges_v1":
+                facade_axis = "Axe 2 - Generative AI (Stable Diffusion 1.5 + ControlNet)"
+                framework = "PyTorch + ONNX Runtime; isolated Diffusers facade worker"
+                chk_hashes = {**chk_hashes, "facade_controlnet": info.get("weights_sha256")}
     except Exception:
         pass
 
     return ModelMetadataResponse(
         project_name="ArchiGen 3D (AI HomeByMe)",
-        major_axis="Axe 2 - Generative AI (Pix2Pix / cGAN)",
+        major_axis=facade_axis,
         upstream_axis="Axe 4 - Floorplan Segmentation (SegFormer)",
-        framework="PyTorch + ONNX Runtime",
+        framework=framework,
         target_resolution=[resolution, resolution],
         supported_styles=supported_styles,
         metrics={"target_fid": 45.0, "target_lpips": 0.28, "target_miou": 0.78},
@@ -405,7 +412,7 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
         num_floors = 1 if wall.get("level_id") else request.num_floors or 1
         style = request.style
 
-        res = bridge.render_wall_facade(
+        res = await run_in_threadpool(bridge.render_wall_facade,
             wall=wall,
             num_floors=num_floors,
             is_front=True,

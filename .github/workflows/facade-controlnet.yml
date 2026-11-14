@@ -1,0 +1,50 @@
+name: Facade ControlNet experiment
+on:
+  push:
+    branches: [codex/facade-controlnet-kaggle-mlflow]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Kaggle action (training consumes your Kaggle GPU quota)
+        type: choice
+        options: [publish-only, smoke, train]
+        default: publish-only
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r experiments/facade_sd15_controlnet/requirements.txt pytest nbformat
+      - run: python -m pytest tests/test_facade_kaggle.py -q
+  publish-kaggle:
+    if: github.event_name == 'workflow_dispatch'
+    needs: contracts
+    runs-on: ubuntu-latest
+    env:
+      KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+      MODE: ${{ inputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install kaggle==2.2.5 six numpy Pillow opencv-python-headless
+      - name: Pin the notebook to this GitHub commit
+        run: |
+          test -n "$KAGGLE_API_TOKEN" || { echo "Set the KAGGLE_API_TOKEN repository secret to enable manual publishing."; exit 1; }
+          TRAIN_MODE=train
+          if [ "$MODE" = smoke ]; then TRAIN_MODE=smoke; fi
+          python -m experiments.facade_sd15_controlnet.manage stage-kernel --output outputs/kaggle-kernel --commit "$GITHUB_SHA" --mode "$TRAIN_MODE"
+      - name: Publish privately to Kaggle
+        run: |
+          if [ "$MODE" = publish-only ]; then
+            kaggle kernels push --path outputs/kaggle-kernel --no-run
+          else
+            kaggle kernels push --path outputs/kaggle-kernel --accelerator NvidiaTeslaT4
+          fi

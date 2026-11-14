@@ -1,0 +1,14 @@
+{
+  "id": "khalilayeb/archigen-facade-sd15-controlnet-mlflow",
+  "title": "ArchiGen Facade SD15 ControlNet MLflow",
+  "code_file": "train_facade_controlnet.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": ["khalilayeb/archigen-cmp-facades-original-locked-splits"],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

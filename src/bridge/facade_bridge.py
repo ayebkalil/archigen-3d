@@ -166,6 +166,13 @@ class FacadeBridge:
         self._init_inference_engine()
 
     def _init_inference_engine(self):
+        controlnet_url = os.environ.get("ARCHIGEN_FACADE_CONTROLNET_URL")
+        if controlnet_url:
+            from src.bridge.facade_controlnet import RemoteControlNetFacadeInference
+            self.inference_engine = RemoteControlNetFacadeInference(controlnet_url)
+            self.enhance_textures = False
+            self.device_name = "SD1.5 ControlNet (local isolated worker, experimental)"
+            return
         # Explicit experiment switch. Never silently relabel a legacy model as 512.
         experiment_path = os.environ.get("ARCHIGEN_FACADE_EXPERIMENT")
         if experiment_path:
@@ -529,6 +536,15 @@ class FacadeBridge:
             front_wall_id = front.get("id") if front else None
 
         results = {}
+
+        if getattr(self.inference_engine, "defer_automatic_generation", False):
+            for wall in exterior_walls:
+                wall["is_front"] = wall.get("id") == front_wall_id
+            layout.setdefault("metadata", {}).update(front_wall_id=front_wall_id, num_floors=num_floors,
+                facade_mode="on_demand", facade_inference_device=self.device_name)
+            return {"front_wall_id": front_wall_id, "exterior_walls_count": len(exterior_walls),
+                    "facade_results": {}, "updated_layout": layout, "inference_device": self.device_name,
+                    "generation": "on-demand only"}
 
         if front_only and len(exterior_walls) > 0:
             # ON-DEMAND FRONT FACADE MODE (Eliminates P95 latency tail: 710ms -> 34ms)
