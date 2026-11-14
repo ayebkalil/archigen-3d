@@ -1,6 +1,12 @@
 # ArchiGen 3D (AI-Powered BIM & Floorplan-to-3D Platform)
 
-[![CI Pipeline](https://github.com/ayebk/archigen-3d/actions/workflows/ci-tests.yml/badge.svg)](https://github.com/ayebk/archigen-3d/actions)
+**New teammate setup:** Git does not contain model binaries. Run
+`python -m pip install dvc`, then `python scripts/models.py pull` and
+`python scripts/models.py check` before starting the backend or Docker.
+See [model setup and distribution audit](docs/model-setup.md) for furniture setup
+and clean-clone verification.
+
+[![CI Pipeline](https://github.com/ayebkalil/archigen-3d/actions/workflows/ci-tests.yml/badge.svg)](https://github.com/ayebkalil/archigen-3d/actions)
 [![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-18-cyan.svg)](https://react.dev/)
@@ -277,12 +283,13 @@ le moteur neuronal TripoSR nécessite l'environnement dédié décrit plus bas.
 
 ```bash
 # 1. Cloner le projet
-git clone https://github.com/ayebk/archigen-3d.git
+git clone https://github.com/ayebkalil/archigen-3d.git
 cd archigen-3d
 
-# 2. Configurer le stockage DVC partagé de l'équipe et récupérer les poids Docker
-dvc remote add --local -d team-weights /path/to/shared-dvc-storage
-dvc pull models/saved/floorplan_unetpp/floorplan_multitask.onnx.dvc models/saved/floorplan_unetpp/floorplan_fallback.onnx.dvc models/saved/generator_perceptual_ema.onnx.dvc models/saved/facade512_experiment/generator.onnx.dvc
+# 2. Récupérer et vérifier les poids de production (sans chemin privé)
+python -m pip install dvc
+python scripts/models.py pull
+python scripts/models.py check
 
 # 3. Lancer la pile complète (FastAPI + React 18 + Nginx)
 docker compose up --build -d --wait
@@ -301,7 +308,7 @@ et `ARCHIGEN_API_PORT` si une instance native utilise déjà les ports 3000 et 8
 Le service backend monte les poids DVC de `models/saved` en lecture seule. Récupérez
 ces fichiers avant le démarrage et conservez-les dans ce dossier.
 
-Le conteneur utilise ONNX Runtime CPU pour le plan et la façade 512. Le mobilier
+Le conteneur utilise ONNX Runtime CPU pour le plan et la façade EMA de production. Le mobilier
 est reconstruit par le worker TripoSR CUDA natif sur le port 8001. Préparez
 [l'environnement natif du mobilier](docs/furniture-quality-experiment.md), puis
 démarrez le worker et les conteneurs ensemble depuis PowerShell.

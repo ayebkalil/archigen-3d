@@ -360,6 +360,11 @@ class ImageTo3DGenerator:
         if getattr(self, '_quality_engine', None) is not None:
             return self._quality_engine.generate_from_image(
                 image, name=name, category=category, remove_bg=remove_bg, target_height_m=target_height_m)
+        if self.tsr_model is None and os.getenv('ARCHIGEN_ALLOW_PROCEDURAL_FURNITURE') != '1':
+            from src.models.artifacts import ModelArtifactError
+            raise ModelArtifactError('TripoSR is not loaded. Run `python scripts/setup_furniture.py pull`, '
+                'install the isolated furniture environment and start the GPU worker. '
+                'See docs/model-setup.md. A procedural extrusion is not a neural reconstruction.')
         category_clean = category.lower().strip()
         base_dims = CATEGORY_DIMENSIONS.get(category_clean, [0.60, 0.60, 0.85]).copy()
         if target_height_m and target_height_m > 0.2:
@@ -489,6 +494,9 @@ class ImageTo3DGenerator:
                 mesh = None
 
         if mesh is None:
+            if os.getenv('ARCHIGEN_ALLOW_PROCEDURAL_FURNITURE') != '1':
+                from src.models.artifacts import ModelArtifactError
+                raise ModelArtifactError('TripoSR reconstruction failed. Inspect the worker logs; no procedural substitute was returned.')
             mesh = self._generate_volumetric_mesh(processed_img, base_dims, category=category_clean)
 
         # 4. Export to binary GLB with explicit vertex normals

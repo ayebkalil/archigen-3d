@@ -1,10 +1,15 @@
-# Standalone Python 3.11 environment. Install CUDA Torch first; see setup script.
+# Standalone Python 3.11 environment. Install CUDA Torch first; see docs/model-setup.md.
 -r backend/requirements.txt
 numpy==1.26.4
+torch==2.6.0
+torchvision==0.21.0
 transformers==4.46.3
 huggingface-hub==0.36.2
 xatlas==0.0.11
 omegaconf==2.3.0
 einops==0.7.0
+trimesh>=4,<6
 rembg[cpu]==2.0.61
-imageio[ffmpeg]>=2.33
+imageio[ffmpeg]>=2.33,<3
+scikit-image>=0.22,<0.27
+PyMCubes==0.1.6

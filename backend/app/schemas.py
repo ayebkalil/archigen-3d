@@ -11,6 +11,8 @@ class HealthResponse(BaseModel):
     fallback_loaded: bool = Field(default=False, example=True)
     fallback_model_name: Optional[str] = Field(default=None, example="multitask_resnet34_blend_alpha_0_3")
     engine_mode: Optional[str] = Field(default=None, example="ONNX Runtime CPU")
+    facade_model_loaded: bool = False
+    readiness_errors: List[str] = Field(default_factory=list)
 
 class ModelMetadataResponse(BaseModel):
     project_name: str = Field(..., example="ArchiGen 3D (AI HomeByMe)")

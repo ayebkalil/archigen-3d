@@ -142,13 +142,14 @@ def test_floorplan_pipeline_tta_modes():
     raw_bytes = buf.getvalue()
 
     res_none = pipeline.process_image(raw_bytes, tta_mode="none")
-    assert res_none["inference_mode"] == "single_pass"
+    onnx = res_none["inference_mode"].startswith('onnx_')
+    assert res_none["inference_mode"] == ('onnx_single_pass' if onnx else 'single_pass')
 
     res_4 = pipeline.process_image(raw_bytes, tta_mode="4_fold")
-    assert res_4["inference_mode"] in ["4_fold_tta", "single_pass"]
+    assert res_4["inference_mode"] in (["onnx_4_fold_tta"] if onnx else ["4_fold_tta", "single_pass"])
 
     res_8 = pipeline.process_image(raw_bytes, tta_mode="8_fold")
-    assert res_8["inference_mode"] in ["8_fold_tta", "single_pass"]
+    assert res_8["inference_mode"] in (["onnx_8_fold_tta"] if onnx else ["8_fold_tta", "single_pass"])
 
 def test_repair_polygon_to_single_polygon():
     """Verify Shapely make_valid repair on self-intersecting polygons with area preservation."""
