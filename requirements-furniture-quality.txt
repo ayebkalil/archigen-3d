@@ -1,4 +1,14 @@
-# Isolated venv with --system-site-packages reuses existing CUDA Torch 2.6.
+# Install CUDA Torch/Torchvision first (see docs/model-setup.md).
+-r backend/requirements.txt
+torch==2.6.0
+torchvision==0.21.0
 transformers==4.46.3
 huggingface-hub==0.36.2
 xatlas==0.0.11
+omegaconf>=2.3,<2.4
+einops>=0.7,<1
+trimesh>=4,<6
+rembg>=2,<3
+imageio>=2.30,<3
+scikit-image>=0.22,<0.27
+PyMCubes==0.1.6

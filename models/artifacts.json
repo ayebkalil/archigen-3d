@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "release": "https://github.com/ayebkalil/archigen-3d/releases/tag/model-weights-v1",
+  "profiles": {
+    "runtime": [
+      "models/saved/floorplan_unetpp/floorplan_multitask.onnx",
+      "models/saved/floorplan_unetpp/floorplan_fallback.onnx",
+      "models/saved/generator_perceptual_ema.onnx"
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "models/saved/facade512_experiment/generator.onnx",
+      "dvc": "models/saved/facade512_experiment/generator.onnx.dvc",
+      "size": 171571099,
+      "md5": "9b067930324826f39ee1f422309335ab",
+      "sha256": "7ef57b3f42e81cb16544e1b7592f246d9cb59535ea7d48dcf5786ffd51b0ea83"
+    },
+    {
+      "path": "models/saved/facade512_experiment/generator.pth",
+      "dvc": "models/saved/facade512_experiment/generator.pth.dvc",
+      "size": 171472130,
+      "md5": "78691c443433935d9b0c26f9ab1ae481",
+      "sha256": "0d1aa7d883a464a076877e207ba6e87a1c5e33b0e642fb96d250d3a599f718dc"
+    },
+    {
+      "path": "models/saved/floorplan_baseline/best.safetensors",
+      "dvc": "models/saved/floorplan_baseline/best.safetensors.dvc",
+      "size": 97851168,
+      "md5": "5a36b545046cacba7864ab3cf12e1be1",
+      "sha256": "d7f6a0fd06e2931aecfc8c4849192c5e153701578026efc78d9a6246731a8d6c"
+    },
+    {
+      "path": "models/saved/floorplan_unetpp/floorplan_fallback.onnx",
+      "dvc": "models/saved/floorplan_unetpp/floorplan_fallback.onnx.dvc",
+      "size": 104321167,
+      "md5": "045589962a7661c905f9ec4ab03f9628",
+      "sha256": "7188af6fc15f11a8fc1979a02656e2bb32d200e7d2d7bb8b8d07b43296fff809",
+      "url": "https://github.com/ayebkalil/archigen-3d/releases/download/model-weights-v1/floorplan_unetpp__floorplan_fallback.onnx"
+    },
+    {
+      "path": "models/saved/floorplan_unetpp/floorplan_multitask.onnx",
+      "dvc": "models/saved/floorplan_unetpp/floorplan_multitask.onnx.dvc",
+      "size": 104321167,
+      "md5": "b08187e54d70f20b3c029c41c76281cf",
+      "sha256": "538ade1935a9624e19047c910ed595f0e9a62aa08d872715216d3b323dfa034c",
+      "url": "https://github.com/ayebkalil/archigen-3d/releases/download/model-weights-v1/floorplan_unetpp__floorplan_multitask.onnx"
+    },
+    {
+      "path": "models/saved/floorplan_unetpp/multitask_resnet34_best.pth",
+      "dvc": "models/saved/floorplan_unetpp/multitask_resnet34_best.pth.dvc",
+      "size": 313349478,
+      "md5": "3915cdcc4dae3924f38f0383679bcf83",
+      "sha256": "a937ddeb4e17cfca616283829c9ee85263111083d82ba7687b270b89e14fb091"
+    },
+    {
+      "path": "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
+      "dvc": "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth.dvc",
+      "size": 104530352,
+      "md5": "ce54c25b4e332c5783097151509ff8ba",
+      "sha256": "bba5d827e27e8a099cfbca07ec13cc862d2d6f3094574f16bac17b86c5301dc6"
+    },
+    {
+      "path": "models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
+      "dvc": "models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth.dvc",
+      "size": 104547098,
+      "md5": "18aa9a6ab145cddadbc268363fbffc57",
+      "sha256": "80fa1ea7780f7cb2f48d720abed8a62104ac90e0e40d99661f3022f3b472fcca"
+    },
+    {
+      "path": "models/saved/floorplan_unetpp/multitask_resnet34_restyled_challenger.pth",
+      "dvc": "models/saved/floorplan_unetpp/multitask_resnet34_restyled_challenger.pth.dvc",
+      "size": 313159956,
+      "md5": "0440a30cf4048d04973853f42c5ba6d8",
+      "sha256": "9a1a7e7a7acb2a0a9b418528861b32784c15f30ffbf9797463aa40067046c006"
+    },
+    {
+      "path": "models/saved/generator_enhanced.onnx",
+      "dvc": "models/saved/generator_enhanced.onnx.dvc",
+      "size": 156648234,
+      "md5": "6c22ab0127a9d9bf1ff1b33726ef7234",
+      "sha256": "15b7c6a415256dc42ec09457f0e70ccdcd89bb746fedc0aa7bd2988dc7188e6f"
+    },
+    {
+      "path": "models/saved/generator_enhanced_best.pth",
+      "dvc": "models/saved/generator_enhanced_best.pth.dvc",
+      "size": 156600691,
+      "md5": "6d68a4fe0deb0e965558a52496946ab5",
+      "sha256": "be30c60bfb69b9b9e1d6964b0a78758016a307a4caa12afe39515d36e7500af7"
+    },
+    {
+      "path": "models/saved/generator_perceptual.onnx",
+      "dvc": "models/saved/generator_perceptual.onnx.dvc",
+      "size": 156648208,
+      "md5": "bad5e7947fb6713cd00cac37896c877a",
+      "sha256": "70fc49a3a4320f5d150e883ce15320061a7c129fd0cda8aa94e0b2f28014ac74"
+    },
+    {
+      "path": "models/saved/generator_perceptual_best.pth",
+      "dvc": "models/saved/generator_perceptual_best.pth.dvc",
+      "size": 156600733,
+      "md5": "69219d64f81a9a3e590c89448f006522",
+      "sha256": "8bac2333cc5db48bf726b69a35e63b87a3be436d12fd079cdbdab9e2f6e95452"
+    },
+    {
+      "path": "models/saved/generator_perceptual_ema.onnx",
+      "dvc": "models/saved/generator_perceptual_ema.onnx.dvc",
+      "size": 156648236,
+      "md5": "1426492875d3f13147c7a65df7670312",
+      "sha256": "46d95ec2b937af63ef36e0f8c7d1255105e8546d0c7dab42919ae8e6d2fc25ab",
+      "url": "https://github.com/ayebkalil/archigen-3d/releases/download/model-weights-v1/generator_perceptual_ema.onnx"
+    },
+    {
+      "path": "models/saved/generator_perceptual_ema_best.pth",
+      "dvc": "models/saved/generator_perceptual_ema_best.pth.dvc",
+      "size": 156600817,
+      "md5": "e827802338e7a41d43f5b7778f16c347",
+      "sha256": "4d4ec134344564cd7af6c79864f204ff72129dff036c4788b740cf80a7a662bc"
+    }
+  ]
+}

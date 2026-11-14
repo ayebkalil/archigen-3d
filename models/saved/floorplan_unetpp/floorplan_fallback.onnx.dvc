@@ -1,5 +1,13 @@
 outs:
-- md5: 045589962a7661c905f9ec4ab03f9628
+- hash: md5
+  path: floorplan_fallback.onnx
+  md5: 045589962a7661c905f9ec4ab03f9628
+  size: 104321167
+md5: 073cf4158ef0b14fd55d70a83669b6c2
+frozen: true
+deps:
+- checksum: '"0x8DF42894484ECD9"'
   size: 104321167
   hash: md5
-  path: floorplan_fallback.onnx
+  path:
+    https://github.com/ayebkalil/archigen-3d/releases/download/model-weights-v1/floorplan_unetpp__floorplan_fallback.onnx

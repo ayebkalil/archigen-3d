@@ -1,5 +1,13 @@
 outs:
-- md5: 1426492875d3f13147c7a65df7670312
+- hash: md5
+  path: generator_perceptual_ema.onnx
+  md5: 1426492875d3f13147c7a65df7670312
+  size: 156648236
+md5: 9fd6a272933e5905718f1c14bcdcbd2b
+frozen: true
+deps:
+- checksum: '"0x8DF42896D667B6F"'
   size: 156648236
   hash: md5
-  path: generator_perceptual_ema.onnx
+  path:
+    https://github.com/ayebkalil/archigen-3d/releases/download/model-weights-v1/generator_perceptual_ema.onnx

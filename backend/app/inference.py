@@ -12,21 +12,12 @@ import io
 import onnxruntime as ort
 
 class ArchiGenONNXInference:
-    def __init__(self, model_path: str = "models/saved/generator_perceptual.onnx"):
+    def __init__(self, model_path: str = "models/saved/generator_perceptual_ema.onnx"):
+        from src.models.artifacts import PROJECT_ROOT, verify_model
         self.model_path = Path(model_path)
-        if not self.model_path.exists():
-            # Fallbacks: try generator_enhanced.onnx or legacy generator.onnx
-            for candidate in ["models/saved/generator_enhanced.onnx", "models/saved/generator.onnx"]:
-                if Path(candidate).exists():
-                    self.model_path = Path(candidate)
-                    break
-        if not self.model_path.exists():
-            # Fallback path if running inside backend container
-            alt_path = Path("../models/saved/generator_perceptual.onnx")
-            if alt_path.exists():
-                self.model_path = alt_path
-            else:
-                raise FileNotFoundError(f"ONNX Model not found at: {self.model_path}")
+        if not self.model_path.is_absolute():
+            self.model_path = PROJECT_ROOT / self.model_path
+        verify_model(self.model_path)
 
         print(f"[INFERENCE ENGINE] Loading ONNX model from: {self.model_path}")
         # Initialize ONNX Runtime Inference Session
