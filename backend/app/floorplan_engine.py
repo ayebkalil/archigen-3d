@@ -119,8 +119,6 @@ class FloorplanPipeline:
             if multitask_weights_path is None:
                 candidates = [
                     PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth",
-                    PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_best.pth",
-                    PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_best_backup_25ep.pth"
                 ]
                 chosen_mt = None
                 for cand in candidates:
@@ -172,7 +170,6 @@ class FloorplanPipeline:
             # Load Fallback Routing Model
             fallback_candidates = [
                 PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_blend_alpha_0_3.pth",
-                PROJECT_ROOT / "models/saved/floorplan_unetpp/multitask_resnet34_restyled_challenger.pth"
             ]
             chosen_fb = None
             for fb_cand in fallback_candidates:
@@ -230,18 +227,10 @@ class FloorplanPipeline:
         self.vectorizer = FloorplanVectorizer()
         self.extruder = Floorplan3DExtruder()
 
-        # Find best available facade models
+        # A missing native checkpoint uses the same champion ONNX, not an older model.
         facade_onnx = PROJECT_ROOT / "models/saved/generator_perceptual_ema.onnx"
-        if not facade_onnx.exists():
-            facade_onnx = PROJECT_ROOT / "models/saved/generator_perceptual.onnx"
-        if not facade_onnx.exists():
-            facade_onnx = PROJECT_ROOT / "models/saved/generator.onnx"
 
         facade_pth = PROJECT_ROOT / "models/saved/generator_perceptual_ema_best.pth"
-        if not facade_pth.exists():
-            facade_pth = PROJECT_ROOT / "models/saved/generator_perceptual_best.pth"
-        if not facade_pth.exists():
-            facade_pth = PROJECT_ROOT / "models/saved/generator_best.pth"
 
         self.bridge = FacadeBridge(
             onnx_model_path=str(facade_onnx),

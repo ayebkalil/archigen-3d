@@ -13,6 +13,7 @@ teammate's machine, but confirmed the following repository defects:
 | Facade failures return the sketch/upload with HTTP 200 | Placeholder mistaken for neural output | Clear model-unavailable errors |
 | Failed PyTorch load can leave an initialized model assigned | Potential inference using incomplete weights | Assign model only after strict loading succeeds |
 | Docker forces experimental 512 facade | Different default from native EMA model | Experiment is opt-in |
+| Missing native checkpoints select older/challenger files if present | Different machines can load different model generations | Use the champion's ONNX version instead; historical models require explicit selection |
 | TripoSR source/checkpoint and inherited venv are machine-local | Furniture may silently use procedural geometry | Pinned bootstrap, complete dependency list, no silent substitute |
 
 ## Production models: native or Docker
