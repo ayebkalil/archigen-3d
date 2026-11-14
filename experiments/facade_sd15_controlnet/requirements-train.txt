@@ -1,5 +1,5 @@
 -r requirements.txt
-bitsandbytes==0.45.5
+bitsandbytes==0.50.2
 lpips==0.1.4
 scikit-image>=0.22,<0.26
 onnxruntime>=1.17,<2
