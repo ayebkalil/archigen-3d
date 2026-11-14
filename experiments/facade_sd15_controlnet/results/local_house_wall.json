@@ -1,0 +1,214 @@
+{
+  "profile": {
+    "seconds": 31.577364199969452,
+    "peak_torch_allocated_mib": 906.15283203125,
+    "peak_torch_reserved_mib": 1000.0,
+    "device_used_after_mib": 799,
+    "load_seconds": 24.251345099997707,
+    "sampled_peak_device_mib": 1177,
+    "device_sample_count": 101,
+    "sample_interval_seconds": 0.5,
+    "target_budget_mib": 3500,
+    "budget_passed_at_samples": true,
+    "measurement_note": "Sampled device peak is not a guarantee of the instantaneous peak.",
+    "wall_id": "ground_east",
+    "checkpoint_step": 750,
+    "weights_sha256": "d55c08f221c658e11743a248ebc4154ec16ea715ef84cf8129e10ae69fa782f2"
+  },
+  "viewer_checks": {
+    "results": [
+      {
+        "mode": "baseline",
+        "uvError": 4.594351987741163e-08,
+        "openingCount": 7,
+        "openings": [
+          {
+            "id": "ground_east_door_0",
+            "type": "door",
+            "positionAlong": 2.9780943321012865,
+            "expectedAlong": 2.978094151742019,
+            "centerErrorM": 1.8035926752091314e-07
+          },
+          {
+            "id": "ground_east_window_0",
+            "type": "window",
+            "positionAlong": 7.159372654031341,
+            "expectedAlong": 7.159372473672073,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_1",
+            "type": "window",
+            "positionAlong": 6.519381074144088,
+            "expectedAlong": 6.51938089378482,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_2",
+            "type": "window",
+            "positionAlong": 4.2324778286803015,
+            "expectedAlong": 4.2324776483210345,
+            "centerErrorM": 1.8035926707682393e-07
+          },
+          {
+            "id": "ground_east_window_3",
+            "type": "window",
+            "positionAlong": 2.1077057834546222,
+            "expectedAlong": 2.1077056030953543,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_4",
+            "type": "window",
+            "positionAlong": 1.7151776144571071,
+            "expectedAlong": 1.715177434097839,
+            "centerErrorM": 1.8035926818704695e-07
+          },
+          {
+            "id": "ground_east_window_5",
+            "type": "window",
+            "positionAlong": 0.8277226236801161,
+            "expectedAlong": 0.8277224433208475,
+            "centerErrorM": 1.8035926852011386e-07
+          }
+        ],
+        "textureSize": [
+          256,
+          256
+        ]
+      },
+      {
+        "mode": "candidate",
+        "uvError": 4.594351987741163e-08,
+        "openingCount": 7,
+        "openings": [
+          {
+            "id": "ground_east_door_0",
+            "type": "door",
+            "positionAlong": 2.9780943321012865,
+            "expectedAlong": 2.978094151742019,
+            "centerErrorM": 1.8035926752091314e-07
+          },
+          {
+            "id": "ground_east_window_0",
+            "type": "window",
+            "positionAlong": 7.159372654031341,
+            "expectedAlong": 7.159372473672073,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_1",
+            "type": "window",
+            "positionAlong": 6.519381074144088,
+            "expectedAlong": 6.51938089378482,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_2",
+            "type": "window",
+            "positionAlong": 4.2324778286803015,
+            "expectedAlong": 4.2324776483210345,
+            "centerErrorM": 1.8035926707682393e-07
+          },
+          {
+            "id": "ground_east_window_3",
+            "type": "window",
+            "positionAlong": 2.1077057834546222,
+            "expectedAlong": 2.1077056030953543,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_4",
+            "type": "window",
+            "positionAlong": 1.7151776144571071,
+            "expectedAlong": 1.715177434097839,
+            "centerErrorM": 1.8035926818704695e-07
+          },
+          {
+            "id": "ground_east_window_5",
+            "type": "window",
+            "positionAlong": 0.8277226236801161,
+            "expectedAlong": 0.8277224433208475,
+            "centerErrorM": 1.8035926852011386e-07
+          }
+        ],
+        "textureSize": [
+          512,
+          512
+        ]
+      },
+      {
+        "mode": "guide",
+        "uvError": 4.594351987741163e-08,
+        "openingCount": 7,
+        "openings": [
+          {
+            "id": "ground_east_door_0",
+            "type": "door",
+            "positionAlong": 2.9780943321012865,
+            "expectedAlong": 2.978094151742019,
+            "centerErrorM": 1.8035926752091314e-07
+          },
+          {
+            "id": "ground_east_window_0",
+            "type": "window",
+            "positionAlong": 7.159372654031341,
+            "expectedAlong": 7.159372473672073,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_1",
+            "type": "window",
+            "positionAlong": 6.519381074144088,
+            "expectedAlong": 6.51938089378482,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_2",
+            "type": "window",
+            "positionAlong": 4.2324778286803015,
+            "expectedAlong": 4.2324776483210345,
+            "centerErrorM": 1.8035926707682393e-07
+          },
+          {
+            "id": "ground_east_window_3",
+            "type": "window",
+            "positionAlong": 2.1077057834546222,
+            "expectedAlong": 2.1077056030953543,
+            "centerErrorM": 1.8035926796500235e-07
+          },
+          {
+            "id": "ground_east_window_4",
+            "type": "window",
+            "positionAlong": 1.7151776144571071,
+            "expectedAlong": 1.715177434097839,
+            "centerErrorM": 1.8035926818704695e-07
+          },
+          {
+            "id": "ground_east_window_5",
+            "type": "window",
+            "positionAlong": 0.8277226236801161,
+            "expectedAlong": 0.8277224433208475,
+            "centerErrorM": 1.8035926852011386e-07
+          }
+        ],
+        "textureSize": [
+          512,
+          512
+        ]
+      }
+    ],
+    "errors": []
+  },
+  "viewer_working_tree_sha256": {
+    "frontend/src/components/Viewer3D.jsx": "6c38e642341bf4ebb64ce3166ac1e4cfa2ac3539e53059ccdfc7ba2acf74f3bb",
+    "frontend/src/geometry/facadeGeometry.js": "a3a576c1a8c939bc3b2c3e339c0691f13ded5713ce94fe080830456d155a3180",
+    "frontend/src/geometry/houseGeometry.js": "14e51d0b2df26dc0caee07ff104406f27166581b0e7fbf428d71bc88dda5ad0e",
+    "frontend/src/geometry/sampleHousePlan.js": "1764154151daf2c0dc7e23fc9fcccfb3318a5b23d44d2b4d15fc466ed1d7d664"
+  },
+  "visual_review": "UV crop removes raw roof/lower-story additions from this wall. Cleaner wall than Pix2Pix, but painted shutter/shadow areas remain around frames. One wall only; not a generalization or concurrent-model benchmark.",
+  "services_restored": {
+    "8000": "healthy",
+    "8001": "healthy"
+  }
+}
