@@ -1,0 +1,7 @@
+# Install inside the existing furniture-quality environment, after its GPU setup.
+# Model/runtime dependencies remain in requirements-furniture-quality.txt.
+psutil==7.2.2
+PyYAML==6.0.3
+httpx==0.28.1
+mlflow-skinny==3.17.1
+pytest>=8.0.0

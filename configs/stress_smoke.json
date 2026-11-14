@@ -1,0 +1,6 @@
+{
+  "extends": "configs/stress_campaign.json",
+  "include_cases": ["resize-512-jpeg", "empty", "uniform", "extreme_header"],
+  "endurance_max_attempts": 0,
+  "concurrency": [1, 2]
+}

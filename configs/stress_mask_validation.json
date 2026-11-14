@@ -1,0 +1,6 @@
+{
+  "extends": "configs/stress_campaign.json",
+  "include_cases": ["resize-512-jpeg", "resize-8192-jpeg", "jpeg-5", "complex_background", "multiple_objects", "incomplete"],
+  "endurance_max_attempts": 0,
+  "concurrency": [1, 2, 4]
+}
