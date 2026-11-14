@@ -140,8 +140,27 @@ def install_architecture(pipeline):
         if trace is not None:
             trace.setdefault('onnx_inputs', []).append({k: list(v.shape) for k,v in feed.items()})
             trace.setdefault('onnx_input_dtypes', []).append({k: str(v.dtype) for k,v in feed.items()})
+            trace.setdefault('onnx_models', []).append(str(getattr(session, '_model_path', 'unknown')))
         with stage('inference'):
-            return original_run(session, outputs, feed, *args, **kwargs)
+            result = original_run(session, outputs, feed, *args, **kwargs)
+        if trace is not None:
+            # Artifact construction is outside the measured inference interval.
+            import numpy as np
+            tensor = next(iter(feed.values()))
+            if tensor.ndim == 4 and tensor.shape[1] == 3:
+                pixels = tensor[0].transpose(1,2,0)
+                is_plan = 'floorplan' in str(getattr(session, '_model_path', ''))
+                pixels = pixels * np.array([.229,.224,.225]) + np.array([.485,.456,.406]) if is_plan else (pixels+1)/2
+                pixels = (np.clip(pixels,0,1)*255).astype(np.uint8)
+                target = Path(trace['directory'])
+                Image.fromarray(pixels).save(target/('model-input.png' if is_plan else 'facade-model-input.png'))
+                rooms = next((value for value in result if value.ndim==4 and value.shape[1]==12), None)
+                if rooms is not None:
+                    labels = rooms[0].argmax(axis=0).astype(np.uint8)
+                    Image.fromarray(labels).save(target/'room-labels.png')
+                    palette = np.array([[(i*73)%256,(i*137)%256,(i*199)%256] for i in range(12)],dtype=np.uint8)
+                    Image.fromarray((pixels*.55+palette[labels]*.45).astype(np.uint8)).save(target/'segmentation-overlay.png')
+        return result
     ort.InferenceSession.run = run
     for model in (pipeline.multitask_model, pipeline.baseline_model, pipeline.fallback_model,
                   getattr(pipeline.bridge.inference_engine, 'generator', None)):

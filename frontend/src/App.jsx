@@ -1,3 +1,4 @@
+import { useProject, useProjectState } from './state/ProjectContext.jsx';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Navbar from './components/Navbar';
@@ -74,43 +75,50 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState(() => {
+  const project = useProject();
+  const [currentView, setCurrentView] = useProjectState('app.currentView', () => {
     return window.location.hash === '#studio' ? 'studio' : 'showcase';
   });
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [transitionTarget, setTransitionTarget] = useState('studio');
-  const [activeTab, setActiveTab] = useState('split');
-  const [pageView, setPageView] = useState('floorplan'); // 'floorplan' | 'generative_studio'
-  const [initialStudioTab, setInitialStudioTab] = useState('furniture');
-  const [file, setFile] = useState(null);
-  const [imageUrl, setImageUrl] = useState('/sample_floorplan.png');
-  const [scale, setScale] = useState(0.03);
-  const [numFloors, setNumFloors] = useState(1);
-  const [selectedStyle, setSelectedStyle] = useState(null);
-  const [frontWallId, setFrontWallId] = useState(null);
+  const [activeTab, setActiveTab] = useProjectState('app.activeTab', 'split');
+  const [pageView, setPageView] = useProjectState('app.pageView', 'floorplan'); // 'floorplan' | 'generative_studio'
+  const [initialStudioTab, setInitialStudioTab] = useProjectState('app.initialStudioTab', 'furniture');
+  const [file, setFile] = useProjectState('app.file', null);
+  const [imageUrl, setImageUrl] = useProjectState('app.imageUrl', '/sample_floorplan.png');
+  const [scale, setScale] = useProjectState('app.scale', 0.03);
+  const [numFloors, setNumFloors] = useProjectState('app.numFloors', 1);
+  const [selectedStyle, setSelectedStyle] = useProjectState('app.selectedStyle', null);
+  const [frontWallId, setFrontWallId] = useProjectState('app.frontWallId', null);
 
-  const [layout, setLayout] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGeneratingFacade, setIsGeneratingFacade] = useState(false);
+  const [layout, setLayout] = useProjectState('app.layout', null);
+  const [isAnalyzing, setIsAnalyzing] = useProjectState('request.analysis', false);
+  const [isGeneratingFacade, setIsGeneratingFacade] = useProjectState('request.facade', false);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [health, setHealth] = useState(null);
   const [latency, setLatency] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const analysisRequest = React.useRef(0);
+  const transitionTimers = React.useRef([]);
+  const transitionInFlight = React.useRef(null);
+  useEffect(() => () => transitionTimers.current.forEach(clearTimeout), []);
   const facadeRevision = React.useRef(0);
 
   // Room Design State (Stage 3)
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [furnishingData, setFurnishingData] = useState({});
-  const [isDesigning, setIsDesigning] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useProjectState('app.selectedRoom', null);
+  const [furnishingData, setFurnishingData] = useProjectState('app.furnishingData', {});
+  const [isDesigning, setIsDesigning] = useProjectState('request.design', false);
   const [roomFocusTrigger, setRoomFocusTrigger] = useState(0);
   const [catalogSelection, setCatalogSelection] = useState(null);
 
   // Facade Studio State
-  const [facadeDraft, setFacadeDraft] = useState(null);
+  const [facadeDraft, setFacadeDraft] = useProjectState('app.facadeDraft', null);
   const [showFacadeModal, setShowFacadeModal] = useState(false);
   const [facadeFocusTrigger, setFacadeFocusTrigger] = useState(0);
   const appliedFacade = layout?.walls.find(wall => wall.id === frontWallId)?.facade_texture;
+  useEffect(() => () => {
+    if (imageUrl?.startsWith('blob:')) project.releaseURL(imageUrl);
+  }, [imageUrl, project]);
 
   // 1. Health check & Initial Demo load
   useEffect(() => {
@@ -119,7 +127,10 @@ export default function App() {
       .then((res) => setHealth(res.data))
       .catch((err) => console.log('Backend not reachable yet:', err));
 
-    if (currentView === 'studio' && !file) loadDefaultSample();
+    if (currentView === 'studio' && !file && !layout && !project.read('app.initialized', false)) {
+      project.set('app.initialized', true);
+      loadDefaultSample();
+    }
 
     // Listen for cross-frame messages from the ARCHIGEN by KKM Hero Showcase
     const handleHash = () => {
@@ -142,17 +153,25 @@ export default function App() {
   }, [currentView]);
 
   const triggerTransition = (targetView) => {
+    if (transitionInFlight.current === targetView) return;
+    transitionTimers.current.forEach(clearTimeout);
+    transitionInFlight.current = targetView;
+    const epoch = project.epoch;
     setIsTransitioning(true);
     setTransitionTarget(targetView);
     // Smoothly flip underlying view halfway through when paper has fully covered viewport
-    setTimeout(() => {
+    const switchTimer = setTimeout(() => {
+      if (epoch !== project.epoch) return;
       setCurrentView(targetView);
       window.location.hash = targetView === 'studio' ? '#studio' : '#showcase';
     }, 2200);
     // Complete deliberate, majestic unroll across full screen
-    setTimeout(() => {
+    const endTimer = setTimeout(() => {
+      if (epoch !== project.epoch) return;
       setIsTransitioning(false);
+      transitionInFlight.current = null;
     }, 3800);
+    transitionTimers.current = [switchTimer, endTimer];
   };
 
   const loadDefaultSample = async () => {
@@ -191,8 +210,12 @@ export default function App() {
   };
 
   const handleFileUpload = (uploadedFile) => {
+    project.set('viewer.cameraPose', null);
+    project.clearSection('catalog.');
+    project.set('canvas.zoom', 1);
+    project.set('canvas.pan', { x: 0, y: 0 });
     setFile(uploadedFile);
-    const url = URL.createObjectURL(uploadedFile);
+    const url = project.trackURL(URL.createObjectURL(uploadedFile));
     setImageUrl(url);
     setFrontWallId(null);
     setFacadeDraft(null);
@@ -361,6 +384,8 @@ export default function App() {
     if (!target) throw new Error('Choose an exterior wall.');
     if (isAnalyzing && layout.metadata.source !== 'sample_reference') throw new Error('Wait for floorplan analysis to finish.');
     const revision = facadeRevision.current;
+    const token = project.startRequest('facade');
+    try {
     const level = buildingLevels(layout, numFloors).find(item => item.walls.includes(target));
     if (!level) throw new Error('The selected wall is outside the building levels.');
     const openings = fitHouseOpenings(level, layout.metadata.scale_meters_per_pixel)
@@ -371,9 +396,15 @@ export default function App() {
       style,
       num_floors: target.level_id ? 1 : numFloors,
     });
-    if (revision !== facadeRevision.current) return null;
+    if (revision !== facadeRevision.current || !project.isCurrent('facade', token)) return null;
     if (response.data?.wall_id !== target.id || !response.data.texture_base64) throw new Error('Facade generation failed.');
     return response.data;
+    } catch (error) {
+      if (!project.isCurrent('facade', token)) return null;
+      throw error;
+    } finally {
+      project.finishRequest('facade', token);
+    }
   };
 
   const applyFacade = (finish) => {
@@ -394,12 +425,12 @@ export default function App() {
 
   const openFacadeStudio = () => {
     setInitialStudioTab('facade');
+    project.set('studio.studioTab', 'facade');
     setPageView('generative_studio');
   };
 
   const handleGenerateFacade = async (style = selectedStyle) => {
     setSelectedStyle(style);
-    setIsGeneratingFacade(true);
     setErrorMsg(null);
     try {
       const draft = await requestFacade(style);
@@ -409,8 +440,6 @@ export default function App() {
       }
     } catch (err) {
       setErrorMsg(err.response?.data?.detail || err.message);
-    } finally {
-      setIsGeneratingFacade(false);
     }
   };
 
@@ -450,9 +479,10 @@ export default function App() {
     const payload = designRoomPayload(room, preset, seed, forceFurnish);
     if (!payload) return;
     setCatalogSelection(null);
-    setIsDesigning(true);
+    const token = project.startRequest('design');
     try {
       const response = await axios.post('/design', payload);
+      if (!project.isCurrent('design', token)) return;
       const result = response.data;
       if (typeof result?.is_valid !== 'boolean' || !Array.isArray(result.items)) {
         throw new Error('The room design service returned an invalid response.');
@@ -462,6 +492,7 @@ export default function App() {
         [room.id]: result
       }));
     } catch (err) {
+      if (!project.isCurrent('design', token)) return;
       console.error('Room design request failed:', err);
       setFurnishingData((prev) => ({
         ...prev,
@@ -472,7 +503,7 @@ export default function App() {
         }
       }));
     } finally {
-      setIsDesigning(false);
+      project.finishRequest('design', token);
     }
   };
 
@@ -606,13 +637,18 @@ export default function App() {
 
       {/* 1. Header */}
       <Navbar
+        onResetProject={async () => {
+          if (window.confirm('Reset this project? The locally saved plan, generated models and drafts will be removed. Your saved furniture library will remain available.')) {
+            window.location.hash = '#studio';
+            await project.reset();
+          }
+        }}
         health={health}
         latency={latency}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         pageView={pageView}
         setPageView={view => {
-          setInitialStudioTab('furniture');
           setPageView(view);
         }}
         onReturnToShowcase={() => triggerTransition('showcase')}
@@ -648,7 +684,6 @@ export default function App() {
           fileName={file?.name}
           imageUrl={imageUrl}
           onOpenGenerativeStudio={() => {
-            setInitialStudioTab('furniture');
             setPageView('generative_studio');
           }}
           onFileUpload={handleFileUpload}
@@ -780,6 +815,7 @@ export default function App() {
       {catalogSelection && furnishingData[catalogSelection.roomId] === catalogSelection.design && (
         <React.Suspense fallback={null}>
           <FurnitureCatalog key={`${catalogSelection.roomId}:${catalogSelection.item.item_id}`}
+            draftKey={`${catalogSelection.roomId}:${catalogSelection.item.item_id}`}
             item={catalogSelection.item} choices={catalogSelection.choices} preset={catalogSelection.design.preset}
             loading={catalogSelection.loading} error={catalogSelection.error}
             onApply={applyFurnitureChoice} onClose={() => setCatalogSelection(null)} />
@@ -792,7 +828,7 @@ export default function App() {
         facadeData={facadeDraft}
         onSwitchStyle={handleGenerateFacade}
         isSwitchingStyle={isGeneratingFacade}
-        isApplied={appliedFacade === facadeDraft}
+        isApplied={Boolean(appliedFacade && facadeDraft && appliedFacade.texture_base64 === facadeDraft.texture_base64 && appliedFacade.wall_id === facadeDraft.wall_id)}
         onApply={() => applyFacade(facadeDraft)}
         onFocusIn3D={viewFacadeIn3D}
       />

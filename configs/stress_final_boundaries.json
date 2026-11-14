@@ -1,0 +1,15 @@
+{
+  "extends": "configs/stress_campaign.json",
+  "models": ["facade", "furniture"],
+  "model_minutes": {"facade": 2, "furniture": 4},
+  "model_budget_scale": 1,
+  "component_tests_when_neural_blocked": false,
+  "campaign_label": "final-restored-input-boundaries",
+  "include_cases_by_model": {
+    "facade": ["resize-2048-png", "resize-4096-png", "resize-8192-png", "wall_geometry-64-2", "wall_geometry-64-16", "wall_geometry-64-64", "blur-7", "noise-64", "contrast-0.05", "jpeg-5", "mask-0.6", "rotate-90"],
+    "furniture": ["resize-1024-png", "resize-2048-png", "resize-4096-png", "resize-8192-png", "empty", "uniform", "transparent", "truncated", "unsupported", "zero_dimension", "extreme_header", "extreme_aspect"]
+  },
+  "timeouts_seconds": {"floorplan":120,"facade":30,"furniture":30,"concurrent_furniture":120},
+  "concurrency": [],
+  "endurance_max_attempts": 0
+}

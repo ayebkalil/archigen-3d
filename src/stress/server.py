@@ -8,10 +8,17 @@ import time
 import traceback
 from functools import lru_cache
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.routing import APIRoute
 from backend.app.schemas import FurnitureGenerateRequest
 from src.furniture.service import generate_furniture_response
 from .trace import CURRENT, install_furniture, stage, write_trace
+
+
+def architecture_router(production):
+    # StaticFiles mounted at '/' has an empty route path in recent Starlette.
+    # Only API routes belong in the isolated service, never the frontend mounts.
+    return APIRouter(routes=[route for route in production.routes if isinstance(route, APIRoute)])
 
 
 @asynccontextmanager
@@ -51,7 +58,7 @@ async def lifespan(app):
         from .trace import install_architecture
         install_architecture(pipeline)
         app.state.pipeline = pipeline
-        app.include_router(production.router)
+        app.include_router(architecture_router(production))
         app.state.engine = None
         yield
         return

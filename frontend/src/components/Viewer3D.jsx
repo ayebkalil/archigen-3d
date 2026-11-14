@@ -1,4 +1,6 @@
+import { useProject, useProjectState } from '../state/ProjectContext.jsx';
 import React, { useEffect, useRef, useState } from 'react';
+import { cameraPose, restoreCameraPose, disposeScene } from '../state/viewState.js';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -26,27 +28,32 @@ export default function Viewer3D({
   facadeFocusTrigger = 0,
   roomFocusTrigger = 0
 }) {
+  const project = useProject();
+  const [, setSavedPose] = useProjectState('viewer.cameraPose', null);
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
+  const saveCameraPose = () => {
+    if (cameraRef.current && controlsRef.current) setSavedPose(cameraPose(cameraRef.current, controlsRef.current));
+  };
   const furnitureGroupRef = useRef(null);
   const roofGroupRef = useRef(null);
   const gltfLoaderRef = useRef(new GLTFLoader());
   const onSelectFurnitureRef = useRef(onSelectFurniture);
   useEffect(() => { onSelectFurnitureRef.current = onSelectFurniture; }, [onSelectFurniture]);
 
-  const [wireframe, setWireframe] = useState(false);
-  const [activeLevel, setActiveLevel] = useState('all');
+  const [wireframe, setWireframe] = useProjectState('viewer.wireframe', false);
+  const [activeLevel, setActiveLevel] = useProjectState('viewer.activeLevel', 'all');
   const [unresolvedOpenings, setUnresolvedOpenings] = useState(0);
-  const [showRoof, setShowRoof] = useState(false);
-  const [roofStyle, setRoofStyle] = useState('slab'); // 'slab' | 'pitched'
-  const [floorStyle, setFloorStyle] = useState('oak'); // 'oak' | 'marble' | 'adaptive'
-  const [viewPreset, setViewPreset] = useState('perspective'); // 'perspective' | 'isometric' | 'top' | 'room'
-  const [showFurniture, setShowFurniture] = useState(true);
+  const [showRoof, setShowRoof] = useProjectState('viewer.showRoof', false);
+  const [roofStyle, setRoofStyle] = useProjectState('viewer.roofStyle', 'slab'); // 'slab' | 'pitched'
+  const [floorStyle, setFloorStyle] = useProjectState('viewer.floorStyle', 'oak'); // 'oak' | 'marble' | 'adaptive'
+  const [viewPreset, setViewPreset] = useProjectState('viewer.viewPreset', 'perspective'); // 'perspective' | 'isometric' | 'top' | 'room'
+  const [showFurniture, setShowFurniture] = useProjectState('viewer.showFurniture', true);
   const [currentFps, setCurrentFps] = useState(60);
-  const [graphicsQuality, setGraphicsQuality] = useState('high'); // 'high' | 'low'
+  const [graphicsQuality, setGraphicsQuality] = useProjectState('viewer.graphicsQuality', 'high'); // 'high' | 'low'
 
   // Store layout centers for furniture positioning
   const centersRef = useRef({ centerX: 0, centerZ: 0 });
@@ -116,6 +123,7 @@ export default function Viewer3D({
 
     // OrbitControls with free panning and smooth damping
     const controls = new OrbitControls(camera, renderer.domElement);
+    controls.addEventListener('end', saveCameraPose);
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.maxPolarAngle = Math.PI / 2 + 0.02; // Prevent dipping below ground
@@ -147,6 +155,7 @@ export default function Viewer3D({
     };
     const handleKeyUp = (e) => {
       keysDown.delete(e.code);
+      saveCameraPose();
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -390,6 +399,7 @@ export default function Viewer3D({
     resizeObserver.observe(containerRef.current);
 
     return () => {
+      saveCameraPose();
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('keydown', handleKeyDown);
@@ -402,6 +412,8 @@ export default function Viewer3D({
         renderer.domElement.removeEventListener('dblclick', handleDoubleClick);
       }
       renderer.dispose();
+      controls.dispose();
+      disposeScene(scene);
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
       }
@@ -880,7 +892,10 @@ export default function Viewer3D({
     }
     if (roofGroupRef.current) bounds.expandByObject(roofGroupRef.current);
     buildingBoundsRef.current = bounds;
-    if (['perspective', 'top', 'isometric'].includes(viewPreset)) fitCamera(viewPreset);
+    if (!restoreCameraPose(cameraRef.current, controlsRef.current, project.read('viewer.cameraPose', null))) {
+      if (['perspective', 'top', 'isometric'].includes(viewPreset)) fitCamera(viewPreset);
+      saveCameraPose();
+    }
   }, [layout, numFloors, wireframe, activeLevel, selectedRoom, graphicsQuality, roofStyle, floorStyle]);
 
   // Update 3D Furniture Assets when furnishingData changes
@@ -1011,16 +1026,19 @@ export default function Viewer3D({
   // View Presets: 3-4 Distinct Architectural Camera Modes
   const setCameraPerspective = () => {
     fitCamera('perspective');
+    saveCameraPose();
     setViewPreset('perspective');
   };
 
   const setCameraIsometric = () => {
     fitCamera('isometric');
+    saveCameraPose();
     setViewPreset('isometric');
   };
 
   const setCameraTopDown = () => {
     fitCamera('top');
+    saveCameraPose();
     setViewPreset('top');
   };
 
@@ -1049,6 +1067,7 @@ export default function Viewer3D({
     camera.up.set(0, 1, 0);
     controlsRef.current.update();
     setViewPreset('room');
+    saveCameraPose();
   };
 
   const setCameraFacadeFocus = () => {
@@ -1079,16 +1098,21 @@ export default function Viewer3D({
     controlsRef.current.target.set(targetX, targetY, targetZ);
     controlsRef.current.update();
     setViewPreset('facade');
+    saveCameraPose();
   };
 
   useEffect(() => {
-    if (facadeFocusTrigger > 0) {
+    if (facadeFocusTrigger > 0 && project.read('$lastFacadeFocus', 0) !== facadeFocusTrigger) {
+      project.set('$lastFacadeFocus', facadeFocusTrigger);
       setCameraFacadeFocus();
     }
   }, [facadeFocusTrigger]);
 
   useEffect(() => {
-    if (roomFocusTrigger > 0) setCameraRoomFocus();
+    if (roomFocusTrigger > 0 && project.read('$lastRoomFocus', 0) !== roomFocusTrigger) {
+      project.set('$lastRoomFocus', roomFocusTrigger);
+      setCameraRoomFocus();
+    }
   }, [roomFocusTrigger]);
 
   return (

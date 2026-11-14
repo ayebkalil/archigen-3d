@@ -1,0 +1,7 @@
+{
+  "extends": "configs/stress_campaign.json",
+  "model_minutes": {"floorplan": 6, "facade": 4, "furniture": 8},
+  "component_tests_when_neural_blocked": false,
+  "campaign_label": "restored-production-weights",
+  "endurance_max_attempts": 12
+}

@@ -30,10 +30,19 @@ def main():
         artifact = directory/review['run_id']/review.get('artifact','prepared.png')
         if artifact.resolve().parent != (directory/review['run_id']).resolve(): raise ValueError('Review artifact must belong to the run')
         review['artifact_sha256'] = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        review['scope'] = 'prepared_input_only; no TripoSR geometry was generated'
+        artifact_name = artifact.name
+        scopes = {'prepared.png':'prepared_input_only', 'mask-preview.png':'foreground_mask_only',
+                  'segmentation-overlay.png':'segmentation_overlay_only; no real semantic ground truth',
+                  'floorplan-output.png':'final_vectorized_rooms_over_reconstructed_canvas; no real semantic ground truth',
+                  'texture.png':'facade_image_only; no real facade ground truth',
+                  'visible-facade.png':'facade_visible_UV_region_for_API_or_full_semantic_output; no real facade ground truth',
+                  'preview.png':'prepared_furniture_input_only; this preview is not a rendered GLB',
+                  'mesh-views.png':'sampled_mesh_projections_only; texture and scan-based fidelity not assessed'}
+        if artifact_name not in scopes: raise ValueError('Unsupported visual review artifact')
+        review['scope'] = scopes[artifact_name]
         review['reviewer'] = 'codex_visual_inspection'
         review['reviewed_at_utc'] = datetime.now(timezone.utc).isoformat()
-        record['visual_review'] = 'reviewed_prepared_input'
+        record['visual_review'] = 'reviewed_artifact'
         record['quality'] = review['quality']
         record['visual_review_details'] = review
         path = directory/review['run_id']/'review.json'

@@ -1,3 +1,4 @@
+import { useProjectState } from '../state/ProjectContext.jsx';
 import React, { Suspense, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Bounds, Html, OrbitControls, useGLTF } from '@react-three/drei';
@@ -48,14 +49,14 @@ function PreviewShape({ item, onChannels }) {
 
 const original = { id: 'original', label: 'Original shape', desc: 'The original geometry for the selected model' };
 
-export default function FurnitureCatalog({ item, choices, preset, loading, error, onApply, onClose }) {
-  const [modelId, setModelId] = useState(item.catalog_id);
-  const [finish, setFinish] = useState(item.finish || preset || 'contemporary_minimal');
-  const [shape, setShape] = useState(item.shape || original.id);
-  const [colors, setColors] = useState(item.colors || {});
+export default function FurnitureCatalog({ item, choices, preset, loading, error, onApply, onClose, draftKey }) {
+  const [modelId, setModelId] = useProjectState(`catalog.${draftKey}.modelId`, item.catalog_id);
+  const [finish, setFinish] = useProjectState(`catalog.${draftKey}.finish`, item.finish || preset || 'contemporary_minimal');
+  const [shape, setShape] = useProjectState(`catalog.${draftKey}.shape`, item.shape || original.id);
+  const [colors, setColors] = useProjectState(`catalog.${draftKey}.colors`, item.colors || {});
   const [channels, setChannels] = useState([]);
-  const [tab, setTab] = useState('Model');
-  const [library, setLibrary] = useState(item.source === 'custom' ? 'custom' : 'builtin');
+  const [tab, setTab] = useProjectState(`catalog.${draftKey}.tab`, 'Model');
+  const [library, setLibrary] = useProjectState(`catalog.${draftKey}.library`, item.source === 'custom' ? 'custom' : 'builtin');
   const models = [item, ...choices];
   const selected = models.find(model => model.catalog_id === modelId) || item;
   const custom = selected.source === 'custom';

@@ -503,7 +503,7 @@ async def generate_furniture_3d_endpoint(request: FurnitureGenerateRequest):
         except httpx.RequestError as exc:
             raise HTTPException(
                 status_code=503,
-                detail="The GPU furniture worker is unavailable. Start it with scripts/start_local_stack.ps1.",
+                detail="The GPU furniture worker is unavailable. Check the furniture service or start scripts/start_docker_stack.ps1 (Docker) / scripts/start_local_stack.ps1 (native).",
             ) from exc
         if not response.is_success:
             raise HTTPException(status_code=response.status_code, detail=response.json().get("detail", "GPU reconstruction failed."))

@@ -1,4 +1,7 @@
+import { useProject, useProjectState } from '../state/ProjectContext.jsx';
 import React, { useState, useEffect, useRef } from 'react';
+import { generateFurniture } from '../state/projectActions.js';
+import { cameraPose, restoreCameraPose, disposeScene } from '../state/viewState.js';
 import FacadeWallSelect from './FacadeWallSelect.jsx';
 import axios from 'axios';
 import * as THREE from 'three';
@@ -72,31 +75,32 @@ export default function GenerativeStudio({
   onViewFacadeIn3D,
   onNavigateToFloorplan
 }) {
-  const [studioTab, setStudioTab] = useState(initialTab);
+  const project = useProject();
+  const [studioTab, setStudioTab] = useProjectState('studio.studioTab', initialTab);
 
   // --- 2D-to-3D Furniture State ---
-  const [furnitureImageBase64, setFurnitureImageBase64] = useState(FURNITURE_PRESETS[0].preview_url);
-  const [furnitureName, setFurnitureName] = useState(FURNITURE_PRESETS[0].name);
-  const [furnitureCategory, setFurnitureCategory] = useState(FURNITURE_PRESETS[0].category);
-  const [removeBg, setRemoveBg] = useState(true);
-  const [targetHeightM, setTargetHeightM] = useState(FURNITURE_PRESETS[0].height_m);
-  const [isGenerating3D, setIsGenerating3D] = useState(false);
-  const [generatedModel, setGeneratedModel] = useState(null);
+  const [furnitureImageBase64, setFurnitureImageBase64] = useProjectState('studio.furnitureImageBase64', FURNITURE_PRESETS[0].preview_url);
+  const [furnitureName, setFurnitureName] = useProjectState('studio.furnitureName', FURNITURE_PRESETS[0].name);
+  const [furnitureCategory, setFurnitureCategory] = useProjectState('studio.furnitureCategory', FURNITURE_PRESETS[0].category);
+  const [removeBg, setRemoveBg] = useProjectState('studio.removeBg', true);
+  const [targetHeightM, setTargetHeightM] = useProjectState('studio.targetHeightM', FURNITURE_PRESETS[0].height_m);
+  const [isGenerating3D, setIsGenerating3D] = useProjectState('request.furniture', false);
+  const [generatedModel, setGeneratedModel] = useProjectState('studio.generatedModel', null);
   const [customLibrary, setCustomLibrary] = useState([]);
-  const [libraryType, setLibraryType] = useState('');
-  const [saveSuccessMsg, setSaveSuccessMsg] = useState(null);
-  const [wireframe3D, setWireframe3D] = useState(false);
-  const [autoRotate3D, setAutoRotate3D] = useState(true);
+  const [libraryType, setLibraryType] = useProjectState('studio.libraryType', '');
+  const [saveSuccessMsg, setSaveSuccessMsg] = useProjectState('$saveSuccessMsg', null);
+  const [wireframe3D, setWireframe3D] = useProjectState('studio.wireframe3D', false);
+  const [autoRotate3D, setAutoRotate3D] = useProjectState('studio.autoRotate3D', true);
 
   // --- Facade Synthesis State ---
-  const [isGeneratingFacade, setIsGeneratingFacade] = useState(false);
-  const [facadeDraft, setFacadeDraft] = useState(null);
-  const [studioError, setStudioError] = useState(null);
+  const [isGeneratingFacade, setIsGeneratingFacade] = useProjectState('request.facade', false);
+  const [facadeDraft, setFacadeDraft] = useProjectState('app.facadeDraft', null);
+  const [studioError, setStudioError] = useProjectState('$studioError', null);
   const targetWall = layout?.walls.find(wall => wall.id === frontWallId && wall.is_exterior);
   const appliedFacade = targetWall?.facade_texture;
   const facadeResult = facadeDraft && facadeDraft.wall_id === frontWallId && facadeDraft.style === selectedStyle
     ? facadeDraft : appliedFacade?.style === selectedStyle ? appliedFacade : null;
-  const isApplied = Boolean(facadeResult && facadeResult === appliedFacade);
+  const isApplied = Boolean(facadeResult && appliedFacade && facadeResult.texture_base64 === appliedFacade.texture_base64 && facadeResult.wall_id === appliedFacade.wall_id);
 
   const fileInputRef = useRef(null);
   const canvas3DRef = useRef(null);
@@ -105,6 +109,7 @@ export default function GenerativeStudio({
   const modelGroupRef = useRef(null);
   const controls3DRef = useRef(null);
   const autoRotateRef = useRef(autoRotate3D);
+  const [, setCameraPose] = useProjectState('studio.cameraPose', null);
 
   useEffect(() => {
     autoRotateRef.current = autoRotate3D;
@@ -159,6 +164,11 @@ export default function GenerativeStudio({
     controls.minDistance = 0.4;
     controls.maxDistance = 5.0;
     controls3DRef.current = controls;
+    const savePose = () => {
+      const model = project.read('studio.generatedModel', null);
+      if (model && modelGroupRef.current?.children.length) setCameraPose({ ...cameraPose(camera, controls), modelId: model.id, rotation: modelGroupRef.current.rotation.y || 0 });
+    };
+    controls.addEventListener('end', savePose);
 
     // Lighting setup
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd0c8b8, 0.9);
@@ -226,6 +236,7 @@ export default function GenerativeStudio({
     resizeObserver.observe(container);
 
     return () => {
+      savePose();
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
@@ -233,6 +244,10 @@ export default function GenerativeStudio({
         container.removeChild(renderer.domElement);
       }
       renderer.dispose();
+      controls.dispose();
+      disposeScene(scene);
+      controls3DRef.current = null;
+      modelGroupRef.current = null;
     };
   }, [studioTab]);
 
@@ -298,8 +313,14 @@ export default function GenerativeStudio({
         // Frame camera comfortably
         const maxDim = Math.max(size.x, size.y, size.z) || 1.0;
         if (controls3DRef.current) {
-          controls3DRef.current.target.set(0, size.y * 0.5, 0);
-          controls3DRef.current.update();
+          const saved = project.read('studio.cameraPose', null);
+          const controls = controls3DRef.current;
+          if (saved?.modelId === generatedModel.id && restoreCameraPose(controls.object, controls, saved)) {
+            modelGroup.rotation.y = saved.rotation || 0;
+          } else {
+            controls.target.set(0, size.y * 0.5, 0);
+            controls.update();
+          }
         }
       },
       undefined,
@@ -374,43 +395,12 @@ export default function GenerativeStudio({
   };
 
   // Trigger 3D Furniture Generation
-  const handleGenerate3DFurniture = async () => {
+  const handleGenerate3DFurniture = () => {
     if (!furnitureImageBase64) return;
-    setIsGenerating3D(true);
-    setStudioError(null);
-    setSaveSuccessMsg(null);
-    try {
-      let inputData = furnitureImageBase64;
-      if (!inputData.startsWith('data:')) {
-        const response = await fetch(inputData);
-        if (!response.ok) throw new Error('Could not load the reference image');
-        const blob = await response.blob();
-        inputData = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }
-      const payload = {
-        image_base64: inputData,
-        name: furnitureName,
-        category: furnitureCategory,
-        remove_bg: removeBg,
-        target_height_m: targetHeightM
-      };
-
-      const res = await axios.post('/furniture/generate-3d', payload);
-      if (res.data?.status === 'success') {
-        setGeneratedModel(res.data);
-        setLibraryType('');
-      }
-    } catch (err) {
-      console.error('Furniture generation error:', err);
-      setStudioError(err.response?.data?.detail || '3D generation failed. Please try another image.');
-    } finally {
-      setIsGenerating3D(false);
-    }
+    return generateFurniture(project, {
+      image: furnitureImageBase64, name: furnitureName, category: furnitureCategory,
+      removeBg, height: targetHeightM,
+    });
   };
 
   // Save 3D Model to Room Design Library
@@ -452,7 +442,6 @@ export default function GenerativeStudio({
 
   // Trigger Facade Generation
   const handleGenerateFacade = async () => {
-    setIsGeneratingFacade(true);
     setStudioError(null);
     try {
       const draft = await requestFacade(selectedStyle);
@@ -460,8 +449,6 @@ export default function GenerativeStudio({
     } catch (err) {
       console.error('Facade generation error:', err);
       setStudioError(err.response?.data?.detail || err.message || 'Facade generation failed.');
-    } finally {
-      setIsGeneratingFacade(false);
     }
   };
 

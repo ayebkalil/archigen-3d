@@ -1,4 +1,45 @@
+# Base stack: MLflow + ONNX API + web. Furniture requires the GPU overlay.
+# Add the CUDA TripoSR worker with:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build --wait
+# or simply .\scripts\start_docker_stack.ps1
 services:
+  model-init:
+    build:
+      context: .
+      dockerfile: docker/models/Dockerfile
+    volumes:
+      - ./models/saved:/app/models/saved
+      - ./frontend/public/models:/native-library:ro
+      - furniture_library:/library
+    restart: "no"
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: docker/mlflow/Dockerfile
+      args:
+        APP_REVISION: ${ARCHIGEN_REVISION:-local}
+    container_name: archigen_mlflow
+    ports:
+      - "127.0.0.1:${ARCHIGEN_MLFLOW_PORT:-5000}:5000"
+    volumes:
+      # Same store as the native server (scripts/start_mlflow.ps1); never run both at once.
+      - type: bind
+        source: ${ARCHIGEN_MLFLOW_DB:-./mlflow.db}
+        target: /mlflow/mlflow.db
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ARCHIGEN_MLFLOW_ARTIFACTS:-./mlartifacts}
+        target: /mlflow/artifacts
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: "no"
+
   backend:
     build:
       context: .
@@ -10,9 +51,15 @@ services:
       - "127.0.0.1:${ARCHIGEN_API_PORT:-8000}:8000"
     environment:
       - ENVIRONMENT=production
+      - ARCHIGEN_FLOORPLAN_BACKEND=onnx
       - ARCHIGEN_FACADE_EXPERIMENT=${ARCHIGEN_FACADE_EXPERIMENT:-}
       - ARCHIGEN_CUSTOM_LIBRARY=/app/library
-      - ARCHIGEN_FURNITURE_SERVICE_URL=${ARCHIGEN_FURNITURE_SERVICE_URL-http://host.docker.internal:8001}
+      # The GPU overlay points this to the CUDA worker; no procedural fallback.
+      - ARCHIGEN_FURNITURE_SERVICE_URL=${ARCHIGEN_FURNITURE_SERVICE_URL-}
+      - ARCHIGEN_MLFLOW_ENABLED=${ARCHIGEN_MLFLOW_ENABLED:-1}
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_HTTP_REQUEST_TIMEOUT=3
+      - MLFLOW_HTTP_REQUEST_MAX_RETRIES=0
       - OMP_NUM_THREADS=2
       - MKL_NUM_THREADS=2
     volumes:
@@ -23,6 +70,11 @@ services:
         read_only: true
         bind:
           create_host_path: false
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+      mlflow:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
       interval: 30s
@@ -43,6 +95,11 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     restart: "no"
 
 volumes:

@@ -1,3 +1,4 @@
+import { useProject, useProjectState } from '../state/ProjectContext.jsx';
 import React, { useState } from 'react';
 import { STOREY_HEIGHT_M } from '../geometry/buildingDimensions.js';
 import {
@@ -68,21 +69,21 @@ export default function Floorplan2DCanvas({
   selectedRoom = null,
   onSelectRoom = null,
 }) {
-  const [showRooms, setShowRooms] = useState(true);
-  const [showWalls, setShowWalls] = useState(true);
-  const [showOpenings, setShowOpenings] = useState(true);
+  const [showRooms, setShowRooms] = useProjectState('canvas.showRooms', true);
+  const [showWalls, setShowWalls] = useProjectState('canvas.showWalls', true);
+  const [showOpenings, setShowOpenings] = useProjectState('canvas.showOpenings', true);
   const wallsOnly = showWalls && !showRooms && !showOpenings;
   const [hoveredWall, setHoveredWall] = useState(null);
 
   // Active CAD Tool: 'select' | 'add_door' | 'delete' | 'relabel'
-  const [activeTool, setActiveTool] = useState('select');
+  const [activeTool, setActiveTool] = useProjectState('canvas.activeTool', 'select');
   const [selectedRoomForRelabel, setSelectedRoomForRelabel] = useState(null);
   const [editFeedback, setEditFeedback] = useState(null);
-  const [showNotif, setShowNotif] = useState(true);
+  const [showNotif, setShowNotif] = useProjectState('canvas.showNotif', true);
 
   // Zoom & Pan interactive state (2D Blueprint Canvas)
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useProjectState('canvas.zoom', 1);
+  const [pan, setPan] = useProjectState('canvas.pan', { x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = React.useRef({ x: 0, y: 0 });
 
@@ -114,7 +115,7 @@ export default function Floorplan2DCanvas({
   };
 
   // Movable Floating Layer Dock state (for split view)
-  const [dockPos, setDockPos] = useState({ x: 20, y: 18 });
+  const [dockPos, setDockPos] = useProjectState('canvas.dockPos', { x: 20, y: 18 });
   const [isDraggingDock, setIsDraggingDock] = useState(false);
   const dragStartRef = React.useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
 
@@ -153,11 +154,11 @@ export default function Floorplan2DCanvas({
   const [calibPointA, setCalibPointA] = useState(null);
   const [calibPointB, setCalibPointB] = useState(null);
   const [wallStart, setWallStart] = useState(null);
-  const [drawExterior, setDrawExterior] = useState(false);
+  const [drawExterior, setDrawExterior] = useProjectState('canvas.drawExterior', false);
   const [levelAnchor, setLevelAnchor] = useState(null);
   const canAlignLevels = layout?.envelope?.length === 2 && !layout.storeys?.length;
   const hasAlignedLevels = layout?.storeys?.length > 0 && layout.metadata?.source !== 'sample_reference';
-  const [knownDistanceM, setKnownDistanceM] = useState('0.90');
+  const [knownDistanceM, setKnownDistanceM] = useProjectState('canvas.knownDistanceM', '0.90');
 
   const canvasSize = layout?.metadata?.canvas_size || [512, 512];
   const walls = layout?.walls || [];

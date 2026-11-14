@@ -1,0 +1,44 @@
+# CUDA TripoSR furniture worker. Requires an NVIDIA GPU visible to Docker
+# (Docker Desktop with the WSL2 backend and a recent NVIDIA driver on Windows).
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build --wait
+services:
+  furniture:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.furniture
+      args:
+        APP_REVISION: ${ARCHIGEN_REVISION:-local}
+    container_name: archigen_furniture
+    # Reachable only on the Compose network, through the backend.
+    expose:
+      - "8001"
+    environment:
+      - ARCHIGEN_FURNITURE_DETAIL=${ARCHIGEN_FURNITURE_DETAIL:-high}
+      - ARCHIGEN_MLFLOW_ENABLED=${ARCHIGEN_MLFLOW_ENABLED:-1}
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_HTTP_REQUEST_TIMEOUT=3
+      - MLFLOW_HTTP_REQUEST_MAX_RETRIES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+    restart: "no"
+
+  backend:
+    environment:
+      - ARCHIGEN_FURNITURE_SERVICE_URL=http://furniture:8001
+    depends_on:
+      furniture:
+        condition: service_healthy

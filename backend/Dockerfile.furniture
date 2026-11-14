@@ -1,0 +1,64 @@
+# CUDA TripoSR furniture worker. Same runtime as scripts/setup_furniture_gpu.ps1:
+# Python 3.11, torch 2.6.0 + CUDA 12.4, patched TripoSR at a pinned revision.
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/app/runtime/huggingface \
+    U2NET_HOME=/app/runtime/rembg \
+    NUMBA_CACHE_DIR=/tmp/numba
+
+RUN apt-get update && apt-get install -y --no-install-recommends git curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Keep the CUDA torch build of the base image; never let a requirement replace it.
+COPY backend/requirements.txt /tmp/req/backend/requirements.txt
+COPY requirements-furniture-quality.txt /tmp/req/requirements-furniture-quality.txt
+RUN printf 'torch==2.6.0\ntorchvision==0.21.0\n' > /tmp/req/constraints.txt \
+    && pip install -c /tmp/req/constraints.txt -r /tmp/req/requirements-furniture-quality.txt \
+    && python -c "import torch; assert torch.__version__.startswith('2.6.0') and torch.version.cuda == '12.4', torch.__version__"
+
+# TripoSR source at the revision used natively, with the optional torchmcubes patch.
+ARG TRIPOSR_REVISION=107cefdc244c39106fa830359024f6a2f1c78871
+COPY patches/triposr-optional-marching-cubes.patch /tmp/triposr.patch
+RUN git init -q TripoSR \
+    && git -C TripoSR remote add origin https://github.com/VAST-AI-Research/TripoSR.git \
+    && git -C TripoSR fetch -q --depth 1 origin "$TRIPOSR_REVISION" \
+    && git -C TripoSR checkout -q --detach FETCH_HEAD \
+    && git -C TripoSR apply --unidiff-zero --ignore-space-change /tmp/triposr.patch \
+    && rm -rf TripoSR/.git /tmp/triposr.patch
+
+# Official checkpoint (SHA256-verified by the script) and auxiliary caches baked in,
+# so the image does not depend on files from the host machine.
+COPY scripts/download_furniture_models.py /app/scripts/download_furniture_models.py
+RUN python scripts/download_furniture_models.py \
+    && python -c "import transformers.utils.hub" \
+    && useradd -m appuser \
+    && chown -R appuser:appuser /app/runtime
+
+# TripoSR requests the encoder config at "main". Resolve that alias to the
+# pinned snapshot so offline startup cannot select another revision.
+RUN mkdir -p /app/runtime/huggingface/hub/models--facebook--dino-vitb16/refs \
+    && printf 'f205d5d8e640a89a2b8ef0369670dfc37cc07fc2' > /app/runtime/huggingface/hub/models--facebook--dino-vitb16/refs/main \
+    && chown -R appuser:appuser /app/runtime/huggingface
+
+COPY src /app/src
+COPY backend/app /app/backend/app
+
+ARG APP_REVISION=local
+LABEL org.opencontainers.image.revision=$APP_REVISION
+ENV ARCHIGEN_IMAGE_REVISION=$APP_REVISION
+
+# Weights are local from now on; fail instead of silently downloading.
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 \
+    ARCHIGEN_FURNITURE_DETAIL=high \
+    OMP_NUM_THREADS=2 \
+    MKL_NUM_THREADS=2
+USER appuser
+EXPOSE 8001
+
+CMD ["uvicorn", "backend.app.furniture_worker:app", "--host", "0.0.0.0", "--port", "8001"]

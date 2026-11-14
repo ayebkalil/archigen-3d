@@ -6,6 +6,7 @@ export default function Navbar({
   onReturnToShowcase,
   pageView = 'floorplan',
   setPageView,
+  onResetProject,
 }) {
   const online = health?.status === 'healthy';
   return (
@@ -46,6 +47,7 @@ export default function Navbar({
         </button>
       </nav>
       <div className="nav-utilities">
+        <button type="button" onClick={onResetProject} className="showcase-link" data-testid="reset-project">Reset project</button>
         <span className={`connection-status ${online ? 'is-online' : ''}`} role="status">
           <i />
           {online ? 'Connected' : 'Connecting'}

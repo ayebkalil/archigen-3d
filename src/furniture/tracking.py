@@ -57,10 +57,16 @@ def _file_hash(path, size, modified_ns):
 @lru_cache(maxsize=1)
 def code_version():
     try:
-        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True, timeout=5).strip()
-        dirty = bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True, timeout=5).strip())
+        revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True, timeout=5,
+                                           stderr=subprocess.DEVNULL).strip()
+        dirty = bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT, text=True, timeout=5,
+                                             stderr=subprocess.DEVNULL).strip())
         return {'git_revision': revision, 'git_dirty_at_process_start': str(dirty).lower()}
     except (OSError, subprocess.SubprocessError):
+        # Docker images carry no .git; they record the revision they were built from.
+        image_revision = os.getenv('ARCHIGEN_IMAGE_REVISION')
+        if image_revision:
+            return {'git_revision': image_revision, 'git_revision_source': 'docker image build argument'}
         return {'git_revision': 'unavailable'}
 
 

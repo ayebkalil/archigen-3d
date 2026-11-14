@@ -1,0 +1,9 @@
+{
+  "extends": "configs/stress_campaign.json",
+  "models": ["floorplan", "facade"],
+  "model_minutes": {"floorplan": 6, "facade": 4},
+  "model_budget_scale": 1,
+  "component_tests_when_neural_blocked": false,
+  "campaign_label": "restored-architecture-after-router-fix",
+  "endurance_max_attempts": 12
+}

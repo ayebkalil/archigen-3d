@@ -70,6 +70,7 @@ if ($webListener) {
 
 $names = @('ARCHIGEN_FURNITURE_DETAIL', 'ARCHIGEN_FURNITURE_SERVICE_URL', 'ARCHIGEN_FURNITURE_QUALITY',
     'HF_HOME', 'U2NET_HOME', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'PYTHONUNBUFFERED',
+    'ARCHIGEN_FLOORPLAN_BACKEND', 'ARCHIGEN_FACADE_EXPERIMENT',
     'MLFLOW_TRACKING_URI', 'ARCHIGEN_MLFLOW_ENABLED', 'MLFLOW_HTTP_REQUEST_TIMEOUT', 'MLFLOW_HTTP_REQUEST_MAX_RETRIES')
 $previous = @{}
 foreach ($name in $names) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
@@ -81,6 +82,9 @@ try {
         $env:MLFLOW_HTTP_REQUEST_TIMEOUT = '3'
         $env:MLFLOW_HTTP_REQUEST_MAX_RETRIES = '0'
     }
+    # Use the verified production ONNX models consistently on this native stack.
+    $env:ARCHIGEN_FLOORPLAN_BACKEND = 'onnx'
+    $env:ARCHIGEN_FACADE_EXPERIMENT = $null
     $env:ARCHIGEN_FURNITURE_DETAIL = $FurnitureDetail
     $env:HF_HOME = Join-Path $projectRoot 'outputs/runtime/huggingface'
     $env:U2NET_HOME = Join-Path $projectRoot 'outputs/runtime/rembg'

@@ -1,0 +1,12 @@
+{
+  "extends": "configs/stress_campaign.json",
+  "models": ["furniture"],
+  "model_minutes": {"furniture": 3},
+  "model_budget_scale": 1,
+  "component_tests_when_neural_blocked": false,
+  "campaign_label": "furniture-large-image-probes",
+  "include_cases": ["resize-4096-png", "resize-8192-png"],
+  "timeouts_seconds": {"floorplan":120,"facade":120,"furniture":30,"concurrent_furniture":120},
+  "concurrency": [],
+  "endurance_max_attempts": 0
+}

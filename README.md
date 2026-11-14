@@ -2,7 +2,8 @@
 
 **New teammate setup:** Git does not contain model binaries. Run
 `python -m pip install dvc`, then `python scripts/models.py pull` and
-`python scripts/models.py check` before starting the backend or Docker.
+`python scripts/models.py check` before starting the native backend. Docker prepares
+the models automatically; see [the complete Docker guide](docs/docker.md).
 See [model setup and distribution audit](docs/model-setup.md) for furniture setup
 and clean-clone verification.
 
@@ -188,7 +189,7 @@ Les captures comparatives ont été réalisées sous la **même pose caméra ver
 - **Gros Plan Rasoir (`stage4_rug_floor_closeup.png`) :** Vérification détaillée de l'interface tapis/sol confirmant l'absence de z-fighting coplanaire.
 
 ### Vérification de l'Image Docker Autonome & Latences Conteneur :
-- **Image Autonome (Zero Volume Mounts) :** Construit intégralement depuis zéro avec `docker compose up --build -d` sans aucun montage de volume du répertoire de travail. Toutes les dépendances sont strictement gérées dans `requirements.txt` sans intervention manuelle.
+- **Ancienne validation historique (configuration remplacée) :** Construit intégralement depuis zéro avec `docker compose up --build -d` sans aucun montage de volume du répertoire de travail. Toutes les dépendances sont strictement gérées dans `requirements.txt` sans intervention manuelle.
 - **Servitude des Modèles :** Les 33 modèles GLB sous licence CC0 (Kenney.nl) sont servis localement avec **33/33 réponses HTTP 200 validées**.
 - **Routeur de Repli & Transparence Cryptographique (Conteneur ONNX CPU) :**
   - Le conteneur embarque le modèle champion ONNX (`floorplan_multitask.onnx`) ainsi que le routeur de repli autonome ONNX (`floorplan_fallback.onnx`, exporté depuis `multitask_resnet34_blend_alpha_0_3.pth`).
@@ -279,47 +280,42 @@ Ouvrez `http://localhost:3000`. Redémarrez le backend après une mise à jour d
 code ou des dépendances. Le mobilier local utilise la reconstruction volumétrique ;
 le moteur neuronal TripoSR nécessite l'environnement dédié décrit plus bas.
 
-## ⚡ Démarrage Rapide (Production Docker Compose)
+## Démarrage de l’application complète avec Docker
 
-```bash
-# 1. Cloner le projet
-git clone https://github.com/ayebkalil/archigen-3d.git
-cd archigen-3d
-
-# 2. Récupérer et vérifier les poids de production (sans chemin privé)
-python -m pip install dvc
-python scripts/models.py pull
-python scripts/models.py check
-
-# 3. Lancer la pile complète (FastAPI + React 18 + Nginx)
-docker compose up --build -d --wait
-```
-
-* **Application Web :** `http://localhost:3000`
-* **Documentation Interactive API Swagger :** `http://localhost:8000/docs`
-* **Health Check Endpoint :** `http://localhost:8000/health` (Conteneur validé en statut `healthy`)
-
-Après un `git pull`, relancez `docker compose up --build -d --wait` pour reconstruire
-les images et recréer les conteneurs. `docker compose start` redémarre les conteneurs
-existants. La bibliothèque de mobilier est conservée dans le volume Compose
-`furniture_library`. Les ports hôte sont configurables avec `ARCHIGEN_WEB_PORT`
-et `ARCHIGEN_API_PORT` si une instance native utilise déjà les ports 3000 et 8000.
-
-Le service backend monte les poids DVC de `models/saved` en lecture seule. Récupérez
-ces fichiers avant le démarrage et conservez-les dans ce dossier.
-
-Le conteneur utilise ONNX Runtime CPU pour le plan et la façade EMA de production. Le mobilier
-est reconstruit par le worker TripoSR CUDA natif sur le port 8001. Préparez
-[l'environnement natif du mobilier](docs/furniture-quality-experiment.md), puis
-démarrez le worker et les conteneurs ensemble depuis PowerShell.
+Prérequis : Docker Desktop avec WSL2, GPU NVIDIA et pilote compatible. Aucun
+Python, Node ou DVC hôte requis pour une nouvelle installation.
 
 ```powershell
-.\scripts\start_local_stack.ps1
+git clone https://github.com/ayebkalil/archigen-3d.git
+cd archigen-3d
+.\scripts\start_docker_stack.ps1
+# Pour remplacer les services natifs de ce dépôt déjà actifs :
+# .\scripts\start_docker_stack.ps1 -ReplaceNative
 ```
 
-Le script utilise le mode haute qualité (grille 384³ et texture 2048 px).
-Après redémarrage de Windows, relancez ce script pour démarrer également le worker.
-Une indisponibilité du worker produit une erreur explicite dans le studio.
+- Application : **http://localhost:3000/#studio**
+- API : http://localhost:8000/docs
+- MLflow : http://localhost:5000
+
+Le lanceur construit React/Nginx, l’API ONNX, TripoSR CUDA et MLflow 3.17.1,
+vérifie CUDA et sauvegarde SQLite avant le démarrage. Un service ponctuel prépare
+les trois ONNX avec vérification SHA-256. Le worker utilise le préréglage `high`
+(grille 384³, texture 2048 px), avec les poids et caches intégrés à son image.
+Aucune extrusion ne remplace une reconstruction GPU indisponible.
+
+`mlflow.db`, `mlartifacts/`, le volume de meubles personnalisés et les projets du
+navigateur sont conservés. Garder la même adresse `localhost:3000` pour IndexedDB.
+Ne pas utiliser `down -v` pour un arrêt normal.
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml logs -f
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml down
+```
+
+Voir le [guide Docker complet](docs/docker.md) pour une nouvelle machine, les
+commandes Compose directes, la configuration, la migration native, la restauration
+et les vérifications reproductibles. Les anciennes mesures Docker ci-dessus
+restent des résultats historiques, pas une validation de la nouvelle pile.
 
 ---
 

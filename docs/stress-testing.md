@@ -159,3 +159,14 @@ sont décrits dans [stress-testing-results.md](stress-testing-results.md).
 Les tests couvrent notamment la détermination des entrées, les interfaces façades,
 les traces concurrentes, l'attribution d'erreur, l'arrêt des descendants, le suivi
 indisponible, l'absence de run automatique dupliqué et la prudence des rapports.
+
+## Campagne avec les poids de production restaurés
+
+Le rapport [stress-testing-neural-results.md](stress-testing-neural-results.md)
+documente la nouvelle série réellement exécutée : 436 mesures neuronales/API,
+avec les sorties, les erreurs et les limites d'évaluation. Les anciens résultats
+de prétraitement restent conservés dans le rapport historique.
+
+```powershell
+.\scripts\run_stress_campaign.ps1 -BudgetMinutes 30 -Manifest configs/stress_neural_restored.json
+```

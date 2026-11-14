@@ -72,12 +72,16 @@ if (!$workerHealth) {
 }
 
 Push-Location $projectRoot
+$previousServiceUrl = $env:ARCHIGEN_FURNITURE_SERVICE_URL
 try {
+    # Mixed mode: the containerized API reaches the native worker on the host.
+    $env:ARCHIGEN_FURNITURE_SERVICE_URL = 'http://host.docker.internal:8001'
     $arguments = @('compose', 'up', '-d', '--wait', '--wait-timeout', '180')
     if (!$SkipBuild) { $arguments += '--build' }
     & docker @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Docker Compose startup failed.' }
     Write-Host "ArchiGen is ready at http://127.0.0.1:3000 with $($workerHealth.device)."
 } finally {
+    $env:ARCHIGEN_FURNITURE_SERVICE_URL = $previousServiceUrl
     Pop-Location
 }

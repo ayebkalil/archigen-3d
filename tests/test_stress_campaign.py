@@ -20,6 +20,42 @@ from src.stress.manage_stack import owned
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_each_model_keeps_its_reserved_budget():
+    from src.stress.campaign import model_deadline
+    budgets = {'floorplan':6, 'facade':4, 'furniture':8}
+    assert model_deadline(0,1380,'floorplan',['facade','furniture'],budgets)==360
+    assert model_deadline(600,1380,'floorplan',['facade','furniture'],budgets)==660
+    assert model_deadline(1100,1380,'furniture',[],budgets)==1380
+
+
+def test_coverage_visits_transforms_before_extreme_levels():
+    from src.stress.campaign import balanced_cases
+    original=[{'family':'resolution','transform':'resize','value':v} for v in (512,8192)]
+    original += [{'family':'invalid','transform':'empty'}]
+    result=balanced_cases(original)
+    assert result[1]['transform']=='empty'
+    assert result[2]['value']==8192
+
+
+def test_restore_environment_preserves_onnx_selection():
+    from src.stress.manage_stack import NATIVE_KEYS
+    assert 'ARCHIGEN_FLOORPLAN_BACKEND' in NATIVE_KEYS
+
+
+def test_isolated_router_excludes_frontend_mount(tmp_path):
+    from fastapi import FastAPI
+    from starlette.staticfiles import StaticFiles
+    from src.stress.server import architecture_router
+    production = FastAPI()
+    @production.get('/predict/example')
+    def example(): return {'ok':True}
+    production.mount('/', StaticFiles(directory=tmp_path), name='frontend')
+    isolated=FastAPI()
+    isolated.include_router(architecture_router(production))
+    assert '/predict/example' in isolated.openapi()['paths']
+    assert not any(getattr(route,'name',None)=='frontend' for route in isolated.routes)
+
+
 @pytest.fixture
 def source(tmp_path):
     path = tmp_path/'source.png'

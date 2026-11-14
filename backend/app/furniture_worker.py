@@ -1,4 +1,4 @@
-"""Native CUDA furniture worker used by the Docker API."""
+"""CUDA furniture worker used by the native and Docker APIs."""
 
 from contextlib import asynccontextmanager
 
@@ -10,11 +10,14 @@ from src.furniture.service import generate_furniture_response
 
 @asynccontextmanager
 async def lifespan(app):
+    import torch
+    if not torch.cuda.is_available():
+        raise RuntimeError("The furniture worker requires CUDA. Check the NVIDIA driver and Docker GPU access.")
     from src.furniture.quality_engine import QualityFurnitureEngine
 
     generator = QualityFurnitureEngine()
     if generator.device.type != "cuda":
-        raise RuntimeError("The furniture worker requires the native CUDA environment.")
+        raise RuntimeError("The furniture worker requires a CUDA runtime.")
     app.state.generator = generator
     yield
 

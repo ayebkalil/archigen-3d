@@ -1,3 +1,4 @@
+import { useProject, useProjectState } from '../state/ProjectContext.jsx';
 import React, { useState } from 'react';
 import { 
   X, 
@@ -39,7 +40,7 @@ export default function FacadeModal({
   onApply,
   onFocusIn3D
 }) {
-  const [activeTab, setActiveTab] = useState('side_by_side'); // 'side_by_side' | 'realistic' | 'sketch'
+  const [activeTab, setActiveTab] = useProjectState('facadeModal.activeTab', 'side_by_side'); // 'side_by_side' | 'realistic' | 'sketch'
 
   if (!isOpen || !facadeData) return null;
 

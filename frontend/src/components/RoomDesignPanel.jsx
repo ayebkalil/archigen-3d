@@ -1,3 +1,4 @@
+import { useProjectState } from '../state/ProjectContext.jsx';
 import React, { useEffect, useState } from 'react';
 import { Sparkles, RefreshCw, Trash2, X, AlertCircle, AlertTriangle, CheckCircle2, ChevronRight, Info, Layers, Compass, Eye } from 'lucide-react';
 import { FURNITURE_FINISHES } from '../geometry/furnitureAppearance.js';
@@ -39,10 +40,10 @@ export default function RoomDesignPanel({
   isDesigning,
   onRelabelRoom
 }) {
-  const [selectedPreset, setSelectedPreset] = useState('contemporary_minimal');
+  const [selectedPreset, setSelectedPreset] = useProjectState(`room.${selectedRoom?.id}.preset`, 'contemporary_minimal');
   const [showRelabel, setShowRelabel] = useState(false);
   const appliedPreset = furnishingData?.[selectedRoom?.id]?.preset;
-  useEffect(() => { setSelectedPreset(appliedPreset || 'contemporary_minimal'); }, [selectedRoom?.id, appliedPreset]);
+  useEffect(() => { if (appliedPreset) setSelectedPreset(appliedPreset); }, [selectedRoom?.id, appliedPreset]);
 
   if (!selectedRoom) return null;
 

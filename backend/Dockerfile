@@ -16,7 +16,7 @@ COPY ./models/artifacts.json /app/models/artifacts.json
 COPY ./src /app/src
 COPY ./backend/app /app/app
 
-# The CPU furniture path uses PyMCubes when TripoSR is unavailable.
+# Retained for explicitly opted-in procedural development; production uses the GPU worker.
 RUN pip install --no-cache-dir --only-binary=:all: PyMCubes==0.1.6
 
 COPY backend/docker-entrypoint.sh /app/docker-entrypoint.sh
@@ -24,6 +24,7 @@ RUN sed -i 's/\r$//' /app/docker-entrypoint.sh
 
 ARG APP_REVISION=local
 LABEL org.opencontainers.image.revision=$APP_REVISION
+ENV ARCHIGEN_IMAGE_REVISION=$APP_REVISION
 USER appuser
 
 EXPOSE 8000

@@ -42,6 +42,24 @@ def sha(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def balanced_cases(selected):
+    """Visit every transformation before spending time on its harder levels."""
+    families = {}
+    for case in selected:
+        families.setdefault(case['family'], {}).setdefault(case['transform'], []).append(case)
+    ordered = []
+    for groups in families.values():
+        ordered.append([group[level] for level in range(max(len(g) for g in groups.values()))
+                        for group in groups.values() if level < len(group)])
+    return [family[level] for level in range(max((len(g) for g in ordered), default=0))
+            for family in ordered if level < len(family)]
+
+
+def model_deadline(now, global_end, model, remaining, budgets, scale=1):
+    reserved = sum(budgets.get(name, 0) for name in remaining) * 60 * scale
+    return min(global_end - reserved, now + budgets[model] * 60 * scale)
+
+
 class Tracking:
     def __init__(self, uri, parent=None):
         self.client, self.experiment = None, None
@@ -91,6 +109,7 @@ def inventory():
     weights = {}
     for model, paths in {
         'floorplan': ['models/saved/floorplan_unetpp/floorplan_multitask.onnx',
+                      'models/saved/floorplan_unetpp/floorplan_fallback.onnx',
                       'models/saved/floorplan_unetpp/multitask_resnet34_finetuned_best.pth',
                       'models/saved/floorplan_unetpp/multitask_resnet34_best.pth',
                       'models/saved/floorplan_baseline/best.safetensors'],
@@ -169,6 +188,9 @@ class Service:
                                     cwd=ROOT, env=env, stdout=self.log)
         deadline = min(time.monotonic()+120, self.campaign.deadline-30)
         while time.monotonic() < deadline:
+            if psutil.virtual_memory().available/MIB < self.campaign.config['min_available_ram_mib']:
+                self.stop()
+                raise RuntimeError('RAM guard stopped service initialization')
             if self.child.poll() is not None:
                 raise RuntimeError(f'Isolated service exited with code {self.child.returncode} (0x{self.child.returncode & 0xffffffff:08x}); see service log')
             try:
@@ -194,6 +216,8 @@ class Campaign:
         self.config, self.started = config, time.monotonic()
         self.deadline = self.started+minutes*60
         self.measure_end = self.started+minutes*60*23/30
+        self.global_measure_end = self.measure_end
+        self.budget_scale = config.get('model_budget_scale', minutes / 30)
         self.setup_end = self.started+minutes*60*5/30
         self.tracking = Tracking(uri)
         self.run_id = self.tracking.start('stress-campaign', run_kind='stress_campaign')
@@ -204,6 +228,7 @@ class Campaign:
         self.validation_lock = threading.Lock()
         self.memory_bytes = int(min(config['max_job_mib']*MIB, psutil.virtual_memory().available*config['memory_available_fraction']))
         self.env = {**os.environ, 'ARCHIGEN_MLFLOW_ENABLED':'0', 'ARCHIGEN_FURNITURE_DETAIL':config['furniture_detail'],
+                    'ARCHIGEN_FLOORPLAN_BACKEND':'onnx', 'ARCHIGEN_FACADE_EXPERIMENT':'',
                     'ARCHIGEN_STRESS_DIRECTORY':str(self.directory), 'HF_HOME':str(ROOT/'outputs/runtime/huggingface'),
                     'U2NET_HOME':str(ROOT/'outputs/runtime/rembg'), 'HF_HUB_OFFLINE':'1', 'TRANSFORMERS_OFFLINE':'1',
                     'OMP_NUM_THREADS':'2','MKL_NUM_THREADS':'2','PYTHONUNBUFFERED':'1'}
@@ -211,12 +236,12 @@ class Campaign:
     def room(self, seconds):
         return time.monotonic()+seconds < self.measure_end and psutil.virtual_memory().available/MIB >= self.config['min_available_ram_mib']
 
-    def build_input(self, case):
+    def build_input(self, case, source=None):
         directory = self.directory/'inputs'/case['id']
         directory.mkdir(parents=True, exist_ok=True)
         output = directory/'input.bin'
         with Job(self.memory_bytes) as job, (directory/'generator.log').open('wb') as log:
-            child = job.start(PYTHON,'src.stress.inputs',['--case',json.dumps(case),'--source',ROOT/self.config['furniture_image'],
+            child = job.start(PYTHON,'src.stress.inputs',['--case',json.dumps(case),'--source',source or ROOT/self.config['furniture_image'],
                               '--seed',self.config['seed'],'--output',output], cwd=ROOT, env=self.env, stdout=log)
             child.wait(timeout=min(30,max(1,self.measure_end-time.monotonic())))
             if child.returncode: raise RuntimeError('Input generation failed in bounded process')
@@ -266,6 +291,7 @@ class Campaign:
             timeout = self.config['timeouts_seconds'][service.model]*concurrency+30
             started = time.perf_counter()
             http_started = started
+            record['_http_started'] = started
             if service.model.startswith('furniture'):
                 payload = {'image_base64':base64.b64encode(data).decode(),'name':'Stress chair','category':
                            'unknown_stress_category' if case['transform']=='unusual_category' else 'chair',
@@ -283,6 +309,7 @@ class Campaign:
                 response = httpx.post('http://127.0.0.1:18001/facade/generate',content=data,
                                       headers={**headers,'content-type':'application/json'},timeout=timeout,trust_env=False)
             record['metrics']['http_total_seconds'] = time.perf_counter()-started
+            record['_http_finished'] = time.perf_counter()
             record['metrics']['http_status'] = response.status_code
             try: result = response.json()
             except ValueError: result = {'raw_response':response.text[:10000]}
@@ -310,19 +337,22 @@ class Campaign:
         except httpx.TransportError as exc:
             record.update(technical_status='crash' if service.child.poll() is not None else 'transport_error',error=str(exc),traceback=traceback.format_exc())
         except Exception as exc:
-            record.update(error=str(exc),error_stage='output_validation',traceback=traceback.format_exc())
+            record.update(technical_status='error',error=str(exc),error_stage='output_validation',traceback=traceback.format_exc())
         if http_started is not None and 'http_total_seconds' not in record['metrics']:
             record['metrics']['http_failure_detection_seconds'] = time.perf_counter()-http_started
         trace_path = directory/'trace.json'
         if trace_path.exists():
             trace = json.loads(trace_path.read_text(encoding='utf-8'))
-            record['error_stage'] = trace.get('error_stage','api_validation' if record['technical_status']=='expected_rejection' else 'none')
+            record['error_stage'] = trace.get('error_stage',record.get('error_stage',
+                'api_validation' if record['technical_status']=='expected_rejection' else
+                'none' if record['technical_status']=='success' else 'indeterminate'))
             record['metrics'].update({k+'_seconds':v for k,v in trace.get('stages_seconds',{}).items()})
             for key in ('queue_seconds','service_total_seconds'): 
                 if key in trace: record['metrics'][key] = trace[key]
             record['parameters']['observed_model_inputs'] = json.dumps(trace.get('model_inputs',[]))
             record['parameters']['observed_onnx_inputs'] = json.dumps(trace.get('onnx_inputs',[]))
             record['parameters']['observed_onnx_input_dtypes'] = json.dumps(trace.get('onnx_input_dtypes',[]))
+            record['parameters']['observed_onnx_models'] = json.dumps(trace.get('onnx_models',[]))
             record['metrics']['observed_encoder_calls'] = len(trace.get('model_inputs',[]))
             record['metrics']['observed_onnx_calls'] = len(trace.get('onnx_inputs',[]))
             if trace.get('prepared_dimensions'):
@@ -358,9 +388,15 @@ class Campaign:
 
     def complete(self, records, sampler, batch_seconds):
         shared = sampler.metrics()
+        completed = [r for r in records if '_http_finished' in r]
+        http_span = (max(r['_http_finished'] for r in completed)-min(r['_http_started'] for r in completed)) if completed else None
         for record in records:
             record['metrics'].update(shared,batch_seconds=batch_seconds,
-                                     batch_throughput_success_per_second=sum(r['technical_status']=='success' for r in records)/max(batch_seconds,.001))
+                                     validated_batch_throughput_success_per_second=sum(r['technical_status']=='success' for r in records)/max(batch_seconds,.001))
+            if http_span is not None:
+                record['metrics'].update(http_batch_seconds=http_span,
+                    batch_throughput_success_per_second=sum(r['technical_status']=='success' for r in completed)/max(http_span,.001))
+            record.pop('_http_started',None);record.pop('_http_finished',None)
             record['parameters']['memory_attribution'] = 'shared service tree and global GPU; not per-request allocations'
             directory = Path(record.pop('_directory'))
             dump(directory/'memory-samples.json',sampler.samples)
@@ -420,7 +456,9 @@ class Campaign:
     def tag_recovery(self, record):
         dump(self.directory/record['run_id']/'record.json',record)
         if self.tracking.client:
-            try: self.tracking.client.set_tag(record['run_id'],'recovery',record['recovery'])
+            try:
+                self.tracking.client.set_tag(record['run_id'],'recovery',record['recovery'])
+                self.tracking.client.log_artifact(record['run_id'],str(self.directory/record['run_id']/'record.json'))
             except Exception as exc: self.tracking.warning(exc)
 
     def run(self):
@@ -428,10 +466,14 @@ class Campaign:
         self.inv = inventory()
         dump(self.directory/'inventory.json',self.inv)
         self.persist()
-        models = ['floorplan','facade','furniture']
+        models = list(self.config.get('models', ['floorplan','facade','furniture']))
         if self.config.get('components_only'):
             models = ['furniture_preprocessing']
-        for model in models:
+        budgets = self.config.get('model_minutes', {'floorplan':6, 'facade':4, 'furniture':8,
+                                                   'furniture_preprocessing':2})
+        for model_index, model in enumerate(models):
+            self.measure_end = model_deadline(time.monotonic(), self.global_measure_end, model,
+                models[model_index+1:], budgets, self.budget_scale)
             if model=='furniture_preprocessing':
                 path = ROOT/'outputs/runtime/rembg/u2netp.onnx'
                 self.inv['weights'][model] = [{'path':str(path.relative_to(ROOT)), 'sha256':sha(path), 'bytes':path.stat().st_size}] if path.is_file() else []
@@ -457,20 +499,21 @@ class Campaign:
                 self.batch(service,baseline,source,kind='warmup')
                 if model.startswith('furniture'):
                     opaque = {'id':'opaque-warmup','family':'reference','transform':'resize','value':512,'format':'jpeg'}
-                    opaque_path = self.build_input(opaque)
+                    opaque_path = self.build_input(opaque, source)
                     self.batch(service,opaque,opaque_path,kind='warmup')
                 if time.monotonic()>self.setup_end:
                     self.skipped.append({'model':model,'case':'setup_budget','reason':'startup exceeded setup allocation; measurement window shortened'})
-                all_cases = cases(self.config,'furniture' if model=='furniture_preprocessing' else model)
-                if self.config.get('include_cases'):
-                    all_cases = [c for c in all_cases if c['id'] in self.config['include_cases']]
+                all_cases = balanced_cases(cases(self.config,'furniture' if model=='furniture_preprocessing' else model))
+                selected_ids = self.config.get('include_cases_by_model', {}).get(model, self.config.get('include_cases'))
+                if selected_ids:
+                    all_cases = balanced_cases([c for c in all_cases if c['id'] in selected_ids])
                 # Baseline included in measured results; warmup is separate.
                 all_cases.insert(0, baseline)
                 for case in all_cases:
                     if not self.room(self.config['timeouts_seconds'][model]):
                         self.skipped.append({'model':model,'case':case,'reason':'budget or RAM admission limit'})
                         continue
-                    try: path = source if case==baseline else self.build_input(case)
+                    try: path = source if case==baseline else self.build_input(case, source)
                     except Exception as exc:
                         self.skipped.append({'model':model,'case':case,'reason':'bounded input generator: '+str(exc)})
                         continue

@@ -48,6 +48,17 @@ jobs:
       run: |
         python -m pytest tests/ backend/tests/ -v
 
+  docker-config:
+    name: Docker Compose configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate CPU and GPU stacks
+        run: |
+          touch mlflow.db
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config -q
+
   test-frontend:
     runs-on: ubuntu-latest
     defaults:
