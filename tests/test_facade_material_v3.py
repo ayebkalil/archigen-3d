@@ -160,6 +160,9 @@ def test_private_notebook_pins_source_and_uses_v2_parent(tmp_path):
         if cell['cell_type']=='code':compile(''.join(cell['source']),'<notebook>','exec')
     text=(tmp_path/'train_facade_material.ipynb').read_text()
     assert 'b'*40 in text and 'experiments.facade_material_v3.kaggle_run' in text
+    stage_kernel(tmp_path/'full','c'*40,'train')
+    full=json.loads((tmp_path/'full/train_facade_material.ipynb').read_text())
+    assert 'MODE = "staged"' in ''.join(line for cell in full['cells'] for line in cell['source'])
 
 
 def test_installer_rejects_traversal_before_writing_destination(tmp_path):
@@ -168,3 +171,21 @@ def test_installer_rejects_traversal_before_writing_destination(tmp_path):
     with zipfile.ZipFile(archive,'w') as zipped:zipped.writestr('../escape.txt','bad')
     with pytest.raises(ValueError,match='Unsafe'):install(archive,tmp_path/'model')
     assert not (tmp_path/'model').exists() and not (tmp_path/'escape.txt').exists()
+
+
+def test_staged_job_never_starts_full_training_after_failed_preflight(tmp_path,monkeypatch):
+    from experiments.facade_material_v3 import kaggle_run
+    import subprocess
+    calls=[]
+    def failed(command,**kwargs):
+        calls.append(command[-1]);raise subprocess.CalledProcessError(1,command)
+    monkeypatch.setattr(kaggle_run.subprocess,'run',failed)
+    with pytest.raises(subprocess.CalledProcessError):kaggle_run.run_staged(tmp_path)
+    assert calls==['smoke']
+    def succeeded(command,**kwargs):calls.append(command[-1])
+    monkeypatch.setattr(kaggle_run.subprocess,'run',succeeded)
+    smoke=tmp_path/'facade-material-v3-smoke';smoke.mkdir()
+    (smoke/'reload-check.json').write_text(json.dumps({'ten_channel_inference':False,'smoke_only':True}))
+    monkeypatch.setattr(kaggle_run,'validate_export',lambda *args,**kwargs:{'config':{'max_train_steps':2}})
+    with pytest.raises(RuntimeError,match='Smoke completion'):kaggle_run.run_staged(tmp_path)
+    assert calls==['smoke','smoke']

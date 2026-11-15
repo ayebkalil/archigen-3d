@@ -19,9 +19,10 @@ def stage_kernel(output,commit=None,mode='smoke'):
     commit=commit or subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
     if len(commit)!=40 or any(c not in '0123456789abcdef' for c in commit):raise ValueError('Pin an immutable full Git SHA')
     notebook=json.loads(Path(__file__).with_name('train_facade_material.ipynb').read_text())
+    execution_mode='staged' if mode=='train' else 'smoke'
     for cell in notebook['cells']:
         if cell['cell_type']=='code':
-            cell['source']=[line.replace('PINNED_COMMIT = ""',f'PINNED_COMMIT = "{commit}"').replace('MODE = "smoke"',f'MODE = "{mode}"') for line in cell['source']]
+            cell['source']=[line.replace('PINNED_COMMIT = ""',f'PINNED_COMMIT = "{commit}"').replace('MODE = "smoke"',f'MODE = "{execution_mode}"') for line in cell['source']]
     write_json(output/'train_facade_material.ipynb',notebook)
     metadata={'id':'khalilayeb/archigen-facade-material10-feedback-v3-'+mode,
         'title':'ArchiGen Facade Material10 Feedback V3 '+mode.title(),
@@ -30,7 +31,7 @@ def stage_kernel(output,commit=None,mode='smoke'):
         'dataset_sources':['khalilayeb/archigen-cmp-facades-original-locked-splits','liushuyuu/irregular-facades-irfs'],
         'kernel_sources':['khalilayeb/archigen-facade-semantic7-lora-v2-train'],'competition_sources':[],'model_sources':[]}
     write_json(output/'kernel-metadata.json',metadata)
-    write_json(output/'source-pin.json',{'commit':commit,'branch':'codex/facade-material-controlnet-v3','mode':mode})
+    write_json(output/'source-pin.json',{'commit':commit,'branch':'codex/facade-material-controlnet-v3','mode':mode,'execution_mode':execution_mode})
     return metadata
 
 

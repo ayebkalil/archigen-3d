@@ -91,7 +91,14 @@ python -m experiments.facade_material_v3.manage stage-kernel --output tmp/v3-smo
 kaggle kernels push --path . --accelerator NvidiaTeslaT4
 ```
 
-Inspect smoke success before staging/pushing full mode. Notebooks are private,
+Staging `--mode train` creates one **staged** notebook: smoke runs first in
+`facade-material-v3-smoke`, and full training starts only after successful smoke
+execution, checksum validation and offloaded reload. It then trains a fresh
+teacher and applies the declared quality gate. Smoke and full outputs and ZIPs
+have distinct names; neither overwrites the other. This allows one queued GPU
+allocation to complete the workflow without another manual start.
+
+Notebooks are private,
 pin a full commit, and attach the existing private CMP dataset, original IRFs
 and completed V2 output. No credentials belong in the notebook or Git.
 

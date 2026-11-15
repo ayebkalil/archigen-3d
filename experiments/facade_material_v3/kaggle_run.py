@@ -12,11 +12,26 @@ from experiments.facade_semantic_v2.data import build_dataset,validate_dataset
 from .runtime import validate_export
 
 
+def run_staged(work):
+    subprocess.run([sys.executable,'-m','experiments.facade_material_v3.kaggle_run','--mode','smoke'],check=True)
+    smoke=work/'facade-material-v3-smoke'
+    check=json.loads((smoke/'reload-check.json').read_text())
+    metadata=validate_export(smoke/'export',allow_smoke=True)
+    if not check.get('ten_channel_inference') or not check.get('smoke_only') or metadata['config']['max_train_steps']!=2:
+        raise RuntimeError('Smoke completion contract failed; full training was not started')
+    write_json(work/'v3-preflight-passed.json',{'smoke_passed':True,'weights_sha256':metadata['weights_sha256'],
+        'training_run_id':metadata['run_id'],'reload_check':check})
+    print('PREFLIGHT PASSED; starting quality-gated full teacher and diffusion training',flush=True)
+    subprocess.run([sys.executable,'-m','experiments.facade_material_v3.kaggle_run','--mode','train'],check=True)
+
+
 def main():
-    parser=argparse.ArgumentParser(__doc__);parser.add_argument('--mode',choices=['smoke','train'],default='smoke')
+    parser=argparse.ArgumentParser(__doc__);parser.add_argument('--mode',choices=['smoke','train','staged'],default='smoke')
     args=parser.parse_args()
     inputs=Path('/kaggle/input');work=Path('/kaggle/working')
     if not inputs.exists():raise RuntimeError('This command requires Kaggle mounts')
+    if args.mode=='staged':
+        run_staged(work);return
     config=json.loads(Path(__file__).with_name('config.json').read_text())
     parents=[p.parent for p in inputs.rglob('model.json') if p.parent.name=='export'
         and json.loads(p.read_text()).get('weights_sha256')==config['parent_weights_sha256']]
@@ -24,9 +39,10 @@ def main():
     cmp_mounts=[p.parent for p in inputs.rglob('manifest.json') if (p.parent/'photos').is_dir() or (p.parent/'photos.zip').is_file()]
     irf_lists=list(inputs.rglob('sample_list.xlsx'))
     if len(cmp_mounts)!=1 or len(irf_lists)!=1:raise ValueError('Attach original locked CMP and original human-annotated IRFs')
-    root=work/'facade-v3-data';output=work/'facade-material-v3';output.mkdir(exist_ok=True)
+    root=work/'facade-v3-data';output=work/('facade-material-v3-smoke' if args.mode=='smoke' else 'facade-material-v3');output.mkdir(exist_ok=True)
     cmp=locate_kaggle_dataset(input_root=cmp_mounts[0])
-    build_dataset(cmp,irf_lists[0].parent,root);validate_dataset(root)
+    if not (root/'manifest.json').is_file():build_dataset(cmp,irf_lists[0].parent,root)
+    validate_dataset(root)
     for name in ('manifest.json','audit.json','ATTRIBUTION.md','irf-credits.json'):shutil.copyfile(root/name,output/name)
     (output/'requirements-freeze.txt').write_text(subprocess.check_output([sys.executable,'-m','pip','freeze'],text=True))
     for module,extra in [('teacher',[]),('train',['--parent',str(parents[0]),'--teacher',str(output/'teacher')])]:
@@ -47,9 +63,9 @@ image=runtime.generate_material(sample[3],sample[4])
 image.save('/kaggle/working/facade-material-v3/export-reloaded.png')
 write_json(Path('/kaggle/working/facade-material-v3/reload-check.json'),{'ten_channel_inference':True,'teacher_required_for_inference':False,'profile':runtime.last_profile,'smoke_only':SMOKE,'quality_claim':False})
 print('EXPORT RELOAD PASSED: material10 + existing LoRA, no teacher needed at inference',flush=True)
-'''.replace('SMOKE',str(args.mode=='smoke'))
+'''.replace('/kaggle/working/facade-material-v3',str(output)).replace('SMOKE',str(args.mode=='smoke'))
     subprocess.run([sys.executable,'-c',reload_code],check=True)
-    archive=work/'archigen-facade-material-v3-model-and-mlflow.zip'
+    archive=work/('archigen-facade-material-v3-smoke-model-and-mlflow.zip' if args.mode=='smoke' else 'archigen-facade-material-v3-model-and-mlflow.zip')
     paths=['export','teacher','validation','portable-artifacts','tracking-events.jsonl','tracking-run.json',
         'requirements-freeze.txt','config.json','contract.json','teacher.json','reload-check.json','export-reloaded.png',
         'manifest.json','audit.json','ATTRIBUTION.md','irf-credits.json']
