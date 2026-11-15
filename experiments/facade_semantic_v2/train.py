@@ -127,7 +127,7 @@ def train(args):
         accelerator.load_state(str(args.resume)); restore_lora(unet, Path(args.resume) / 'lora')
         tracker.client.set_tag(tracker.run_id, 'resumed_from_run_id', state['run_id'])
     write_json(output / 'config.json', config); write_json(output / 'contract.json', contract)
-    for path in (output / 'config.json', output / 'contract.json', data_root / 'manifest.json', data_root / 'audit.json', data_root / 'ATTRIBUTION.md'):
+    for path in (output / 'config.json', output / 'contract.json', data_root / 'manifest.json', data_root / 'audit.json', data_root / 'ATTRIBUTION.md', data_root / 'irf-credits.json'):
         tracker.artifact(path)
     (output / 'requirements-freeze.txt').write_text(subprocess.run([os.sys.executable, '-m', 'pip', 'freeze'], capture_output=True, text=True, check=True).stdout)
     tracker.artifact(output / 'requirements-freeze.txt')

@@ -154,6 +154,8 @@ def build_dataset(cmp_root, irf_root, output, phash_threshold=5):
     write_json(output / 'audit.json', {'counts': counts, 'excluded': excluded,
         'irf_building_groups': len({r['group'] for r in rows if r['source'] == 'IRF'}),
         'native_short_axis_ge_512': sum(min(r['native_size']) >= 512 for r in rows)})
+    write_json(output / 'irf-credits.json', {row['id']: metadata[row['id'].split('/', 1)[1]]
+        for row in rows if row['source'] == 'IRF'})
     (output / 'ATTRIBUTION.md').write_text(
         'IRFs: Wei, Hu, Zhang and Liu (2024), doi:10.3390/buildings14092602.\n'
         'Material is based on original data provided by ArchDaily. Copyright belongs to ArchDaily and the architects/photographers credited in sample_list.xlsx.\n'

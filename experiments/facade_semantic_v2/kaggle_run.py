@@ -39,7 +39,7 @@ def main():
     cmp_root = locate_kaggle_dataset(input_root=cmp_mounts[0])
     manifest = build_dataset(cmp_root, irf_lists[0].parent, data_root)
     validate_dataset(data_root)
-    for filename in ('manifest.json', 'audit.json', 'ATTRIBUTION.md'):
+    for filename in ('manifest.json', 'audit.json', 'ATTRIBUTION.md', 'irf-credits.json'):
         import shutil
         shutil.copyfile(data_root / filename, output / filename)
     print('Verified original training/validation/test counts:', manifest['counts'], flush=True)
