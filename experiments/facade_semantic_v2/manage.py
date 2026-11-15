@@ -54,6 +54,9 @@ def install(archive, destination, tracking_uri=None):
         shutil.copytree(root, destination)
     ids = []
     if tracking_uri:
+        for history in sorted((destination / 'tracking-history').glob('*')):
+            if (history / 'tracking-events.jsonl').exists():
+                ids.append(import_tracking(history, tracking_uri))
         ids.append(import_tracking(destination, tracking_uri))
         if (destination / 'evaluation/tracking-events.jsonl').exists():
             ids.append(import_tracking(destination / 'evaluation', tracking_uri))

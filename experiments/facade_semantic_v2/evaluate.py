@@ -99,7 +99,8 @@ def main():
                     rows.append({'id': data.rows[index]['id'], 'source': data.rows[index]['source']})
                 rows[ordinal].update({f'{name}_{key}': value for key, value in values.items()})
                 write_json(output / 'per-image.json', rows)
-                if name == 'candidate' and ordinal < 8:
+                source_ordinal = sum(row['source'] == data.rows[index]['source'] for row in rows[:ordinal + 1])
+                if name == 'candidate' and source_ordinal <= 4:
                     path = output / f'comparison_{ordinal:03d}.png'
                     panel(photo, labels, generated, path, Image.open(output / f'parent_{ordinal:03d}.png'))
                     tracker.artifact(path, 'comparisons')

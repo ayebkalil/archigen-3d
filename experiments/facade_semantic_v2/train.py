@@ -38,7 +38,7 @@ def validation(controlnet, unet, vae, encoder, tokenizer, scheduler, data, confi
                 generator=torch.Generator(device=device).manual_seed(config['seed'] + index)).images[0]
         rows.append({'id': data.rows[index]['id'], 'source': data.rows[index]['source'],
                      **pair_metrics(generated, photo, labels, valid)})
-        if len(rows) <= 4:
+        if sum(row['source'] == data.rows[index]['source'] for row in rows) <= 2:
             path = output / 'validation' / f'step_{step:06d}_{len(rows)}.png'
             panel(photo, labels, generated, path); tracker.artifact(path, f'validation/step_{step:06d}')
     metrics = {}
