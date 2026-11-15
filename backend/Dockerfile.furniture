@@ -37,6 +37,7 @@ COPY scripts/download_furniture_models.py /app/scripts/download_furniture_models
 RUN python scripts/download_furniture_models.py \
     && python -c "import transformers.utils.hub" \
     && useradd -m appuser \
+    && install -d -o appuser -g appuser /run/archigen-gpu \
     && chown -R appuser:appuser /app/runtime
 
 # TripoSR requests the encoder config at "main". Resolve that alias to the

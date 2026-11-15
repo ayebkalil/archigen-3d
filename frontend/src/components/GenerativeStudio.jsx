@@ -2,7 +2,8 @@ import { useProject, useProjectState } from '../state/ProjectContext.jsx';
 import React, { useState, useEffect, useRef } from 'react';
 import { generateFurniture } from '../state/projectActions.js';
 import { cameraPose, restoreCameraPose, disposeScene } from '../state/viewState.js';
-import FacadeWallSelect from './FacadeWallSelect.jsx';
+import FacadeWallSelect, { exteriorWallsOf } from './FacadeWallSelect.jsx';
+import FacadeEngineCompare, { ENGINES, FacadeLevelGallery } from './FacadeEngineCompare.jsx';
 import axios from 'axios';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -45,6 +46,9 @@ const ROOM_LIBRARY_TYPES = {
   storage: [['wardrobe', 'Wardrobe'], ['bookcase', 'Bookcase'], ['sideboard', 'Sideboard'], ['nightstand', 'Nightstand']],
 };
 
+// Survives re-mounts of the studio, not page reloads.
+const ACTIVE_FACADE_JOBS = new Set();
+
 const FACADE_STYLES = [
   { id: 'Modern Minimalist', label: 'Modern Minimalist', desc: 'Warm white stucco' },
   { id: 'Mediterranean Stone', label: 'Mediterranean Stone', desc: 'Sandstone blocks with staggered joints' },
@@ -71,6 +75,8 @@ export default function GenerativeStudio({
   numFloors,
   setNumFloors,
   requestFacade,
+  requestHybridFacade,
+  facadePayloadFor,
   onApplyFacadeTexture,
   onViewFacadeIn3D,
   onNavigateToFloorplan
@@ -89,6 +95,8 @@ export default function GenerativeStudio({
   const [customLibrary, setCustomLibrary] = useState([]);
   const [libraryType, setLibraryType] = useProjectState('studio.libraryType', '');
   const [saveSuccessMsg, setSaveSuccessMsg] = useProjectState('$saveSuccessMsg', null);
+  const [libraryRevision, setLibraryRevision] = useProjectState('library.revision', 0);
+  const [savedLibraryId] = useProjectState('studio.savedLibraryId', null);
   const [wireframe3D, setWireframe3D] = useProjectState('studio.wireframe3D', false);
   const [autoRotate3D, setAutoRotate3D] = useProjectState('studio.autoRotate3D', true);
 
@@ -101,6 +109,71 @@ export default function GenerativeStudio({
   const facadeResult = facadeDraft && facadeDraft.wall_id === frontWallId && facadeDraft.style === selectedStyle
     ? facadeDraft : appliedFacade?.style === selectedStyle ? appliedFacade : null;
   const isApplied = Boolean(facadeResult && appliedFacade && facadeResult.texture_base64 === appliedFacade.texture_base64 && facadeResult.wall_id === appliedFacade.wall_id);
+
+  // --- Engine comparison (Pix2Pix vs Stable Diffusion hybrid), one record per wall ---
+  const [facadeEngine, setFacadeEngine] = useProjectState('studio.facadeEngine', 'pix2pix');
+  const [hybridSeed, setHybridSeed] = useProjectState('studio.hybridSeed', 42);
+  const [facadeCompare, setFacadeCompare] = useProjectState('app.facadeCompare', {});
+  const [hybridStatus, setHybridStatus] = useState(null);
+  const currentKey = frontWallId ? facadePayloadFor?.(frontWallId)?.key : null;
+  const storedRecord = facadeCompare?.[frontWallId];
+  const compareRecord = storedRecord && storedRecord.key === currentKey ? storedRecord : null;
+  const staleRecord = storedRecord && !compareRecord;
+  const engineRunning = ['pix2pix', 'hybrid'].some(engine => compareRecord?.entries?.[engine]?.status === 'running');
+  useEffect(() => {
+    if (studioTab !== 'facade') return;
+    axios.get('/facade/hybrid/status').then(res => setHybridStatus(res.data)).catch(err => setHybridStatus({ ready: false, worker: { status: 'unreachable', error: err.message } }));
+  }, [studioTab]);
+  // Jobs do not survive a reload of the page; say so instead of showing a spinner forever.
+  useEffect(() => {
+    setFacadeCompare(current => {
+      let changed = false;
+      const next = Object.fromEntries(Object.entries(current || {}).map(([wallId, record]) => [wallId, {
+        ...record, entries: Object.fromEntries(Object.entries(record.entries || {}).map(([engine, entry]) => {
+          if (entry?.status !== 'running' || ACTIVE_FACADE_JOBS.has(`${wallId}:${engine}`)) return [engine, entry];
+          changed = true;
+          return [engine, { ...entry, status: 'interrupted' }];
+        })),
+      }]));
+      return changed ? next : current;
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateEntry = (wallId, key, engine, patch) => setFacadeCompare(current => {
+    const record = current?.[wallId]?.key === key ? current[wallId] : { key, entries: {} };
+    return { ...current, [wallId]: { ...record, entries: { ...record.entries, [engine]: { ...record.entries?.[engine], ...patch } } } };
+  });
+
+  const runEngine = async (engine) => {
+    const context = facadePayloadFor(frontWallId);
+    if (!context) { setStudioError('Choose an exterior wall.'); return; }
+    const wallId = frontWallId, key = context.key, style = selectedStyle;
+    const jobKey = `${wallId}:${engine}`;
+    if (engine === 'hybrid' && !style) {
+      updateEntry(wallId, key, engine, { status: 'failed', error: 'Choose a material direction: the hybrid engine needs a material prompt', error_type: 'no_style' });
+      return;
+    }
+    ACTIVE_FACADE_JOBS.add(jobKey);
+    updateEntry(wallId, key, engine, { status: 'running', phase: engine === 'pix2pix' ? 'generating' : 'submitting', step: 0, error: null, error_type: null, data: null, style, started: Date.now() });
+    try {
+      const data = engine === 'pix2pix'
+        ? await requestFacade(style)
+        : await requestHybridFacade(style, Number(hybridSeed) || 0, job => updateEntry(wallId, key, engine, {
+          phase: job.phase, step: job.step, total_steps: job.total_steps, attempt: job.attempt, job_id: job.job_id }), wallId);
+      if (!data || data.outdated) updateEntry(wallId, key, engine, { status: 'outdated' });
+      else {
+        updateEntry(wallId, key, engine, { status: 'succeeded', phase: 'succeeded', data });
+        if (engine === facadeEngine) setFacadeDraft(data);
+      }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      const message = typeof detail === 'object' ? `${detail.message} ${detail.issues?.join('; ') || ''}` : detail || err.message;
+      updateEntry(wallId, key, engine, { status: 'failed', phase: 'failed', error: message,
+        error_type: err.job?.error_type || (typeof detail === 'object' ? detail.error : err.response?.status === 503 ? 'worker_unavailable' : null) });
+    } finally {
+      ACTIVE_FACADE_JOBS.delete(jobKey);
+    }
+  };
 
   const fileInputRef = useRef(null);
   const canvas3DRef = useRef(null);
@@ -124,7 +197,7 @@ export default function GenerativeStudio({
         }
       })
       .catch(err => console.log('Custom library empty or uninitialized:', err));
-  }, []);
+  }, [libraryRevision]);
 
   // --- Initialize Dedicated 3D Furniture Viewport ---
   useEffect(() => {
@@ -414,13 +487,15 @@ export default function GenerativeStudio({
         furniture_type: libraryType || undefined,
         dimensions_m: generatedModel.dimensions_m,
         bounds: generatedModel.bounds,
-        glb_base64: generatedModel.model_glb_base64
+        glb_base64: generatedModel.model_glb_base64,
+        preview_base64: generatedModel.preview_image_base64
       };
 
       const res = await axios.post('/furniture/save-to-library', payload);
       if (res.data?.status === 'success') {
-        setSaveSuccessMsg(`Saved to Custom in the room catalog.`);
+        setSaveSuccessMsg(`Saved to the room library.`);
         setCustomLibrary(prev => [...prev.filter(item => item.id !== generatedModel.id), res.data.item]);
+        setLibraryRevision(revision => (revision || 0) + 1);
       }
     } catch (err) {
       console.error('Save error:', err);
@@ -440,22 +515,77 @@ export default function GenerativeStudio({
     document.body.removeChild(a);
   };
 
+  // --- "All walls" of a floor: generate with the chosen engine and apply wall by wall ---
+  const [bulkLevel, setBulkLevel] = useProjectState('studio.facadeBulkLevel', null);
+  const [bulkProgress, setBulkProgress] = useState(null);
+  const bulkStop = useRef(false);
+  const bulkWalls = bulkLevel ? exteriorWallsOf(layout, bulkLevel) : [];
+  const bulkRunning = Boolean(bulkProgress && !bulkProgress.finished);
+  const selectAllWalls = level => {
+    const walls = exteriorWallsOf(layout, level);
+    if (!walls.length) return;
+    setBulkLevel(level);
+    setBulkProgress(null);
+    setStudioError(null);
+    if (!walls.some(wall => wall.id === frontWallId)) onSelectWall(walls[0].id);
+  };
+
+  const runBulk = async () => {
+    const engine = facadeEngine === 'hybrid' ? 'hybrid' : 'pix2pix';
+    const style = selectedStyle;
+    const walls = bulkWalls;
+    if (engine === 'hybrid' && !style) {
+      setBulkProgress({ finished: true, total: walls.length, done: 0, applied: [], failed: [],
+        error: 'Choose a material direction first: Stable Diffusion needs a material prompt.' });
+      return;
+    }
+    bulkStop.current = false;
+    const summary = { engine, style, total: walls.length, done: 0, applied: [], failed: [], started: Date.now() };
+    for (const wall of walls) {
+      if (bulkStop.current) { summary.stopped = true; break; }
+      setBulkProgress({ ...summary, current: wall.id, phase: engine === 'pix2pix' ? 'generating' : 'submitting' });
+      try {
+        const data = engine === 'pix2pix'
+          ? await requestFacade(style, wall.id)
+          : await requestHybridFacade(style, Number(hybridSeed) || 0,
+            job => setBulkProgress(current => ({ ...current, phase: job.phase, step: job.step, total_steps: job.total_steps, attempt: job.attempt })), wall.id);
+        if (!data || data.outdated) {
+          summary.failed.push({ id: wall.id, error: 'discarded: the geometry changed during generation' });
+        } else {
+          onApplyFacadeTexture(data);
+          updateEntry(wall.id, data.payload_key, engine, { status: 'succeeded', phase: 'succeeded', style, data });
+          summary.applied.push(wall.id);
+        }
+      } catch (err) {
+        const detail = err.response?.data?.detail;
+        summary.failed.push({ id: wall.id, error: typeof detail === 'object' && detail ? `${detail.message} ${detail.issues?.join('; ') || ''}` : detail || err.message });
+      }
+      summary.done++;
+    }
+    setBulkProgress({ ...summary, current: null, finished: true, seconds: (Date.now() - summary.started) / 1000 });
+  };
+
   // Trigger Facade Generation
   const handleGenerateFacade = async () => {
     setStudioError(null);
-    try {
-      const draft = await requestFacade(selectedStyle);
-      if (draft) setFacadeDraft(draft);
-    } catch (err) {
-      console.error('Facade generation error:', err);
-      setStudioError(err.response?.data?.detail || err.message || 'Facade generation failed.');
-    }
+    if (bulkLevel) { runBulk(); return; }
+    runEngine(facadeEngine === 'hybrid' ? 'hybrid' : 'pix2pix');
+  };
+
+  const handleCompareEngines = () => {
+    setStudioError(null);
+    runEngine('pix2pix');
+    runEngine('hybrid');
   };
 
   // Apply Facade to Active 3D Building Floorplan
   const handleApplyFacadeTo3D = () => {
     if (!facadeResult?.texture_base64) return;
-    onApplyFacadeTexture(facadeResult);
+    try {
+      onApplyFacadeTexture(facadeResult);
+    } catch (err) {
+      setStudioError(err.message);
+    }
   };
 
   return (
@@ -783,7 +913,7 @@ export default function GenerativeStudio({
                     className="h-9 px-4 rounded-full bg-[#1d1d1f] hover:bg-black text-[#efebe2] font-stencil text-xs uppercase tracking-wider flex items-center space-x-1.5 transition-all shadow-sm"
                   >
                     <BookmarkCheck className="w-3.5 h-3.5 text-[#f0500f]" />
-                    <span>Save to room library</span>
+                    <span>{savedLibraryId === generatedModel.id ? 'Update library entry' : 'Save to room library'}</span>
                   </button>
 
                   <button
@@ -836,10 +966,13 @@ export default function GenerativeStudio({
               </label>
               <div className="p-3 bg-white rounded-xl border border-[#1d1d1f]/15 space-y-2 text-xs">
                 <p className="text-[#1d1d1f]/70">Click a wall on the map or choose one from the list.</p>
-                <FacadeWallSelect layout={layout} value={frontWallId} disabled={isGeneratingFacade} showMap
+                <FacadeWallSelect layout={layout} value={frontWallId} disabled={isGeneratingFacade || bulkRunning} showMap
+                  bulkLevel={bulkLevel} onSelectAll={selectAllWalls}
                   onChange={wallId => {
                     setFacadeDraft(null);
                     setStudioError(null);
+                    setBulkLevel(null);
+                    setBulkProgress(null);
                     onSelectWall(wallId);
                   }} />
                 <div className="flex justify-between">
@@ -867,11 +1000,29 @@ export default function GenerativeStudio({
               </div>
             </div>
 
+            <div className="space-y-2" data-testid="facade-engine-select">
+              <label className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#f0500f]" />
+                <span>02 / Engine</span>
+              </label>
+              {Object.entries(ENGINES).map(([id, engine]) => (
+                <button type="button" key={id} aria-pressed={facadeEngine === id} onClick={() => setFacadeEngine(id)}
+                  data-testid={`engine-${id}`}
+                  className={`w-full rounded-xl border p-3 text-left transition-all ${facadeEngine === id ? 'bg-white border-[#f0500f] ring-1 ring-[#f0500f]' : 'bg-white/50 border-[#1d1d1f]/15 hover:bg-white'}`}>
+                  <span className="font-stencil text-xs uppercase tracking-wider">{engine.label}</span>
+                  <p className="mt-0.5 text-[10px] leading-snug text-[#1d1d1f]/65">{engine.controls}</p>
+                </button>
+              ))}
+              <p className="text-[10px] text-[#1d1d1f]/65" role="status" data-testid="hybrid-status">
+                Stable Diffusion worker: {hybridStatus ? (hybridStatus.ready ? `ready · ${hybridStatus.worker?.device || 'GPU'}` : `${hybridStatus.worker?.status || 'unavailable'}${hybridStatus.worker?.error ? ` — ${hybridStatus.worker.error}` : ''}`) : 'checking…'}
+              </p>
+            </div>
+
             {/* Architectural Styles Selector */}
             <div className="space-y-2">
               <label className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f] flex items-center space-x-1.5">
                 <Palette className="w-3.5 h-3.5 text-[#f0500f]" />
-                <span>02 / Material direction</span>
+                <span>03 / Material direction</span>
               </label>
               <p className="text-xs text-[#1d1d1f]/70">{selectedStyle ? 'Click the selected material again to use the default facade.' : 'Default facade selected.'}</p>
 
@@ -897,11 +1048,24 @@ export default function GenerativeStudio({
               </div>
             </div>
 
+            <label className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-[#1d1d1f]/70">Stable Diffusion seed <span className="text-[10px]">(Pix2Pix has none)</span></span>
+              <input type="number" min="0" max="2147483647" value={hybridSeed} data-testid="hybrid-seed"
+                onChange={event => setHybridSeed(Math.max(0, Math.floor(Number(event.target.value) || 0)))}
+                className="w-24 rounded border border-[#1d1d1f]/20 bg-white px-2 py-1 font-mono" />
+            </label>
+
             <div className="sticky bottom-0 z-10 space-y-2 bg-[#efebe2] py-2">
+            <button type="button" data-testid="compare-facade-engines" onClick={handleCompareEngines}
+              disabled={!targetWall || isGeneratingFacade || engineRunning || Boolean(bulkLevel)}
+              title={bulkLevel ? 'The comparison works on one wall: pick a single wall to compare' : undefined}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-full border-2 border-[#1d1d1f] bg-white px-3 text-xs font-bold disabled:opacity-40">
+              <Layers size={16} /> Compare both engines
+            </button>
             <button
               data-testid="generate-facade"
               onClick={handleGenerateFacade}
-              disabled={!targetWall || isGeneratingFacade}
+              disabled={!targetWall || isGeneratingFacade || bulkRunning || (!bulkLevel && compareRecord?.entries?.[facadeEngine]?.status === 'running')}
               className="w-full h-11 px-5 rounded-full bg-[#f0500f] hover:bg-[#d8450a] text-white font-stencil text-xs uppercase tracking-wider flex items-center justify-center space-x-2 transition-all shadow-md shadow-[#f0500f]/20 disabled:opacity-50"
             >
               {isGeneratingFacade ? (
@@ -912,18 +1076,41 @@ export default function GenerativeStudio({
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  <span>Generate facade</span>
+                  <span>{bulkLevel ? `Generate & apply · ${bulkWalls.length} walls` : `Generate · ${ENGINES[facadeEngine]?.label}`}</span>
                 </>
               )}
             </button>
-            {!isApplied && facadeResult?.texture_base64 && (
+            {bulkLevel && (
+              <div className="rounded-lg border border-[#1d1d1f]/15 bg-white p-2 text-xs space-y-1" role="status" data-testid="bulk-progress">
+                {!bulkProgress && <p className="text-[#1d1d1f]/70">{bulkWalls.length} walls · {ENGINES[facadeEngine]?.label}{selectedStyle ? ` · ${selectedStyle}` : ''}. Each wall gets its own texture from its own geometry, then it is applied.</p>}
+                {bulkProgress?.error && <p className="text-red-800">{bulkProgress.error}</p>}
+                {bulkRunning && (
+                  <>
+                    <p className="flex items-center gap-1 font-bold"><RefreshCw className="h-3.5 w-3.5 animate-spin" /> Wall {bulkProgress.done + 1} / {bulkProgress.total} · {bulkProgress.current}</p>
+                    <p className="text-[#1d1d1f]/70">{bulkProgress.phase === 'generating' && bulkProgress.total_steps ? `Generating material · step ${bulkProgress.step || 0}/${bulkProgress.total_steps}` : bulkProgress.phase}</p>
+                    <div className="h-1.5 rounded bg-[#1d1d1f]/10"><div className="h-1.5 rounded bg-[#f0500f]" style={{ width: `${100 * bulkProgress.done / bulkProgress.total}%` }} /></div>
+                    <button type="button" onClick={() => { bulkStop.current = true; }} className="underline">Stop after this wall</button>
+                  </>
+                )}
+                {bulkProgress?.finished && !bulkProgress.error && (
+                  <>
+                    <p className="font-bold text-emerald-800">{bulkProgress.applied.length} / {bulkProgress.total} walls applied{bulkProgress.stopped ? ' (stopped)' : ''} · {bulkProgress.seconds?.toFixed(0)} s</p>
+                    {bulkProgress.failed.map(item => <p key={item.id} className="text-red-800">{item.id}: {item.error}</p>)}
+                    {bulkProgress.applied.length > 0 && (
+                      <button type="button" onClick={onViewFacadeIn3D} className="inline-flex items-center gap-1 font-bold underline"><Eye size={14} /> View in 3D</button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            {!bulkLevel && !isApplied && facadeResult?.texture_base64 && (
               <button type="button" onClick={handleApplyFacadeTo3D} data-testid="apply-facade"
                 disabled={isGeneratingFacade}
                 className="flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#1d1d1f] px-3 text-xs font-bold text-white disabled:opacity-40">
                 <Check size={16} /> Apply to this wall
               </button>
             )}
-            {isApplied && (
+            {!bulkLevel && isApplied && (
               <div className="rounded-lg border border-emerald-700/30 bg-emerald-50 p-2 text-xs text-emerald-900" role="status">
                 <p><strong>Applied to this wall.</strong> Pick another wall to continue.</p>
                 <button type="button" onClick={onViewFacadeIn3D} className="mt-1 inline-flex items-center gap-1 font-bold underline">
@@ -936,6 +1123,23 @@ export default function GenerativeStudio({
 
           {/* Center: Side-by-Side Semantic Sketch vs Realistic Output */}
           <main className="facade-stage flex-1 flex flex-col h-full bg-[#f6f3eb] p-6 overflow-y-auto">
+            {bulkLevel ? (
+              <div className="rounded-2xl border border-[#1d1d1f]/20 bg-white p-5 shadow-sm">
+                <FacadeLevelGallery
+                  title={bulkLevel === 'all' ? 'All exterior walls' : `${layout?.storeys?.find(level => level.id === bulkLevel)?.label || bulkLevel} · all walls`}
+                  walls={bulkWalls} progress={bulkProgress} onViewIn3D={onViewFacadeIn3D}
+                  onOpenWall={wallId => { setBulkLevel(null); setBulkProgress(null); setFacadeDraft(null); onSelectWall(wallId); }} />
+              </div>
+            ) : (<>
+            <div className="mb-6 rounded-2xl border border-[#1d1d1f]/20 bg-white p-5 shadow-sm">
+              {staleRecord && (
+                <p className="mb-2 rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900" role="status">
+                  Earlier results for this wall were made for a different geometry (plan, storeys or openings changed) and are hidden. Generate again.
+                </p>
+              )}
+              <FacadeEngineCompare record={compareRecord} appliedTexture={appliedFacade?.texture_base64}
+                onApply={data => onApplyFacadeTexture(data)} onViewIn3D={onViewFacadeIn3D} />
+            </div>
             
             <div className="facade-comparison grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[460px]">
               
@@ -945,7 +1149,7 @@ export default function GenerativeStudio({
                   <div className="flex items-center space-x-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-[#0030ff]" />
                     <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">
-                      01 / Opening layout
+                      01 / Pix2Pix input (CMP sketch)
                     </span>
                   </div>
                   <span className="text-[10px] font-mono text-[#1d1d1f]/50">Structure guide</span>
@@ -956,9 +1160,9 @@ export default function GenerativeStudio({
                 </p>
 
                 <div className="flex-1 w-full bg-[#0030ff]/10 rounded-xl overflow-hidden border border-[#1d1d1f]/10 flex items-center justify-center p-3 min-h-[280px]">
-                  {facadeResult?.sketch_base64 ? (
+                  {(compareRecord?.entries?.pix2pix?.data || (facadeResult?.engine !== 'stable_diffusion_hybrid' && facadeResult))?.sketch_base64 ? (
                     <img
-                      src={facadeResult.sketch_base64}
+                      src={(compareRecord?.entries?.pix2pix?.data || facadeResult).sketch_base64}
                       alt="Semantic Sketch"
                       className="max-h-full max-w-full object-contain rounded shadow-inner"
                       style={{ imageRendering: 'pixelated' }}
@@ -989,49 +1193,38 @@ export default function GenerativeStudio({
                 </div>
               </div>
 
-              {/* RIGHT: Synthesized Realistic Facade */}
-              <div className="facade-preview-card bg-white rounded-2xl border border-[#1d1d1f]/20 p-5 shadow-sm flex flex-col">
+              {/* RIGHT: Stable Diffusion hybrid inputs */}
+              <div className="facade-preview-card bg-white rounded-2xl border border-[#1d1d1f]/20 p-5 shadow-sm flex flex-col" data-testid="hybrid-inputs">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#f0500f] animate-pulse" />
-                    <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">
-                      02 / Material preview
-                    </span>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#f0500f]/10 text-[#f0500f]">
-                    {selectedStyle == null ? 'Default facade' : facadeResult?.model_info?.finish || facadeResult?.model_info?.effective_style || selectedStyle}
-                  </span>
+                  <span className="font-stencil text-xs uppercase tracking-wider text-[#1d1d1f]">02 / Stable Diffusion inputs</span>
+                  <span className="text-[10px] font-mono text-[#1d1d1f]/50">Mask + material swatch</span>
                 </div>
-
                 <p className="text-[11px] text-[#1d1d1f]/70 mb-3 font-mono">
-                  Explore a generated finish before applying it to your building.
+                  The opening mask is computed from the plan geometry. Stable Diffusion only generates the square material,
+                  which is repeated at its physical size around the masks.
                 </p>
-
-                <div className="flex-1 w-full bg-[#1d1d1f]/5 rounded-xl overflow-hidden border border-[#1d1d1f]/10 flex items-center justify-center p-3 min-h-[280px]">
-                  {isGeneratingFacade ? (
-                    <div className="flex flex-col items-center justify-center space-y-2 text-[#f0500f]">
-                      <RefreshCw className="w-8 h-8 animate-spin" />
-                      <span className="font-mono text-xs">Neural Inference in Progress...</span>
-                    </div>
-                  ) : facadeResult?.texture_base64 ? (
-                    <img
-                      src={facadeResult.texture_base64}
-                      alt="Realistic Facade"
-                      className="max-h-full max-w-full object-contain rounded shadow-lg"
-                    />
-                  ) : (
-                    <div className="text-xs text-[#1d1d1f]/50 font-mono text-center">
-                      Your facade preview will appear here.
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-[#1d1d1f]/10 flex items-center justify-between text-xs font-mono text-[#1d1d1f]/60">
-                  <span>{facadeResult ? `Aspect ratio preserved · ${facadeResult.model_info?.resolution || 256}px` : 'Ready to generate'}</span>
-                  {facadeResult && <span className="text-[#f0500f] font-semibold">Texture preview</span>}
-                </div>
-                {facadeResult?.model_info?.finish && (
-                  <p className="mt-2 text-xs text-[#1d1d1f]/70">Material finish applied over the neutral neural texture.</p>
+                {compareRecord?.entries?.hybrid?.data ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <figure>
+                      <img src={compareRecord.entries.hybrid.data.sketch_base64} alt="Opening mask" className="w-full rounded border border-[#1d1d1f]/15 bg-black" />
+                      <figcaption className="mt-1 text-[10px] font-mono text-[#1d1d1f]/60">Opening mask (white = door/window)</figcaption>
+                    </figure>
+                    <figure>
+                      <img src={compareRecord.entries.hybrid.data.material_base64} alt="Generated material swatch" className="w-full rounded border border-[#1d1d1f]/15" />
+                      <figcaption className="mt-1 text-[10px] font-mono text-[#1d1d1f]/60">
+                        SD material {compareRecord.entries.hybrid.data.model_info.native_material_px}² px ·
+                        seam x {compareRecord.entries.hybrid.data.model_info.material_quality.metrics.seam_ratio_x.toFixed(2)} /
+                        y {compareRecord.entries.hybrid.data.model_info.material_quality.metrics.seam_ratio_y.toFixed(2)}
+                      </figcaption>
+                    </figure>
+                    <p className="col-span-2 text-[10px] font-mono text-[#1d1d1f]/60 break-words">
+                      Prompt: {compareRecord.entries.hybrid.data.model_info.prompt}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center rounded-xl border border-[#1d1d1f]/10 bg-[#1d1d1f]/5 p-6 text-center text-xs font-mono text-[#1d1d1f]/50 min-h-[200px]">
+                    Generate with Stable Diffusion — hybrid to inspect its mask and material.
+                  </div>
                 )}
               </div>
 
@@ -1058,6 +1251,7 @@ export default function GenerativeStudio({
               </div>
             </div>
 
+            </>)}
           </main>
         </div>
       )}

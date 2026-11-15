@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir --only-binary=:all: -r /tmp/requirements.txt -r /
     && install -d -o appuser -g appuser /app/library /app/library/custom
 COPY ./models/benchmarks /app/models/benchmarks
 COPY ./models/artifacts.json /app/models/artifacts.json
+COPY ./configs/facade_hybrid.json /app/configs/facade_hybrid.json
 COPY ./src /app/src
 COPY ./backend/app /app/app
 

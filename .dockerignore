@@ -14,6 +14,9 @@
 !models/benchmarks/**
 !requirements-furniture-quality.txt
 !requirements-tracking.txt
+!requirements-facade-hybrid.txt
+!configs/
+!configs/facade_hybrid.json
 !patches/
 !patches/**
 !scripts/

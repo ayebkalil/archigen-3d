@@ -12,6 +12,7 @@ import MetricsSummary from './components/MetricsSummary';
 import RoomDesignPanel from './components/RoomDesignPanel';
 import FacadeModal from './components/FacadeModal';
 import GenerativeStudio from './components/GenerativeStudio';
+import RoomLibraryPanel from './components/RoomLibraryPanel';
 
 const FurnitureCatalog = React.lazy(() => import('./components/FurnitureCatalog.jsx'));
 
@@ -103,6 +104,9 @@ export default function App() {
   const transitionInFlight = React.useRef(null);
   useEffect(() => () => transitionTimers.current.forEach(clearTimeout), []);
   const facadeRevision = React.useRef(0);
+  const latestGeometry = React.useRef({ layout: null, numFloors: 1 });
+  // Incremented by every geometry change (analysis, storeys, scale, plan edits), not by wall selection.
+  const geometryRevision = React.useRef(0);
 
   // Room Design State (Stage 3)
   const [selectedRoom, setSelectedRoom] = useProjectState('app.selectedRoom', null);
@@ -110,6 +114,49 @@ export default function App() {
   const [isDesigning, setIsDesigning] = useProjectState('request.design', false);
   const [roomFocusTrigger, setRoomFocusTrigger] = useState(0);
   const [catalogSelection, setCatalogSelection] = useState(null);
+
+  // Room library: saved TripoSR models placed freely on the floors of the house.
+  const [placedFurniture, setPlacedFurniture] = useProjectState('app.placedFurniture', []);
+  const [placement, setPlacement] = useState(null); // { item, moveId? }
+  const [placementError, setPlacementError] = useState(null);
+  const [selectedPlacedId, setSelectedPlacedId] = useState(null);
+  const selectedPlaced = placedFurniture.find(item => item.id === selectedPlacedId) || null;
+  const startPlacement = item => { setPlacement({ item }); setPlacementError(null); setSelectedPlacedId(null); };
+  const cancelPlacement = React.useCallback(() => { setPlacement(null); setPlacementError(null); }, []);
+  const handlePlaceAt = spot => {
+    if (spot.error) { setPlacementError(spot.error); return; }
+    if (!placement) return;
+    const where = { position_m: spot.position_m, level_id: spot.level_id, elevation_m: spot.elevation_m, room_id: spot.room_id };
+    if (placement.moveId) {
+      setPlacedFurniture(list => list.map(item => item.id === placement.moveId ? { ...item, ...where } : item));
+      setSelectedPlacedId(placement.moveId);
+    } else {
+      const { item } = placement;
+      const id = `placed_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      setPlacedFurniture(list => [...list, { id, library_id: item.id, name: item.name, category: item.category,
+        glb: item.glb, preview: item.preview, dimensions_m: item.dimensions_m, rotation_deg: 0, ...where }]);
+      setSelectedPlacedId(id);
+    }
+    setPlacement(null);
+    setPlacementError(null);
+  };
+  const rotatePlaced = (id, degrees) => setPlacedFurniture(list => list.map(item => item.id === id
+    ? { ...item, rotation_deg: ((item.rotation_deg || 0) + degrees + 360) % 360 } : item));
+  const movePlaced = id => {
+    const item = placedFurniture.find(entry => entry.id === id);
+    if (item) { setPlacement({ item, moveId: id }); setPlacementError(null); }
+  };
+  const removePlaced = id => { setPlacedFurniture(list => list.filter(item => item.id !== id)); setSelectedPlacedId(null); };
+  const clearPlacementsForNewPlan = () => { setPlacedFurniture([]); setPlacement(null); setSelectedPlacedId(null); };
+  const libraryPanel = (
+    <RoomLibraryPanel placement={placement} placementError={placementError} placed={placedFurniture}
+      selected={selectedPlaced} onStartPlacement={startPlacement} onCancelPlacement={cancelPlacement}
+      onRotate={rotatePlaced} onMove={movePlaced} onRemove={removePlaced} onDeselect={() => setSelectedPlacedId(null)} />
+  );
+  const placementViewerProps = {
+    placedFurniture, placementActive: Boolean(placement), onPlaceAt: handlePlaceAt,
+    onSelectPlaced: id => { setSelectedPlacedId(id); setPlacement(null); }, selectedPlacedId,
+  };
 
   // Facade Studio State
   const [facadeDraft, setFacadeDraft] = useProjectState('app.facadeDraft', null);
@@ -215,6 +262,7 @@ export default function App() {
     project.set('canvas.zoom', 1);
     project.set('canvas.pan', { x: 0, y: 0 });
     setFile(uploadedFile);
+    clearPlacementsForNewPlan();
     const url = project.trackURL(URL.createObjectURL(uploadedFile));
     setImageUrl(url);
     setFrontWallId(null);
@@ -226,7 +274,7 @@ export default function App() {
     if (!fileObj) return;
     const request = ++analysisRequest.current;
     if (!reference) {
-      facadeRevision.current++;
+      facadeRevision.current++; geometryRevision.current++;
       setFacadeDraft(null);
     }
     setIsAnalyzing(true);
@@ -333,7 +381,7 @@ export default function App() {
 
   const handleSetNumFloors = (count) => {
     if (count === numFloors) return;
-    facadeRevision.current++;
+    facadeRevision.current++; geometryRevision.current++;
     setFacadeDraft(null);
     setNumFloors(count);
     if (layout && !layout.storeys?.length) {
@@ -344,7 +392,7 @@ export default function App() {
   const handleCalibrateScale = (newScale) => {
     setScale(newScale);
     if (layout?.metadata.source === 'sample_reference') {
-      facadeRevision.current++;
+      facadeRevision.current++; geometryRevision.current++;
       setFacadeDraft(null);
       const rescaled = rescaleSampleHouse(layout, newScale);
       setLayout({ ...rescaled, walls: rescaled.walls.map(wall => ({ ...wall, facade_texture: undefined })) });
@@ -362,7 +410,7 @@ export default function App() {
   };
 
   const handleLayoutEdit = (next) => {
-    facadeRevision.current++;
+    facadeRevision.current++; geometryRevision.current++;
     setFacadeDraft(null);
     const before = [...layout.doors, ...layout.windows];
     const after = [...next.doors, ...next.windows];
@@ -379,32 +427,89 @@ export default function App() {
     if (!next.walls.some(wall => wall.id === frontWallId)) setFrontWallId(next.walls.find(wall => wall.is_exterior)?.id || null);
   };
 
-  const requestFacade = async (style) => {
-    const target = layout?.walls.find(wall => wall.id === frontWallId && wall.is_exterior);
+  // The wall geometry sent to every facade engine. Both engines receive exactly this
+  // payload, and its key identifies results that are still valid for the wall.
+  latestGeometry.current = { layout, numFloors };
+  const facadePayloadFor = (wallId = frontWallId) => {
+    // Always read the latest geometry, also from callbacks of long-running jobs.
+    const { layout: currentLayout, numFloors: floors } = latestGeometry.current;
+    const target = currentLayout?.walls.find(wall => wall.id === wallId && wall.is_exterior);
+    if (!target) return null;
+    const level = buildingLevels(currentLayout, floors).find(item => item.walls.includes(target));
+    if (!level) return null;
+    const openings = fitHouseOpenings(level, currentLayout.metadata.scale_meters_per_pixel)
+      .filter(opening => opening.associated_wall === target.id);
+    const { facade_texture: _ignored, ...wall } = target;
+    const payload = {
+      wall: { ...wall, height_m: level.unitHeight, openings },
+      wall_id: target.id,
+      num_floors: target.level_id ? 1 : floors,
+    };
+    return { target, payload, key: JSON.stringify(payload) };
+  };
+
+  const requestFacade = async (style, wallId = frontWallId) => {
+    const target = layout?.walls.find(wall => wall.id === wallId && wall.is_exterior);
     if (!target) throw new Error('Choose an exterior wall.');
     if (isAnalyzing && layout.metadata.source !== 'sample_reference') throw new Error('Wait for floorplan analysis to finish.');
     const revision = facadeRevision.current;
     const token = project.startRequest('facade');
     try {
-    const level = buildingLevels(layout, numFloors).find(item => item.walls.includes(target));
-    if (!level) throw new Error('The selected wall is outside the building levels.');
-    const openings = fitHouseOpenings(level, layout.metadata.scale_meters_per_pixel)
-      .filter(opening => opening.associated_wall === target.id);
-    const response = await axios.post('/facade/generate', {
-      wall: { ...target, height_m: level.unitHeight, openings, facade_texture: undefined },
-      wall_id: target.id,
-      style,
-      num_floors: target.level_id ? 1 : numFloors,
-    });
+    const context = facadePayloadFor(target.id);
+    if (!context) throw new Error('The selected wall is outside the building levels.');
+    const started = performance.now();
+    const response = await axios.post('/facade/generate', { ...context.payload, style });
     if (revision !== facadeRevision.current || !project.isCurrent('facade', token)) return null;
     if (response.data?.wall_id !== target.id || !response.data.texture_base64) throw new Error('Facade generation failed.');
-    return response.data;
+    return { ...response.data, engine: 'pix2pix', payload_key: context.key, client_ms: performance.now() - started };
     } catch (error) {
       if (!project.isCurrent('facade', token)) return null;
       throw error;
     } finally {
       project.finishRequest('facade', token);
     }
+  };
+
+  // Stable Diffusion hybrid: an asynchronous job, polled without blocking the UI.
+  // A result is returned only if the wall geometry is unchanged when it finishes.
+  const requestHybridFacade = async (style, seed, onProgress, wallId = frontWallId) => {
+    const context = facadePayloadFor(wallId);
+    if (!context) throw new Error('Choose an exterior wall.');
+    if (isAnalyzing && layout.metadata.source !== 'sample_reference') throw new Error('Wait for floorplan analysis to finish.');
+    const started = performance.now();
+    const revision = geometryRevision.current;
+    // Stale when any geometry changed during the job (even if later restored), or this wall's payload differs.
+    const isStale = () => revision !== geometryRevision.current || facadePayloadFor(context.target.id)?.key !== context.key;
+    let { data: job } = await axios.post('/facade/hybrid/jobs', { ...context.payload, style, seed });
+    onProgress?.(job);
+    while (!['succeeded', 'failed', 'cancelled'].includes(job.status)) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (isStale()) {
+        axios.delete(`/facade/hybrid/jobs/${job.job_id}`).catch(() => {});
+        return { outdated: true };
+      }
+      job = (await axios.get(`/facade/hybrid/jobs/${job.job_id}`)).data;
+      onProgress?.(job);
+    }
+    if (isStale()) return { outdated: true };
+    if (job.status !== 'succeeded') {
+      const error = new Error(job.error || `Stable Diffusion job ${job.status}.`);
+      error.job = job;
+      throw error;
+    }
+    if (job.result.wall_id !== context.target.id) throw new Error('The job finished for a different wall.');
+    return { ...job.result, payload_key: context.key, client_ms: performance.now() - started, job_id: job.job_id, tracking: job.tracking };
+  };
+
+  // Refuses results whose wall geometry changed after generation.
+  const applyFacadeChecked = (finish) => {
+    if (finish.payload_key) {
+      const current = facadePayloadFor(finish.wall_id);
+      if (!current || current.key !== finish.payload_key) {
+        throw new Error('This wall changed since the texture was generated. Generate it again.');
+      }
+    }
+    applyFacade(finish);
   };
 
   const applyFacade = (finish) => {
@@ -667,7 +772,9 @@ export default function App() {
             numFloors={numFloors}
             setNumFloors={handleSetNumFloors}
             requestFacade={requestFacade}
-            onApplyFacadeTexture={applyFacade}
+            requestHybridFacade={requestHybridFacade}
+            facadePayloadFor={facadePayloadFor}
+            onApplyFacadeTexture={applyFacadeChecked}
             onViewFacadeIn3D={viewFacadeIn3D}
             onNavigateToFloorplan={() => setPageView('floorplan')}
           />
@@ -749,7 +856,8 @@ export default function App() {
                   onClearRoomFurnishings={handleClearDesign}
                   facadeFocusTrigger={facadeFocusTrigger}
                   roomFocusTrigger={roomFocusTrigger}
-                />
+                  {...placementViewerProps}
+                >{libraryPanel}</Viewer3D>
               </>
             )}
 
@@ -784,7 +892,8 @@ export default function App() {
                 onClearRoomFurnishings={handleClearDesign}
                 facadeFocusTrigger={facadeFocusTrigger}
                 roomFocusTrigger={roomFocusTrigger}
-              />
+                {...placementViewerProps}
+              >{libraryPanel}</Viewer3D>
             )}
 
             {/* Room Design Floating Panel (Stage 3) */}

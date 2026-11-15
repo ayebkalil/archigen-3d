@@ -21,6 +21,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from fastapi.concurrency import run_in_threadpool
 import io
 import base64
 from typing import Annotated, Optional, List, Dict, Any
@@ -378,6 +379,7 @@ class FacadeGenerateRequest(BaseModel):
     num_floors: Optional[int] = 1
     wall: Optional[Dict[str, Any]] = None
     layout: Optional[Dict[str, Any]] = None
+    tracking_tags: Optional[Dict[str, str]] = None
 
 @app.post("/facade/generate", tags=["Generative AI"])
 async def generate_facade_endpoint(request: FacadeGenerateRequest):
@@ -426,6 +428,7 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
         num_floors = 1 if wall.get("level_id") else request.num_floors or 1
         style = request.style
 
+        generation_started = time.perf_counter()
         res = bridge.render_wall_facade(
             wall=wall,
             num_floors=num_floors,
@@ -433,12 +436,25 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
             style=style,
             material_finish=True,
         )
+        generation_ms = (time.perf_counter() - generation_started) * 1000.0
 
         import base64
         photo_b64 = base64.b64encode(res["photo_bytes"]).decode("ascii")
         sketch_b64 = base64.b64encode(res["sketch_bytes"]).decode("ascii")
+        native = res["photo_image"].size
+        model_info = dict(res.get("model_info") or {})
+        if model_info.get("style_conditioned"):
+            style_control = "experimental style-conditioned generator"
+        elif style:
+            style_control = "post-hoc colour/finish applied to the Pix2Pix output (not a model input)"
+        else:
+            style_control = "none"
+        model_info.update(native_texture_px=list(native), style_control=style_control)
+        _track_pix2pix(wall, style, num_floors, res, generation_ms, bridge.device_name, request.tracking_tags)
 
         return {
+            "engine": "pix2pix",
+            "generation_ms": round(generation_ms, 2),
             "status": "success",
             "wall_id": wall.get("id"),
             "style": style,
@@ -447,7 +463,7 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
             "wall_height_m": res["wall_height_m"],
             "uv_bounds": res["uv_bounds"],
             "facade_frame": res["facade_frame"],
-            "model_info": res.get("model_info"),
+            "model_info": model_info,
             "openings": res["openings"],
             "texture_base64": f"data:image/png;base64,{photo_b64}",
             "sketch_base64": f"data:image/png;base64,{sketch_b64}",
@@ -463,6 +479,108 @@ async def generate_facade_endpoint(request: FacadeGenerateRequest):
         raise HTTPException(status_code=500, detail=f"Facade generation error: {e}")
 
 
+def _track_pix2pix(wall, style, num_floors, res, generation_ms, device, tags=None):
+    """Background MLflow run for the Pix2Pix reference; never delays or fails the response."""
+    from src.furniture.tracking import tracking_enabled
+    if not tracking_enabled():
+        return
+
+    def log():
+        import hashlib, json
+        from src.models.facade_tracking import log_run
+        wall_json = json.dumps(wall, sort_keys=True, default=str)
+        info = res.get("model_info") or {}
+        log_run(f"pix2pix-{style or 'default'}-{wall.get('id')}", {
+            "engine": "pix2pix", "model": info.get("model", "legacy_256"), "device": device,
+            "wall_id": wall.get("id"), "wall_length_m": round(res["wall_length_m"], 4),
+            "wall_height_m": round(res["wall_height_m"], 4), "num_floors": num_floors,
+            "openings": len(res["openings"]), "style": style, "input_sha256": hashlib.sha256(wall_json.encode()).hexdigest(),
+            "resolution": res["photo_image"].size[0], "style_control": "post-hoc colour grading" if style else "none",
+        }, {"generation_ms": generation_ms}, {
+            "input/wall.json": wall, "input/sketch.png": res["sketch_image"], "output/pix2pix_texture.png": res["photo_image"],
+        }, tags={"run_kind": "studio_generation", **(tags or {}), "engine": "pix2pix"})
+
+    threading.Thread(target=log, daemon=True).start()
+
+
+class HybridFacadeRequest(BaseModel):
+    wall: Dict[str, Any]
+    wall_id: Optional[str] = None
+    style: str = "Traditional Brick"
+    seed: int = Field(default=42, ge=0, le=2 ** 31 - 1)
+    num_floors: int = Field(default=1, ge=1, le=10)
+    use_cache: bool = True
+    tracking_tags: Optional[Dict[str, str]] = None
+
+
+_hybrid_jobs = None
+
+
+def hybrid_jobs():
+    global _hybrid_jobs
+    if _hybrid_jobs is None:
+        from app.facade_hybrid_jobs import HybridFacadeJobs
+        _hybrid_jobs = HybridFacadeJobs()
+    return _hybrid_jobs
+
+
+@app.get("/facade/hybrid/status", tags=["Generative AI"])
+async def hybrid_facade_status():
+    """Readiness of the Stable Diffusion material worker (independent of Pix2Pix)."""
+    from src.models.material_diffusion import load_config
+    config = load_config()
+    worker = await run_in_threadpool(hybrid_jobs().worker.health)
+    return {
+        "worker": worker, "ready": worker.get("status") == "ready",
+        "styles": list(config["styles"]), "model": config["model"]["repo"],
+        "revision": config["model"]["revision"], "license": config["model"]["license"],
+        "generation": config["generation"],
+        "controls": {
+            "pix2pix": "Style preset = post-hoc colour grading of the Pix2Pix output; no text prompt, no seed.",
+            "stable_diffusion_hybrid": "Style preset = Stable Diffusion text prompt for the wall material; seed selectable. Geometry and openings are fixed by the plan.",
+        },
+    }
+
+
+@app.post("/facade/hybrid/jobs", status_code=202, tags=["Generative AI"])
+async def submit_hybrid_facade(request: HybridFacadeRequest):
+    """Start a Stable Diffusion material + geometry-locked composition job (non-blocking)."""
+    from src.bridge.facade_hybrid import FacadeGeometryError
+    wall = request.wall
+    if wall.get("is_exterior") is False:
+        raise HTTPException(status_code=422, detail="Choose an exterior wall for the facade.")
+    if request.wall_id and wall.get("id") != request.wall_id:
+        raise HTTPException(status_code=422, detail="wall_id does not match the supplied wall.")
+    wall = {**wall, "geometry_fixed": True}
+    num_floors = 1 if wall.get("level_id") else request.num_floors
+    try:
+        tags = {"run_kind": "studio_generation", **(request.tracking_tags or {})}
+        return hybrid_jobs().submit(wall, request.style, request.seed, num_floors, request.use_cache, run_tags=tags)
+    except FacadeGeometryError as exc:
+        raise HTTPException(status_code=422, detail={"error": "invalid_geometry", "issues": exc.issues,
+                                                     "message": "The wall geometry cannot be composed without moving or clipping openings."}) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.get("/facade/hybrid/jobs/{job_id}", tags=["Generative AI"])
+async def hybrid_facade_job(job_id: str):
+    job = hybrid_jobs().get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired facade job.")
+    return job
+
+
+@app.delete("/facade/hybrid/jobs/{job_id}", tags=["Generative AI"])
+async def cancel_hybrid_facade_job(job_id: str):
+    job = hybrid_jobs().cancel(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired facade job.")
+    return job
+
+
 # --- 2D-to-3D Furniture Synthesizer (TripoSR / Volumetric) ---
 
 class FurnitureSaveRequest(BaseModel):
@@ -473,6 +591,8 @@ class FurnitureSaveRequest(BaseModel):
     dimensions_m: List[float]
     bounds: Dict[str, Any]
     glb_base64: str
+    # Optional thumbnail shown in the room library (PNG or JPEG data URL).
+    preview_base64: Optional[str] = None
 
 CUSTOM_LIBRARY = os.getenv("ARCHIGEN_CUSTOM_LIBRARY")
 CUSTOM_FURNITURE_DIR = (Path(CUSTOM_LIBRARY) if CUSTOM_LIBRARY else PROJECT_ROOT / "frontend" / "public" / "models") / "custom"
@@ -567,6 +687,16 @@ async def save_furniture_to_library_endpoint(request: FurnitureSaveRequest):
         }
         if request.furniture_type:
             item_entry["furniture_type"] = request.furniture_type
+        if request.preview_base64:
+            try:
+                preview = base64.b64decode(request.preview_base64.split(",", 1)[-1], validate=True)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail="The preview image is not valid base64.") from exc
+            extension = "png" if preview[:8] == bytes.fromhex("89504e470d0a1a0a") else "jpg" if preview[:3] == bytes.fromhex("ffd8ff") else None
+            if extension is None or len(preview) > 5 * 1024 * 1024:
+                raise HTTPException(status_code=422, detail="The preview must be a PNG or JPEG image under 5 MB.")
+            (CUSTOM_FURNITURE_DIR / f"{request.id}.{extension}").write_bytes(preview)
+            item_entry["preview"] = f"/models/custom/{request.id}.{extension}"
         custom_items[request.id] = item_entry
         CUSTOM_CATALOG_FILE.write_text(json.dumps(custom_items, indent=2), encoding="utf-8")
 

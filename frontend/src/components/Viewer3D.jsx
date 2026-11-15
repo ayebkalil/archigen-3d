@@ -26,7 +26,13 @@ export default function Viewer3D({
   furnishingData = {},
   onClearRoomFurnishings = null,
   facadeFocusTrigger = 0,
-  roomFocusTrigger = 0
+  roomFocusTrigger = 0,
+  placedFurniture = [],
+  placementActive = false,
+  onPlaceAt = null,
+  onSelectPlaced = null,
+  selectedPlacedId = null,
+  children = null
 }) {
   const project = useProject();
   const [, setSavedPose] = useProjectState('viewer.cameraPose', null);
@@ -43,6 +49,12 @@ export default function Viewer3D({
   const gltfLoaderRef = useRef(new GLTFLoader());
   const onSelectFurnitureRef = useRef(onSelectFurniture);
   useEffect(() => { onSelectFurnitureRef.current = onSelectFurniture; }, [onSelectFurniture]);
+  // Free placement of saved room-library models.
+  const placementRef = useRef({ active: false, onPlaceAt: null, onSelectPlaced: null });
+  placementRef.current = { active: placementActive, onPlaceAt, onSelectPlaced };
+  const placedGroupRef = useRef(null);
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
 
   const [wireframe, setWireframe] = useProjectState('viewer.wireframe', false);
   const [activeLevel, setActiveLevel] = useProjectState('viewer.activeLevel', 'all');
@@ -89,6 +101,11 @@ export default function Viewer3D({
     furnitureGroup.name = "furnitureGroup";
     scene.add(furnitureGroup);
     furnitureGroupRef.current = furnitureGroup;
+
+    const placedGroup = new THREE.Group();
+    placedGroup.name = "placedFurnitureGroup";
+    scene.add(placedGroup);
+    placedGroupRef.current = placedGroup;
 
     // Roof container group (can be activated / deactivated)
     const roofGroup = new THREE.Group();
@@ -288,9 +305,43 @@ export default function Viewer3D({
       raycaster.setFromCamera(mouse, cameraRef.current);
       const intersects = raycaster.intersectObjects(sceneRef.current.children, true);
 
+      // Placement mode: the first floor surface hit (not hidden by a wall) receives the model.
+      const placing = placementRef.current;
+      if (placing.active && placing.onPlaceAt) {
+        for (const hit of intersects) {
+          const data = hit.object.userData || {};
+          if (['wall_assembly', 'facade'].includes(data.type)) {
+            placing.onPlaceAt({ error: 'A wall is in the way: click on a visible floor, or rotate the view.' });
+            return;
+          }
+          if (data.isFloorMesh || data.type === 'foundation_slab' || data.type === 'floor_finish') {
+            const levelId = data.room?.level_id ?? data.levelId ?? null;
+            const level = layoutRef.current?.storeys?.find(item => item.id === levelId);
+            const [offsetX, offsetZ] = level?.offset || [0, 0];
+            const { centerX, centerZ } = centersRef.current;
+            placing.onPlaceAt({
+              position_m: [hit.point.x + centerX - offsetX, hit.point.z + centerZ - offsetZ],
+              level_id: levelId,
+              elevation_m: Math.max(0, hit.point.y - 0.021),
+              room_id: data.room?.id ?? null,
+            });
+            return;
+          }
+        }
+        placing.onPlaceAt({ error: 'Click on a floor inside the house.' });
+        return;
+      }
+
       let behindWall = false;
       for (const hit of intersects) {
         if (['wall_assembly', 'facade'].includes(hit.object.userData.type)) behindWall = true;
+        if (!behindWall && placementRef.current.onSelectPlaced) {
+          let placedId = null;
+          for (let object = hit.object; object; object = object.parent) {
+            if (object.userData.placedId) { placedId = object.userData.placedId; break; }
+          }
+          if (placedId) { placementRef.current.onSelectPlaced(placedId); return; }
+        }
         if (!behindWall && onSelectFurnitureRef.current) {
           for (let object = hit.object; object; object = object.parent) {
             if (object.userData.isFurnitureMesh) {
@@ -1023,6 +1074,55 @@ export default function Viewer3D({
     return () => { current = false; };
   }, [furnishingData, showFurniture, layout, graphicsQuality, activeLevel]);
 
+  // Saved room-library models placed freely by the user (independent of automatic room designs).
+  // Each GLB is downloaded once and cloned, so rotating or moving a model is instantaneous.
+  const placedCacheRef = useRef(new Map());
+  useEffect(() => {
+    const group = placedGroupRef.current;
+    if (!group) return undefined;
+    // Clones share the cached geometry and materials: detach them, never dispose them here.
+    while (group.children.length) {
+      const child = group.children[0];
+      group.remove(child);
+      if (child.isLineSegments) { child.geometry.dispose(); child.material.dispose(); }
+    }
+    if (!showFurniture || !placedFurniture?.length) return undefined;
+    let current = true;
+    const { centerX, centerZ } = centersRef.current;
+    const cache = placedCacheRef.current;
+    const load = url => {
+      if (!cache.has(url)) {
+        cache.set(url, new Promise((resolve, reject) => gltfLoaderRef.current.load(url, gltf => resolve(gltf.scene), undefined, reject)));
+      }
+      return cache.get(url);
+    };
+    for (const item of placedFurniture) {
+      const level = layout?.storeys?.find(entry => entry.id === item.level_id);
+      if (level && activeLevel !== 'all' && activeLevel !== level.id) continue;
+      const [offsetX, offsetZ] = level?.offset || [0, 0];
+      load(item.glb).then(scene => {
+        if (!current) return;
+        const model = fitCustomFurnitureAsset(scene.clone(true), item.dimensions_m);
+        model.position.set(item.position_m[0] + offsetX - centerX, (item.elevation_m || 0) + 0.02, item.position_m[1] + offsetZ - centerZ);
+        model.rotation.y = -(item.rotation_deg || 0) * Math.PI / 180;
+        model.traverse(child => {
+          if (child.isMesh) { child.castShadow = graphicsQuality === 'high'; child.receiveShadow = graphicsQuality === 'high'; }
+        });
+        model.userData = { placedId: item.id };
+        group.add(model);
+        if (item.id === selectedPlacedId) {
+          const outline = new THREE.BoxHelper(model, 0xf0500f);
+          outline.userData = { placedId: item.id };
+          group.add(outline);
+        }
+      }).catch(error => {
+        cache.delete(item.glb);
+        console.error('Failed to load placed model', item.glb, error);
+      });
+    }
+    return () => { current = false; };
+  }, [placedFurniture, selectedPlacedId, showFurniture, layout, graphicsQuality, activeLevel]);
+
   // View Presets: 3-4 Distinct Architectural Camera Modes
   const setCameraPerspective = () => {
     fitCamera('perspective');
@@ -1317,7 +1417,8 @@ export default function Viewer3D({
       </div>
 
       {/* 3D WebGL Canvas Container */}
-      <div ref={containerRef} className="flex-1 w-full h-full relative cursor-grab active:cursor-grabbing" />
+      <div ref={containerRef} className={`flex-1 w-full h-full relative ${placementActive ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`} />
+      {children}
     </div>
   );
 }

@@ -1,0 +1,94 @@
+{
+  "schema": "archigen.facade_hybrid.v1",
+  "model": {
+    "name": "stable-diffusion-v1-5 (fp16)",
+    "repo": "stable-diffusion-v1-5/stable-diffusion-v1-5",
+    "revision": "451f4fe16113bff5a5d2269ed5ad43b0592e9a14",
+    "license": "creativeml-openrail-m",
+    "license_url": "https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5/blob/main/README.md",
+    "files": [
+      "model_index.json",
+      "scheduler/scheduler_config.json",
+      "text_encoder/config.json",
+      "text_encoder/model.fp16.safetensors",
+      "tokenizer/merges.txt",
+      "tokenizer/special_tokens_map.json",
+      "tokenizer/tokenizer_config.json",
+      "tokenizer/vocab.json",
+      "unet/config.json",
+      "unet/diffusion_pytorch_model.fp16.safetensors",
+      "vae/config.json",
+      "vae/diffusion_pytorch_model.fp16.safetensors"
+    ],
+    "weights": {
+      "text_encoder/model.fp16.safetensors": {
+        "size": 246144864,
+        "sha256": "77795e2023adcf39bc29a884661950380bd093cf0750a966d473d1718dc9ef4e"
+      },
+      "unet/diffusion_pytorch_model.fp16.safetensors": {
+        "size": 1719125304,
+        "sha256": "c83908253f9a64d08c25fc90874c9c8aef9a329ce1ca5fb909d73b0c83d1ea21"
+      },
+      "vae/diffusion_pytorch_model.fp16.safetensors": {
+        "size": 167335342,
+        "sha256": "4fbcf0ebe55a0984f5a5e00d8c4521d52359af7229bb4d81890039d2aa16dd7c"
+      }
+    },
+    "excluded": "safety_checker and feature_extractor are not downloaded or loaded (material swatches only)"
+  },
+  "generation": {
+    "resolution": 512,
+    "steps": 25,
+    "guidance_scale": 7.0,
+    "scheduler": "DPMSolverMultistepScheduler(use_karras_sigmas=True)",
+    "precision": "fp16",
+    "tiling": "circular_padding_unet_and_vae",
+    "max_attempts": 3,
+    "seed_stride": 1000,
+    "attempt_timeout_s": 240,
+    "gpu_wait_timeout_s": 900,
+    "min_free_vram_mib": 3000
+  },
+  "negative_prompt": "window, door, frame, building, house, facade, roof, sky, ground, floor, person, text, letters, watermark, logo, signature, perspective, vanishing point, corner, cast shadow, sunlight, spotlight, vignette, blurry, painting, cartoon, illustration, 3d render, border",
+  "styles": {
+    "Modern Minimalist": {
+      "material": "stucco",
+      "prompt": "seamless tileable texture, smooth off-white fine stucco plaster wall surface, subtle trowel marks and mineral grain, flat orthographic front view, soft diffuse overcast light, uniform, high detail photograph",
+      "scale": {"method": "assumed", "tile_m": 1.0}
+    },
+    "Mediterranean Stone": {
+      "material": "stone",
+      "prompt": "seamless tileable texture, pale limestone ashlar wall, rectangular stone blocks in regular horizontal courses, thin joints, natural pores, flat orthographic front view, soft diffuse light, uniform, high detail photograph",
+      "scale": {"method": "course_period", "course_m": 0.30, "default_tile_m": 2.0, "min_courses": 2, "max_courses": 12}
+    },
+    "Traditional Brick": {
+      "material": "brick",
+      "prompt": "seamless tileable texture, red clay brick wall, running bond, regular horizontal courses, even light grey mortar joints, flat orthographic front view, soft diffuse light, uniform, high detail photograph",
+      "scale": {"method": "course_period", "course_m": 0.075, "default_tile_m": 1.2, "min_courses": 6, "max_courses": 40}
+    },
+    "Lush Vegetation": {
+      "material": "ivy",
+      "prompt": "seamless tileable texture, dense green ivy leaves fully covering a wall, flat orthographic front view, soft diffuse light, uniform coverage, high detail photograph",
+      "scale": {"method": "assumed", "tile_m": 1.2}
+    }
+  },
+  "quality_gates": {
+    "max_seam_ratio": 1.3,
+    "max_low_frequency_contrast": 0.09,
+    "max_course_tilt_deg": 2.5,
+    "min_detail_std": 3.0,
+    "note": "Heuristic gates catch lighting blobs, seams, tilted courses and flat outputs. They do not prove the absence of windows or doors; visual review remains required."
+  },
+  "composition": {
+    "max_px_per_m": 256,
+    "max_texture_px": 4096,
+    "edge_tolerance_m": 0.001,
+    "opening_fill": {
+      "window": [96, 112, 124],
+      "window_frame": [44, 44, 46],
+      "door": [92, 64, 44],
+      "door_frame": [34, 30, 28]
+    },
+    "opening_note": "Opening pixels are schematic placeholders strictly inside geometry masks. The 3D viewer cuts these regions and renders its existing door and window meshes."
+  }
+}

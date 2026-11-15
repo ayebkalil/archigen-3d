@@ -93,6 +93,50 @@ def apply_facade_style(img: Image.Image, style: str) -> Image.Image:
 
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
 
+def wall_opening_templates(wall: Dict[str, Any], frame: Dict[str, Any], is_front: bool = False) -> List[Dict[str, Any]]:
+    """Per-storey openings in exact wall meters, shared by every facade engine.
+
+    Detected positions are projected onto the same finite wall face used for UVs.
+    Openings belonging to another side of a compound wall are excluded.
+    """
+    wall_len_m = frame["length_m"]
+    attached = wall.get("openings", [])
+    templates = []
+    for idx, op in enumerate(attached):
+        kind = op.get("type")
+        if kind not in ("door", "window"):
+            continue
+        along = op.get("position_along_wall_m")
+        if along is None and op.get("position_meters") is not None:
+            px, pz = op["position_meters"]
+            ox, oz = frame["origin"]
+            dx, dz = frame["direction"]
+            along = (px - ox) * dx + (pz - oz) * dz
+            distance = abs((px - ox) * dz - (pz - oz) * dx)
+            if distance > 0.85 or along < 0 or along > wall_len_m:
+                continue
+        if along is None:
+            continue
+        templates.append({
+            "id": op.get("id", f"{kind}_{idx}"), "type": kind,
+            "position_along_wall_m": float(along),
+            "width_m": float(op.get("width_m", op.get("width", 1.15 if kind == "door" else 1.10))),
+            "height_m": float(op.get("height_m", op.get("height", DOOR_HEIGHT_M if kind == "door" else WINDOW_HEIGHT_M))),
+            "sill_m": float(op.get("sill_m", 0.0 if kind == "door" else WINDOW_SILL_M)),
+        })
+    # Procedural preview only when no measured openings were supplied.
+    if not attached and not wall.get("geometry_fixed"):
+        if is_front:
+            templates.append({"id": "facade_door", "type": "door", "position_along_wall_m": wall_len_m / 2, "width_m": 1.15, "height_m": DOOR_HEIGHT_M, "sill_m": 0.0})
+        bays = max(int(round(wall_len_m / 2.8)), 1)
+        for i in range(bays):
+            along = (i + 1) * wall_len_m / (bays + 1)
+            if is_front and abs(along - wall_len_m / 2) < 1.3:
+                continue
+            templates.append({"id": f"facade_window_{i}", "type": "window", "position_along_wall_m": along, "width_m": 1.1, "height_m": WINDOW_HEIGHT_M, "sill_m": WINDOW_SILL_M})
+    return templates
+
+
 class PyTorchFacadeInference:
     """
     Ultra-low-latency PyTorch CUDA Generator (~10ms per 256x256 facade).
@@ -345,42 +389,7 @@ class FacadeBridge:
             safe_rect(wall_x0, wall_y0 + cornice_h, wall_x0 + pillar_w, wall_y1 - base_h, palette["molding"])
             safe_rect(wall_x1 - pillar_w, wall_y0 + cornice_h, wall_x1, wall_y1 - base_h, palette["molding"])
 
-        # Detected positions are projected onto the same finite wall face used
-        # for UVs. Openings belonging to another side of a compound wall are excluded.
-        attached = wall.get("openings", [])
-        templates = []
-        for idx, op in enumerate(attached):
-            kind = op.get("type")
-            if kind not in ("door", "window"):
-                continue
-            along = op.get("position_along_wall_m")
-            if along is None and op.get("position_meters") is not None:
-                px, pz = op["position_meters"]
-                ox, oz = frame["origin"]
-                dx, dz = frame["direction"]
-                along = (px - ox) * dx + (pz - oz) * dz
-                distance = abs((px - ox) * dz - (pz - oz) * dx)
-                if distance > 0.85 or along < 0 or along > wall_len_m:
-                    continue
-            if along is None:
-                continue
-            templates.append({
-                "id": op.get("id", f"{kind}_{idx}"), "type": kind,
-                "position_along_wall_m": float(along),
-                "width_m": float(op.get("width_m", op.get("width", 1.15 if kind == "door" else 1.10))),
-                "height_m": float(op.get("height_m", op.get("height", DOOR_HEIGHT_M if kind == "door" else WINDOW_HEIGHT_M))),
-                "sill_m": float(op.get("sill_m", 0.0 if kind == "door" else WINDOW_SILL_M)),
-            })
-        # Procedural preview only when no measured openings were supplied.
-        if not attached and not wall.get("geometry_fixed"):
-            if is_front:
-                templates.append({"id": "facade_door", "type": "door", "position_along_wall_m": wall_len_m / 2, "width_m": 1.15, "height_m": DOOR_HEIGHT_M, "sill_m": 0.0})
-            bays = max(int(round(wall_len_m / 2.8)), 1)
-            for i in range(bays):
-                along = (i + 1) * wall_len_m / (bays + 1)
-                if is_front and abs(along - wall_len_m / 2) < 1.3:
-                    continue
-                templates.append({"id": f"facade_window_{i}", "type": "window", "position_along_wall_m": along, "width_m": 1.1, "height_m": WINDOW_HEIGHT_M, "sill_m": WINDOW_SILL_M})
+        templates = wall_opening_templates(wall, frame, is_front)
 
         rendered_openings = []
         for fl in range(num_floors):

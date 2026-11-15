@@ -1,0 +1,16 @@
+# Stable Diffusion material worker (docker/facade-diffusion). Installed on top of the
+# CUDA torch 2.6.0 base image; never install into the CPU backend image.
+diffusers==0.35.2
+transformers==4.46.3
+accelerate==1.12.0
+huggingface-hub==0.36.2
+safetensors==0.8.0
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+filelock>=3.13
+requests>=2.31
+numpy==1.26.4
+Pillow>=10.0.0
+opencv-python-headless>=4.8.0,<4.12
+psutil>=5.9

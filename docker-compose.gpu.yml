@@ -1,6 +1,9 @@
-# CUDA TripoSR furniture worker. Requires an NVIDIA GPU visible to Docker
-# (Docker Desktop with the WSL2 backend and a recent NVIDIA driver on Windows).
+# CUDA workers: TripoSR furniture and Stable Diffusion facade materials. Requires an
+# NVIDIA GPU visible to Docker (Docker Desktop with the WSL2 backend and a recent
+# NVIDIA driver on Windows).
 #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build --wait
+# Both workers share one GPU lock file, so a furniture reconstruction and a material
+# generation never run on the GPU at the same time.
 services:
   furniture:
     build:
@@ -15,9 +18,12 @@ services:
     environment:
       - ARCHIGEN_FURNITURE_DETAIL=${ARCHIGEN_FURNITURE_DETAIL:-high}
       - ARCHIGEN_MLFLOW_ENABLED=${ARCHIGEN_MLFLOW_ENABLED:-1}
+      - ARCHIGEN_GPU_LOCK=/run/archigen-gpu/gpu.lock
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - MLFLOW_HTTP_REQUEST_TIMEOUT=3
       - MLFLOW_HTTP_REQUEST_MAX_RETRIES=0
+    volumes:
+      - gpu_lock:/run/archigen-gpu
     deploy:
       resources:
         reservations:
@@ -36,9 +42,66 @@ services:
       start_period: 180s
     restart: "no"
 
+  # One-shot: download + SHA-256 verify the pinned SD 1.5 fp16 weights (~2.1 GB)
+  # into a persistent volume. Later starts only re-check sizes and the marker.
+  facade-diffusion-init:
+    build:
+      context: .
+      dockerfile: docker/facade-diffusion/Dockerfile
+      args:
+        APP_REVISION: ${ARCHIGEN_REVISION:-local}
+    image: archigen-3d-facade-diffusion
+    command: ["python", "-m", "backend.app.facade_diffusion_worker", "download"]
+    environment:
+      - HF_HUB_OFFLINE=0
+      - HF_HUB_DISABLE_XET=1
+      - HF_HUB_DOWNLOAD_TIMEOUT=120
+      - HF_HOME=/models/.hf
+    volumes:
+      - facade_diffusion_models:/models
+    restart: "no"
+
+  facade-diffusion:
+    image: archigen-3d-facade-diffusion
+    container_name: archigen_facade_diffusion
+    expose:
+      - "8002"
+    environment:
+      - ARCHIGEN_GPU_LOCK=/run/archigen-gpu/gpu.lock
+    volumes:
+      - facade_diffusion_models:/models:ro
+      - facade_material_cache:/cache
+      - gpu_lock:/run/archigen-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      facade-diffusion-init:
+        condition: service_completed_successfully
+    healthcheck:
+      # Healthy only once weights are verified and the pipeline is loaded.
+      test: ["CMD", "python", "-c", "import json,urllib.request,sys; s=json.load(urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=5)); sys.exit(s['status']!='ready')"]
+      interval: 15s
+      timeout: 10s
+      retries: 4
+      start_period: 240s
+    restart: "no"
+
   backend:
     environment:
       - ARCHIGEN_FURNITURE_SERVICE_URL=http://furniture:8001
+      - ARCHIGEN_FACADE_DIFFUSION_URL=http://facade-diffusion:8002
     depends_on:
       furniture:
         condition: service_healthy
+      facade-diffusion:
+        condition: service_started
+
+volumes:
+  gpu_lock:
+  facade_diffusion_models:
+  facade_material_cache:

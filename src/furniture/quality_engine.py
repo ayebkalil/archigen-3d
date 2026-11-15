@@ -16,6 +16,21 @@ import trimesh
 from .quality_geometry import prepare_input, extract_surface, to_room_coordinates, bake_neural_atlas
 
 
+def shared_gpu_section(timeout_s=900):
+    """Exclusive GPU section shared with other ArchiGen GPU workers (e.g. Stable Diffusion).
+
+    Only active when ARCHIGEN_GPU_LOCK names a lock file on a volume shared by the
+    workers; otherwise behaviour is unchanged.
+    """
+    path = os.environ.get('ARCHIGEN_GPU_LOCK')
+    if not path:
+        import contextlib
+        return contextlib.nullcontext()
+    from filelock import FileLock
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    return FileLock(path, timeout=timeout_s)
+
+
 def gpu_usage():
     line = subprocess.check_output([
         'nvidia-smi', '--id=0', '--query-gpu=memory.total,memory.used',
@@ -146,7 +161,7 @@ class QualityFurnitureEngine:
         if preset not in ('balanced', 'high'):
             raise ValueError('ARCHIGEN_FURNITURE_DETAIL must be balanced or high')
         resolution, atlas_resolution = (384, 2048) if preset == 'high' else (256, 1024)
-        with self.lock:
+        with self.lock, shared_gpu_section():
             started = time.monotonic()
             self.peak_device_mib = 0
             if self.device.type == 'cuda':

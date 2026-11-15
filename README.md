@@ -248,6 +248,14 @@ Le benchmark sur 50 plans réels (architecturaux, CubiCasa5k, plans externes ; *
 
 ---
 
+## Façades : Pix2Pix vs Stable Diffusion — hybride
+
+Le studio de façades propose deux moteurs explicites et une comparaison côte à côte :
+Pix2Pix (référence inchangée) et un moteur hybride où Stable Diffusion 1.5 génère
+seulement le matériau, la géométrie du plan fixant le mur et les ouvertures. Le worker
+CUDA `facade-diffusion` démarre avec `scripts/start_docker_stack.ps1`. Méthode,
+résultats mesurés, coûts et limites : [docs/facade-hybrid.md](docs/facade-hybrid.md).
+
 ## Démarrage local sans Docker (PowerShell)
 
 Pour la reconstruction neuronale des meubles sur GPU NVIDIA, suivez
