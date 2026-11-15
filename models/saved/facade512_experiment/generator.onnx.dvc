@@ -1,5 +1,11 @@
 outs:
-- md5: 9b067930324826f39ee1f422309335ab
+- hash: md5
+  path: generator.onnx
+md5: db84121e4f544cd681cd4c099c557c09
+frozen: true
+deps:
+- checksum: '"0x8DF4331C7979698"'
   size: 171571099
   hash: md5
-  path: generator.onnx
+  path:
+    https://github.com/ayebkalil/archigen-3d/releases/download/facade512-weights-v1/generator.onnx

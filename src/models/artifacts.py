@@ -65,9 +65,12 @@ def require_artifacts(profile='runtime', root=PROJECT_ROOT):
 def verify_model(path, root=PROJECT_ROOT):
     """Verify a pinned deployed artifact; explicit external experiments remain opt-in."""
     path, root = Path(path).resolve(), Path(root).resolve()
+    manifest = inventory(root)
+    entry = next((item for item in manifest['artifacts'] if root / item['path'] == path), None)
+    profile = next((name for name, paths in manifest['profiles'].items() if entry and entry['path'] in paths), 'runtime')
+    restore = f'python scripts/models.py pull --profile {profile}'
     if not path.is_file():
-        raise ModelArtifactError(f'Model is missing: {path.name}. Run `{RESTORE_COMMAND}`.')
-    entry = next((item for item in inventory(root)['artifacts'] if root / item['path'] == path), None)
+        raise ModelArtifactError(f'Model is missing: {path.name}. Run `{restore}`.')
     if entry and (path.stat().st_size != entry['size'] or sha256(path) != entry['sha256']):
-        raise ModelArtifactError(f'Model checksum mismatch: {entry["path"]}. Run `{RESTORE_COMMAND}` to repair it.')
+        raise ModelArtifactError(f'Model checksum mismatch: {entry["path"]}. Run `{restore}` to repair it.')
     return entry

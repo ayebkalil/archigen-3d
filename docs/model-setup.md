@@ -60,6 +60,46 @@ Restore weights **before** `docker compose up --build`. The container mounts
 image cannot populate an empty host model folder. `ARCHIGEN_FACADE_EXPERIMENT` is
 empty by default; opt-in experimental weights and their JSON sidecar are separate.
 
+## Optional Pix2Pix 512 experiment
+
+The three production models above are sufficient for the default application.
+`facade512_experiment/generator.onnx` is a separate **experimental residual-FiLM
+512 generator**, not Stable Diffusion/ControlNet. It is not promoted to production
+and does not have supervised labels for the four architectural styles.
+
+Its earlier DVC pointers relied on the developer's local training remote, so
+teammates could not restore it from the production release. The separate
+[experimental release](https://github.com/ayebkalil/archigen-3d/releases/tag/facade512-weights-v1)
+publishes `generator.onnx`, its required `generator.json`, optional `generator.pth`,
+and `SHA256SUMS.txt`. The inventory pins exact sizes and SHA-256 values for the
+weights **and JSON**. Metadata uses LF line endings on every platform.
+
+```powershell
+git pull
+python scripts/models.py pull --profile facade512
+python scripts/models.py check --profile facade512 --json
+$env:ARCHIGEN_FACADE_EXPERIMENT='models/saved/facade512_experiment/generator.onnx'
+python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+Run these in the backend Python environment, with DVC installed as above.
+The optional ONNX profile needs no CUDA/PyTorch installation. The sidecar is
+already tracked in Git; `pull` also repairs a missing/corrupt sidecar from the
+release. ONNX loading verifies both pinned files and rejects incorrect metadata.
+
+For native PyTorch weights instead, use `--profile facade512-torch`, install the
+existing `requirements-facade512.txt`, and select the `.pth` path explicitly.
+Leave `ARCHIGEN_FACADE_EXPERIMENT` unset (PowerShell: `Remove-Item
+Env:ARCHIGEN_FACADE_EXPERIMENT -ErrorAction SilentlyContinue`) for the production
+EMA facade. Docker remains on production unless that variable is explicitly set.
+See [experiment results and limitations](facade512-experiment.md).
+
+Clean-machine verification of the optional ONNX profile:
+
+```powershell
+python scripts/verify_team_install.py --ref main --profile facade512
+```
+
 ## Neural furniture on a clean NVIDIA CUDA machine
 
 ```powershell
@@ -90,7 +130,7 @@ it does not provide TripoSR quality.
 ## Verification
 
 ```powershell
-python scripts/verify_team_install.py --ref codex/fix-model-distribution
+python scripts/verify_team_install.py --ref main
 python -m pytest tests/ backend/tests/ -q
 ```
 

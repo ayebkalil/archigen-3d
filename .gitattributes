@@ -1,0 +1,2 @@
+# This integrity-pinned JSON sidecar must have identical bytes on Windows/Linux.
+models/saved/facade512_experiment/generator.json text eol=lf

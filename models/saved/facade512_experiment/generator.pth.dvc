@@ -1,5 +1,11 @@
 outs:
-- md5: 78691c443433935d9b0c26f9ab1ae481
+- hash: md5
+  path: generator.pth
+md5: 2b9eaf8bfefe5a3bf25b48de54cc0f40
+frozen: true
+deps:
+- checksum: '"0x8DF4333772F3D2C"'
   size: 171472130
   hash: md5
-  path: generator.pth
+  path:
+    https://github.com/ayebkalil/archigen-3d/releases/download/facade512-weights-v1/generator.pth
