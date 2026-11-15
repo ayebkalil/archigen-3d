@@ -92,7 +92,10 @@ resumable state, while the separately saved best model remains available.
 
 Report LPIPS, SSIM, PSNR and opening-edge MAE separately for CMP and IRF, with
 paired LPIPS bootstrap intervals and visual comparison panels. Metrics exclude
-letterbox padding. Opening-edge MAE is a photo-edge proxy, **not semantic IoU**.
+letterbox padding. Very narrow valid rectangles are upscaled proportionally to
+a minimum short axis of 64 for LPIPS only (AlexNet pooling requirement); RGB
+metrics retain their original valid-area resolution. Opening-edge MAE is a
+photo-edge proxy, **not semantic IoU**.
 V1's published square-stretch benchmark is a different protocol; compare V2 only
 with the matched V1 results generated here. Selection-subset performance is
 optimistic; full validation is still not the untouched final test. Inspect extra

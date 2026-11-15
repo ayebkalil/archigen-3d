@@ -8,19 +8,34 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from experiments.facade_sd15_controlnet.data import write_json, digest
-from experiments.facade_sd15_controlnet.evaluate import image_metrics
+from experiments.facade_sd15_controlnet.evaluate import image_metrics, perceptual_model
 from experiments.facade_sd15_controlnet.tracking import RunTracker
 from .conditioning import DISPLAY_RGB
 from .data import FacadeDataset, selection_indices
 
-PROTOCOL = 'v2-facade-bbox-neutral-background-letterbox-valid-rectangle; identical prompt/seed/steps; validation only'
+PROTOCOL = 'v2-facade-bbox-neutral-background-letterbox-valid-rectangle; LPIPS short axis at least 64, aspect-preserving upscale only; identical prompt/seed/steps; validation only'
 
 
 def pair_metrics(generated, photo, labels, valid, perceptual=True):
     y, x = np.where(valid > 0)
     box = (int(x.min()), int(y.min()), int(x.max()) + 1, int(y.max()) + 1)
     openings = Image.fromarray((((labels == 2) | (labels == 3)) * 255).astype('uint8'))
-    return image_metrics(generated.crop(box), photo.crop(box), openings.crop(box), perceptual=perceptual)
+    generated, photo = generated.crop(box), photo.crop(box)
+    values = image_metrics(generated, photo, openings.crop(box), perceptual=False)
+    if perceptual:
+        import torch
+        # AlexNet pooling requires a minimum spatial size. Keep padding out of
+        # the metric and preserve aspect instead of stretching narrow strips.
+        if min(photo.size) < 64:
+            scale = 64 / min(photo.size)
+            size = tuple(max(64, round(axis * scale)) for axis in photo.size)
+            generated = generated.resize(size, Image.Resampling.BICUBIC)
+            photo = photo.resize(size, Image.Resampling.BICUBIC)
+        def tensor(image):
+            return torch.from_numpy(np.asarray(image, np.float32).transpose(2, 0, 1).copy())[None] / 127.5 - 1
+        with torch.no_grad():
+            values['lpips'] = float(perceptual_model()(tensor(generated), tensor(photo)).item())
+    return values
 
 
 def panel(photo, labels, generated, path, parent=None):
