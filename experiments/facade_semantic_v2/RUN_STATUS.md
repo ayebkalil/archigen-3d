@@ -1,7 +1,8 @@
 # V2 execution record — 15 November 2026
 
-**No quality improvement is established yet.** The full experiment is running
-privately on Kaggle; production remains unchanged.
+The full 2000-step experiment and 210-image matched validation have completed.
+V2 improves perceptual similarity, with mixed structural results. Production
+remains unchanged; the multi-side house test is recorded separately.
 
 ## Verified smoke run
 
@@ -40,6 +41,10 @@ limitations are described in the README. No four-style labels were invented.
 - Full-run data audit reproduced the smoke counts. Optimizer steps 1–14 were
   observed with finite losses and no runtime failure; peak allocated VRAM was
   6451.05 MiB. This is an early execution check, not a quality evaluation.
+- Training completed all 2000 steps and selected step 2000. Training MLflow run:
+  `7d9d80627e1e4c75b39bd7bbd1162353`. Imported locally as
+  `c9141e312f6f4a3cbb3cd81d5aac754b`; matched evaluation imported as
+  `e7e6f18a9eaa4090a8de8f7f1721bb30`.
 - Config: 2000 optimizer steps; physical batch 1, accumulation 4; semantic7
   ControlNet + rank8 UNet LoRA; fixed base and parent weight hashes.
 - Best model selected every 500 steps using source-macro LPIPS on fixed 12 CMP
@@ -48,8 +53,26 @@ limitations are described in the README. No four-style labels were invented.
 - MLflow SQLite, portable metric history/artifacts and a checksum-protected
   local model bundle are written to saved Kaggle output. Download the bundle
   after completion; do not install the smoke model.
-- Local 25-step inference, house-wall visual review and promotion to production
-  are pending the trained candidate's quality evaluation.
+- Local 25-step inference and multi-side house review are complete; see
+  [house test](HOUSE_TEST.md). The model is not promoted to production.
+
+## Completed matched validation
+
+See [full results](results/full-validation-v1-v2.json). Both models use identical
+new preprocessing, prompts, sampling settings and per-image seeds. These are
+validation results; the selection subset overlaps this set, and final tests
+remain unused.
+
+| Source | n | V1 LPIPS ↓ | V2 LPIPS ↓ | Reduction | V2 LPIPS wins |
+|---|---:|---:|---:|---:|---:|
+| CMP | 100 | 0.575715 | 0.536236 | 6.86% | 78 |
+| IRFs | 110 | 0.686063 | 0.637672 | 7.05% | 85 |
+
+Paired bootstrap 95% intervals for V2-minus-V1 LPIPS are entirely below zero
+on both sources. CMP SSIM falls from 0.181844 to 0.154960; IRFs SSIM rises from
+0.154797 to 0.167443. Opening-edge MAE increases slightly on both sources, so
+these results do not establish improved opening fidelity. Local model ZIP,
+ControlNet and LoRA checksums have been verified against the selected export.
 
 ## Code checks
 

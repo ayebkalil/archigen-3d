@@ -1,0 +1,48 @@
+{
+  "protocol": "v2-facade-bbox-neutral-background-letterbox-valid-rectangle; LPIPS short axis at least 64, aspect-preserving upscale only; identical prompt/seed/steps; validation only",
+  "pilot": false,
+  "by_source": {
+    "CMP": {
+      "n": 100,
+      "means": {
+        "parent_psnr": 10.728845308382754,
+        "parent_ssim": 0.18184396223122548,
+        "parent_opening_edge_mae": 0.3150321528315544,
+        "parent_lpips": 0.5757146793603897,
+        "candidate_psnr": 11.11294508678376,
+        "candidate_ssim": 0.1549602347049983,
+        "candidate_opening_edge_mae": 0.3200647048652172,
+        "candidate_lpips": 0.5362359088659286
+      },
+      "lpips_delta_ci95": [
+        -0.05083444523066282,
+        -0.028580197624862202
+      ]
+    },
+    "IRF": {
+      "n": 110,
+      "means": {
+        "parent_psnr": 9.321766403714559,
+        "parent_ssim": 0.15479699545148556,
+        "parent_opening_edge_mae": 0.2900096614252437,
+        "parent_lpips": 0.6860628997737711,
+        "candidate_psnr": 9.895413425882868,
+        "candidate_ssim": 0.16744254339530126,
+        "candidate_opening_edge_mae": 0.29079181348735633,
+        "candidate_lpips": 0.6376723741943185
+      },
+      "lpips_delta_ci95": [
+        -0.06250017834657973,
+        -0.0348566823926839
+      ]
+    }
+  },
+  "caveat": "Opening-edge MAE is an appearance proxy, not semantic opening IoU. V1 published square-resize metrics are not comparable.",
+  "paired_lpips_wins": {
+    "CMP": 78,
+    "IRF": 85
+  },
+  "source_commit": "5d9d1e8a988e49e4fbb11e03518603efa303e415",
+  "training_run_id": "7d9d80627e1e4c75b39bd7bbd1162353",
+  "selected_step": 2000
+}

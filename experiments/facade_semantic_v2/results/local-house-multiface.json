@@ -1,0 +1,36 @@
+{
+  "architecture": "sd15_semantic7_lora_facade_v2",
+  "checkpoint_step": 2000,
+  "weights_sha256": "07c7eab625e775b88ca4f9a099f661b7e1dfe9decfbff5bbf648a218e0466d1f",
+  "lora_sha256": "7fa979232a4a6e15037e006e3c7705865c76ad8755848409463532749e910830",
+  "device": "Local RTX 3050 / FP16 / sequential CPU offload",
+  "inference_steps": 25,
+  "seed": 42,
+  "prompt": "Architectural photograph of a building facade surface, front elevation, clear windows and doors, realistic plaster, masonry and glass, natural diffuse light.",
+  "sampled_peak_device_mib": 1081,
+  "total_seconds": 584.901978400012,
+  "complete": true,
+  "panel_count": 15,
+  "opening_count": 30,
+  "generation_mean_seconds": 34.29843706000441,
+  "max_torch_allocated_mib": 910.40283203125,
+  "comparison_modes": [
+    "candidate",
+    "baseline",
+    "plain",
+    "guide"
+  ],
+  "max_uv_error": 9.478116913541612e-08,
+  "max_frame_center_error_m": 1.8035926885318077e-07,
+  "javascript_webgl_errors": [],
+  "physical_openings_unchanged": true,
+  "case_source": "Bundled two-storey reference house; production opening fitter; not a floorplan-model generalization benchmark",
+  "model_quality_accepted": false,
+  "observations": [
+    "Inconsistent materials across adjacent panels despite identical neutral prompt and seed.",
+    "A solid panel ground_south_extension is painted with glass doors/windows absent from its opening guide.",
+    "Vegetation, baked lighting and contextual details remain in some wall textures."
+  ],
+  "geometry_caveat": "Numerical UV/frame checks validate renderer geometry, not neural texture opening fidelity.",
+  "profile_caveat": "Device-wide samples every 0.5 s are not an instantaneous peak guarantee."
+}
