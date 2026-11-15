@@ -189,3 +189,48 @@ def test_actual_pipeline_accepts_semantic_tensor_and_reloads_lora(tmp_path):
         result = pipeline(prompt_embeds=torch.randn(1, 8, 16), negative_prompt_embeds=torch.zeros(1, 8, 16),
             image=torch.rand(1, 7, 64, 64), height=64, width=64, num_inference_steps=2, output_type='latent').images
     assert result.shape == (1, 4, 8, 8) and torch.isfinite(result).all()
+
+
+def test_full_dataset_audit_keeps_locked_splits_and_skips_sparse_training(tmp_path):
+    pytest.importorskip('openpyxl')
+    from openpyxl import Workbook
+    from experiments.facade_sd15_controlnet.data import package_dataset, write_json, digest
+    from experiments.facade_semantic_v2.data import build_dataset, validate_dataset, FacadeDataset
+    cmp = tmp_path / 'cmp'; cmp.mkdir(); irf = tmp_path / 'irf'; irf.mkdir()
+    rows = []
+    for i, split in enumerate(('train', 'val', 'test', 'train')):
+        photo = cmp / f'{i}.jpg'; Image.new('RGB', (32, 24), (i * 40, 100, 80)).save(photo)
+        labels = np.full((24, 32), 2 if i != 3 else 1, np.uint8); labels[3, 3] = 3
+        Image.fromarray(labels).save(photo.with_suffix('.png'))
+        rows.append({'id': str(i), 'split': split, 'photo': photo.name, 'photo_sha256': digest(photo)})
+    write_json(cmp / 'source.json', {'samples': rows, 'source': 'synthetic CMP fixture', 'license': 'fixture'})
+    package_dataset(cmp / 'source.json', cmp, tmp_path / 'cmp-pack')
+    book = Workbook(); sheet = book.active; sheet.title = 'case information'
+    sheet.append(['Sample ID', 'Case URL', 'Architects', 'Photographs'])
+    counts = dict.fromkeys(('train', 'val', 'test'), 0)
+    for i in range(2000):
+        url = 'https://www.archdaily.com/fixture-' + str(i)
+        split = split_group(building_key(url, str(i)))
+        if counts[split] >= 10:
+            continue
+        counts[split] += 1
+        stem = f'A_{i:04d}'
+        rng = np.random.default_rng(i)
+        Image.fromarray(rng.integers(0, 255, (256, 512, 3), dtype=np.uint8)).save(irf / (stem + '.jpg'))
+        labels = np.full((256, 512), 2, np.uint8); labels[40:100, 60:120] = 3
+        Image.fromarray(IRF_RGB[labels]).save(irf / (stem + '.png'))
+        write_json(irf / (stem + '.json'), {'imageWidth': 512, 'imageHeight': 256, 'shapes': [{'label': 'wall'}]})
+        sheet.append([stem + '.png', url, 'Fixture architect', 'Fixture photographer'])
+        if min(counts.values()) == 10:
+            break
+    book.save(irf / 'sample_list.xlsx')
+    root = tmp_path / 'prepared'
+    manifest = build_dataset(tmp_path / 'cmp-pack', irf, root)
+    validate_dataset(root)
+    assert manifest['counts']['CMP'] == {'train': 2, 'val': 1, 'test': 1}
+    assert manifest['counts']['IRF'] == {'train': 10, 'val': 10, 'test': 10}
+    train = FacadeDataset(root, 'train', source='CMP')
+    assert len(train) == 1 and train.rows[0]['id'] == 'CMP/0'
+    assert len(json.loads((root / 'irf-credits.json').read_text())) == 30
+    val = FacadeDataset(root, 'val', augment=True)
+    assert not val.augment
