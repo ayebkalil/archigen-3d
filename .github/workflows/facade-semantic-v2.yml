@@ -1,0 +1,18 @@
+name: Facade semantic ControlNet V2 contracts
+on:
+  push:
+    branches: [codex/facade-semantic-controlnet-v2]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r experiments/facade_semantic_v2/requirements.txt pytest nbformat
+      - run: python -m pytest tests/test_facade_semantic_v2.py tests/test_facade_kaggle.py -q
