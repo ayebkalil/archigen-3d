@@ -18,6 +18,9 @@ def test_distinct_semantics_and_exact_original_annotations():
     assert np.array_equal(channels[1:].sum(0), np.ones((1, 6)))
     assert channels[3, 0, 2] == 1 and channels[4, 0, 3] == 1
     assert np.array_equal(irf_labels(Image.fromarray(IRF_RGB[None])), IRF_TO_CANONICAL[None])
+    indexed = Image.fromarray(np.arange(6, dtype=np.uint8)[None]).convert('P')
+    indexed.putpalette(IRF_RGB.ravel().tolist() + [0] * (768 - IRF_RGB.size))
+    assert np.array_equal(irf_labels(indexed), IRF_TO_CANONICAL[None])
     assert cmp_labels(np.array([[2, 3, 4, 7]], np.uint8)).tolist() == [[1, 2, 3, 4]]
     with pytest.raises(ValueError, match='colours'):
         irf_labels(Image.new('RGB', (4, 4), (1, 2, 3)))

@@ -23,6 +23,18 @@ def cmp_labels(labels):
 
 
 def irf_labels(image):
+    if image.mode == 'P':
+        # Original IRFs masks are indexed PNGs. Validate the tiny used palette,
+        # rather than expanding each megapixel into HxWx6x3 comparisons.
+        indices = np.asarray(image)
+        palette = np.asarray(image.getpalette('RGB'), np.uint8).reshape(-1, 3)
+        lookup = np.zeros(256, np.uint8)
+        for index in np.unique(indices):
+            matches = np.where((IRF_RGB == palette[index]).all(axis=1))[0]
+            if len(matches) != 1:
+                raise ValueError('Unexpected IRFs label colours; predictions are not accepted as annotations')
+            lookup[index] = IRF_TO_CANONICAL[matches[0]]
+        return lookup[indices]
     colours = np.asarray(image.convert('RGB'))
     matches = (colours[:, :, None, :] == IRF_RGB[None, None]).all(axis=-1)
     if not matches.any(axis=-1).all():
