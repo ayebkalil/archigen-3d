@@ -1,0 +1,91 @@
+{
+  "date": "2026-11-15",
+  "branch": "codex/facade-v3-reference-locked",
+  "source_snapshot": "f321cde0f00614477237495d2049f1235553e95a",
+  "weights_changed": false,
+  "held_out_benchmark": false,
+  "production_changed": false,
+  "case_house_sha256": "3857a3b2af8f52058b910fed3cb31e9b1fc91555633d21c381601baea7e603d6",
+  "case_panels_sha256": "1f0c183f2cfc1d8e075e73f89d29850d9e71b4bfce17583128fbebb8294e3341",
+  "weights_sha256": "07c7eab625e775b88ca4f9a099f661b7e1dfe9decfbff5bbf648a218e0466d1f",
+  "lora_sha256": "7fa979232a4a6e15037e006e3c7705865c76ad8755848409463532749e910830",
+  "settings": {
+    "seed": 42,
+    "steps": 25,
+    "strength": 0.35,
+    "guidance_scale": 5.0,
+    "control_scale": 1.7,
+    "prompt": "Architectural front elevation, uniform warm white fine stucco wall, clean black window frames, clear reflective glass, simple wood door, consistent wall material, neutral diffuse light.",
+    "negative_prompt": "extra windows, extra doors, extra openings, plants, trees, ivy, vegetation, roof, street, people, cars, text, watermark, brick cladding, stone cladding, wood wall cladding, strong shadows, perspective, warped windows"
+  },
+  "shared_material": {
+    "id": "white_stucco",
+    "source": "existing project PBR material",
+    "reference_is_synthetic_render": true,
+    "weights_changed": false,
+    "trim_m": 0.045,
+    "surface_resolution": 1024,
+    "tile_period": "2 m target, adjusted per closed perimeter to avoid a closure seam",
+    "reference_wall_lighting": "unlit albedo; actual opening meshes retain their materials",
+    "maps": {
+      "diff": "0713f87484f7b400280d599720e605a8c4b0d6a0ea941bc3ebc816aca89eba2b",
+      "nor": "5d2cd36afc28cd7baef475efe9961c2bb6a5490d4a1a36a549a388cd3cefec7c",
+      "arm": "c8e43bbd65ed19e25142d4305494e7dba0902b0ca3a1e08c3643495856538369"
+    }
+  },
+  "panel_count": 15,
+  "physical_opening_count": 30,
+  "mean_generation_seconds": 11.41041339999841,
+  "load_seconds": 13.971778700011782,
+  "total_seconds": 193.75191629998153,
+  "max_torch_allocated_mib": 909.5908203125,
+  "sampled_peak_device_mib": 1332,
+  "sampling_interval_seconds": 0.5,
+  "max_uv_error": 9.478116913541612e-08,
+  "javascript_webgl_errors": [],
+  "protected_wall_pixel_max_error": 0,
+  "blank_wall_exact_matches": [
+    "ground_south_extension",
+    "upper_south"
+  ],
+  "proxies": {
+    "v2": {
+      "wall_mean_srgb_dispersion": 32.96404725643787,
+      "blank_wall_sobel_mean": 0.5507180094718933
+    },
+    "guided": {
+      "wall_mean_srgb_dispersion": 2.107585699931384,
+      "blank_wall_sobel_mean": 0.02606773655861616
+    },
+    "locked": {
+      "wall_mean_srgb_dispersion": 0.013317749048057348,
+      "blank_wall_sobel_mean": 0.02160256076604128
+    },
+    "base": {
+      "wall_mean_srgb_dispersion": 0.013317749048057348,
+      "blank_wall_sobel_mean": 0.02160256076604128
+    }
+  },
+  "proxy_notes": [
+    "Wall-colour dispersion is a texture-space consistency proxy, not realism or material recognition.",
+    "Lower blank-wall gradient is not proof of fewer semantic false openings.",
+    "Locked/base values are constrained by construction, not evidence of learned-model improvement."
+  ],
+  "final_mlflow_run_id": "0d1f7555a54142a59f5ab9f0fddd0efc",
+  "lit_reference_ablation_mlflow_run_id": "7271367e85c44b0b82d03e347dd1ae44",
+  "python_full_suite": {
+    "passed": 119,
+    "skipped": 16
+  },
+  "real_diffusion_checks": {
+    "passed": 5
+  },
+  "frontend_build": "passed; existing >500 kB bundle warning",
+  "interpretation": "Better layout/material consistency in one house; no evidence that learned photorealism improved. Compositing constraints are not learned accuracy. No new training run launched.",
+  "artifacts": {
+    "comparison.png": "6ffce4e6ff22ca4d3216e91608056dfa1ad80fc11b0c9cb96aac794393efea55",
+    "profile.json": "61f38fdbd495d7812fbe165ba4cf11e74863da3a4487b2832c30f5f01dfc4ecf",
+    "viewer-checks.json": "b369b24b12384e3e0ec0c9420251288090b7d38ce438edf175bb14f9601b11c0",
+    "appearance-proxies.json": "c1860d3384f8ab3ba4174e18723e954ddcd54726d60f4a8b6ddfe29bbe0a5630"
+  }
+}

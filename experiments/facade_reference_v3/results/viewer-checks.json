@@ -1,0 +1,2579 @@
+{
+  "modes": 5,
+  "panels": 15,
+  "openings": 30,
+  "maxUvError": 9.478116913541612e-8,
+  "errors": [],
+  "checks": [
+    {
+      "mode": "v2",
+      "walls": [
+        {
+          "wallId": "ground_north",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_north_window_0",
+              "position": [
+                -2.209049841891281,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7223309742508659,
+              "height": 0.7692307692307692
+            },
+            {
+              "id": "ground_north_window_1",
+              "position": [
+                -1.3326215931335637,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7993796115042916,
+              "height": 0.8557692307692308
+            },
+            {
+              "id": "ground_north_window_2",
+              "position": [
+                -0.12392109622044778,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8282728504743263,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "ground_north_window_3",
+              "position": [
+                0.8151091703056776,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8764282487577173,
+              "height": 0.9423076923076924
+            }
+          ],
+          "uvError": 5.614845721702011e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_setback_door_0",
+              "position": [
+                1.513362445414848,
+                0,
+                -3.9345880828253685
+              ],
+              "width": 0.922039973051059,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 6.656743067878779e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_east_top_window_0",
+              "position": [
+                2.0487283313484195,
+                0,
+                -3.0972493956643783
+              ],
+              "width": 0.8788813903224382,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 3.963521644223533e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east",
+          "expectedOpenings": 7,
+          "openings": [
+            {
+              "id": "ground_east_door_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                1.6813544008271135
+              ],
+              "width": 0.8533221065163377,
+              "height": 1.9006849315068495
+            },
+            {
+              "id": "ground_east_window_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                -2.4401913736467984
+              ],
+              "width": 0.6655912430827434,
+              "height": 0.7191780821917808
+            },
+            {
+              "id": "ground_east_window_1",
+              "position": [
+                2.9303056768558955,
+                0,
+                -1.5954024881956235
+              ],
+              "width": 0.7509234537343772,
+              "height": 0.821917808219178
+            },
+            {
+              "id": "ground_east_window_2",
+              "position": [
+                2.9303056768558955,
+                0,
+                0.5891021044862024
+              ],
+              "width": 0.8874549907769913,
+              "height": 0.9589041095890409
+            },
+            {
+              "id": "ground_east_window_3",
+              "position": [
+                2.9303056768558955,
+                0,
+                2.6114754969299208
+              ],
+              "width": 0.4949268217794759,
+              "height": 0.5308219178082192
+            },
+            {
+              "id": "ground_east_window_4",
+              "position": [
+                2.9303056768558955,
+                0,
+                3.1661348661655415
+              ],
+              "width": 0.4095946111278421,
+              "height": 0.46232876712328763
+            },
+            {
+              "id": "ground_east_window_5",
+              "position": [
+                2.9303056768558955,
+                0,
+                4.0279901937470415
+              ],
+              "width": 0.8703885486466645,
+              "height": 0.9589041095890409
+            }
+          ],
+          "uvError": 4.903341888073953e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south_extension",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 3.241298707212792e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_terrace_side",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_terrace_side_door_0",
+              "position": [
+                0.6413973799126644,
+                0,
+                4.1248581348496165
+              ],
+              "width": 0.9199953410868952,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 9.478116913541612e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_diagonal",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_diagonal_window_0",
+              "position": [
+                0.43312873042698286,
+                0,
+                3.0990078730608372
+              ],
+              "width": 0.3890968498999955,
+              "height": 0.4148706896551724
+            }
+          ],
+          "uvError": 3.112919255698898e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "ground_south_door_0",
+              "position": [
+                -0.33957235356121007,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.9207348290920042,
+              "height": 1.9
+            },
+            {
+              "id": "ground_south_window_0",
+              "position": [
+                -1.7991868694473718,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.88504743261557,
+              "height": 0.95
+            }
+          ],
+          "uvError": 5.838839567395837e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_west",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.8412130661613064
+              ],
+              "width": 0.7310795113082689,
+              "height": 0.7833333333333334
+            },
+            {
+              "id": "ground_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.0353640593783284
+              ],
+              "width": 0.6480022941141474,
+              "height": 0.7166666666666666
+            },
+            {
+              "id": "ground_west_window_2",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -1.3572597958123707
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            },
+            {
+              "id": "ground_west_window_3",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -3.4674211125430556
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            }
+          ],
+          "uvError": 4.3586904086012623e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_north",
+          "expectedOpenings": 3,
+          "openings": [
+            {
+              "id": "upper_north_window_0",
+              "position": [
+                -1.9845444963107965,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.884396928173468,
+              "height": 0.9423076923076924
+            },
+            {
+              "id": "upper_north_window_1",
+              "position": [
+                -0.12923354916428131,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "upper_north_window_2",
+              "position": [
+                0.784002409275713,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            }
+          ],
+          "uvError": 4.5697467809802106e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_setback_door_0",
+              "position": [
+                1.5049781659388657,
+                2.5,
+                -3.649159676068108
+              ],
+              "width": 0.921764749988003,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 8.221692093801636e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_east_top_window_0",
+              "position": [
+                2.2351160880280165,
+                2.5,
+                -3.1139904670929504
+              ],
+              "width": 0.8795192182973748,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 6.64066042155298e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_east_window_0",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -2.416611995209177
+              ],
+              "width": 0.6687190826282752,
+              "height": 0.7188295165394403
+            },
+            {
+              "id": "upper_east_window_1",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -1.5918584599676375
+              ],
+              "width": 0.7515128738108235,
+              "height": 0.8078880407124682
+            }
+          ],
+          "uvError": 4.2047364923192276e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_south",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 6.019453357986038e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_west",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -1.3898795522849445
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            },
+            {
+              "id": "upper_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -3.480051270319019
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            }
+          ],
+          "uvError": 5.881855846823214e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "mode": "guided",
+      "walls": [
+        {
+          "wallId": "ground_north",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_north_window_0",
+              "position": [
+                -2.209049841891281,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7223309742508659,
+              "height": 0.7692307692307692
+            },
+            {
+              "id": "ground_north_window_1",
+              "position": [
+                -1.3326215931335637,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7993796115042916,
+              "height": 0.8557692307692308
+            },
+            {
+              "id": "ground_north_window_2",
+              "position": [
+                -0.12392109622044778,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8282728504743263,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "ground_north_window_3",
+              "position": [
+                0.8151091703056776,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8764282487577173,
+              "height": 0.9423076923076924
+            }
+          ],
+          "uvError": 5.614845721702011e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_setback_door_0",
+              "position": [
+                1.513362445414848,
+                0,
+                -3.9345880828253685
+              ],
+              "width": 0.922039973051059,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 6.656743067878779e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_east_top_window_0",
+              "position": [
+                2.0487283313484195,
+                0,
+                -3.0972493956643783
+              ],
+              "width": 0.8788813903224382,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 3.963521644223533e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east",
+          "expectedOpenings": 7,
+          "openings": [
+            {
+              "id": "ground_east_door_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                1.6813544008271135
+              ],
+              "width": 0.8533221065163377,
+              "height": 1.9006849315068495
+            },
+            {
+              "id": "ground_east_window_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                -2.4401913736467984
+              ],
+              "width": 0.6655912430827434,
+              "height": 0.7191780821917808
+            },
+            {
+              "id": "ground_east_window_1",
+              "position": [
+                2.9303056768558955,
+                0,
+                -1.5954024881956235
+              ],
+              "width": 0.7509234537343772,
+              "height": 0.821917808219178
+            },
+            {
+              "id": "ground_east_window_2",
+              "position": [
+                2.9303056768558955,
+                0,
+                0.5891021044862024
+              ],
+              "width": 0.8874549907769913,
+              "height": 0.9589041095890409
+            },
+            {
+              "id": "ground_east_window_3",
+              "position": [
+                2.9303056768558955,
+                0,
+                2.6114754969299208
+              ],
+              "width": 0.4949268217794759,
+              "height": 0.5308219178082192
+            },
+            {
+              "id": "ground_east_window_4",
+              "position": [
+                2.9303056768558955,
+                0,
+                3.1661348661655415
+              ],
+              "width": 0.4095946111278421,
+              "height": 0.46232876712328763
+            },
+            {
+              "id": "ground_east_window_5",
+              "position": [
+                2.9303056768558955,
+                0,
+                4.0279901937470415
+              ],
+              "width": 0.8703885486466645,
+              "height": 0.9589041095890409
+            }
+          ],
+          "uvError": 4.903341888073953e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south_extension",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 3.241298707212792e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_terrace_side",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_terrace_side_door_0",
+              "position": [
+                0.6413973799126644,
+                0,
+                4.1248581348496165
+              ],
+              "width": 0.9199953410868952,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 9.478116913541612e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_diagonal",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_diagonal_window_0",
+              "position": [
+                0.43312873042698286,
+                0,
+                3.0990078730608372
+              ],
+              "width": 0.3890968498999955,
+              "height": 0.4148706896551724
+            }
+          ],
+          "uvError": 3.112919255698898e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "ground_south_door_0",
+              "position": [
+                -0.33957235356121007,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.9207348290920042,
+              "height": 1.9
+            },
+            {
+              "id": "ground_south_window_0",
+              "position": [
+                -1.7991868694473718,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.88504743261557,
+              "height": 0.95
+            }
+          ],
+          "uvError": 5.838839567395837e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_west",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.8412130661613064
+              ],
+              "width": 0.7310795113082689,
+              "height": 0.7833333333333334
+            },
+            {
+              "id": "ground_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.0353640593783284
+              ],
+              "width": 0.6480022941141474,
+              "height": 0.7166666666666666
+            },
+            {
+              "id": "ground_west_window_2",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -1.3572597958123707
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            },
+            {
+              "id": "ground_west_window_3",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -3.4674211125430556
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            }
+          ],
+          "uvError": 4.3586904086012623e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_north",
+          "expectedOpenings": 3,
+          "openings": [
+            {
+              "id": "upper_north_window_0",
+              "position": [
+                -1.9845444963107965,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.884396928173468,
+              "height": 0.9423076923076924
+            },
+            {
+              "id": "upper_north_window_1",
+              "position": [
+                -0.12923354916428131,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "upper_north_window_2",
+              "position": [
+                0.784002409275713,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            }
+          ],
+          "uvError": 4.5697467809802106e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_setback_door_0",
+              "position": [
+                1.5049781659388657,
+                2.5,
+                -3.649159676068108
+              ],
+              "width": 0.921764749988003,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 8.221692093801636e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_east_top_window_0",
+              "position": [
+                2.2351160880280165,
+                2.5,
+                -3.1139904670929504
+              ],
+              "width": 0.8795192182973748,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 6.64066042155298e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_east_window_0",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -2.416611995209177
+              ],
+              "width": 0.6687190826282752,
+              "height": 0.7188295165394403
+            },
+            {
+              "id": "upper_east_window_1",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -1.5918584599676375
+              ],
+              "width": 0.7515128738108235,
+              "height": 0.8078880407124682
+            }
+          ],
+          "uvError": 4.2047364923192276e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_south",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 6.019453357986038e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_west",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -1.3898795522849445
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            },
+            {
+              "id": "upper_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -3.480051270319019
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            }
+          ],
+          "uvError": 5.881855846823214e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "mode": "locked",
+      "walls": [
+        {
+          "wallId": "ground_north",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_north_window_0",
+              "position": [
+                -2.209049841891281,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7223309742508659,
+              "height": 0.7692307692307692
+            },
+            {
+              "id": "ground_north_window_1",
+              "position": [
+                -1.3326215931335637,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7993796115042916,
+              "height": 0.8557692307692308
+            },
+            {
+              "id": "ground_north_window_2",
+              "position": [
+                -0.12392109622044778,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8282728504743263,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "ground_north_window_3",
+              "position": [
+                0.8151091703056776,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8764282487577173,
+              "height": 0.9423076923076924
+            }
+          ],
+          "uvError": 5.614845721702011e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_setback_door_0",
+              "position": [
+                1.513362445414848,
+                0,
+                -3.9345880828253685
+              ],
+              "width": 0.922039973051059,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 6.656743067878779e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_east_top_window_0",
+              "position": [
+                2.0487283313484195,
+                0,
+                -3.0972493956643783
+              ],
+              "width": 0.8788813903224382,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 3.963521644223533e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east",
+          "expectedOpenings": 7,
+          "openings": [
+            {
+              "id": "ground_east_door_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                1.6813544008271135
+              ],
+              "width": 0.8533221065163377,
+              "height": 1.9006849315068495
+            },
+            {
+              "id": "ground_east_window_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                -2.4401913736467984
+              ],
+              "width": 0.6655912430827434,
+              "height": 0.7191780821917808
+            },
+            {
+              "id": "ground_east_window_1",
+              "position": [
+                2.9303056768558955,
+                0,
+                -1.5954024881956235
+              ],
+              "width": 0.7509234537343772,
+              "height": 0.821917808219178
+            },
+            {
+              "id": "ground_east_window_2",
+              "position": [
+                2.9303056768558955,
+                0,
+                0.5891021044862024
+              ],
+              "width": 0.8874549907769913,
+              "height": 0.9589041095890409
+            },
+            {
+              "id": "ground_east_window_3",
+              "position": [
+                2.9303056768558955,
+                0,
+                2.6114754969299208
+              ],
+              "width": 0.4949268217794759,
+              "height": 0.5308219178082192
+            },
+            {
+              "id": "ground_east_window_4",
+              "position": [
+                2.9303056768558955,
+                0,
+                3.1661348661655415
+              ],
+              "width": 0.4095946111278421,
+              "height": 0.46232876712328763
+            },
+            {
+              "id": "ground_east_window_5",
+              "position": [
+                2.9303056768558955,
+                0,
+                4.0279901937470415
+              ],
+              "width": 0.8703885486466645,
+              "height": 0.9589041095890409
+            }
+          ],
+          "uvError": 4.903341888073953e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south_extension",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 3.241298707212792e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_terrace_side",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_terrace_side_door_0",
+              "position": [
+                0.6413973799126644,
+                0,
+                4.1248581348496165
+              ],
+              "width": 0.9199953410868952,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 9.478116913541612e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_diagonal",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_diagonal_window_0",
+              "position": [
+                0.43312873042698286,
+                0,
+                3.0990078730608372
+              ],
+              "width": 0.3890968498999955,
+              "height": 0.4148706896551724
+            }
+          ],
+          "uvError": 3.112919255698898e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "ground_south_door_0",
+              "position": [
+                -0.33957235356121007,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.9207348290920042,
+              "height": 1.9
+            },
+            {
+              "id": "ground_south_window_0",
+              "position": [
+                -1.7991868694473718,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.88504743261557,
+              "height": 0.95
+            }
+          ],
+          "uvError": 5.838839567395837e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_west",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.8412130661613064
+              ],
+              "width": 0.7310795113082689,
+              "height": 0.7833333333333334
+            },
+            {
+              "id": "ground_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.0353640593783284
+              ],
+              "width": 0.6480022941141474,
+              "height": 0.7166666666666666
+            },
+            {
+              "id": "ground_west_window_2",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -1.3572597958123707
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            },
+            {
+              "id": "ground_west_window_3",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -3.4674211125430556
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            }
+          ],
+          "uvError": 4.3586904086012623e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_north",
+          "expectedOpenings": 3,
+          "openings": [
+            {
+              "id": "upper_north_window_0",
+              "position": [
+                -1.9845444963107965,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.884396928173468,
+              "height": 0.9423076923076924
+            },
+            {
+              "id": "upper_north_window_1",
+              "position": [
+                -0.12923354916428131,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "upper_north_window_2",
+              "position": [
+                0.784002409275713,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            }
+          ],
+          "uvError": 4.5697467809802106e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_setback_door_0",
+              "position": [
+                1.5049781659388657,
+                2.5,
+                -3.649159676068108
+              ],
+              "width": 0.921764749988003,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 8.221692093801636e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_east_top_window_0",
+              "position": [
+                2.2351160880280165,
+                2.5,
+                -3.1139904670929504
+              ],
+              "width": 0.8795192182973748,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 6.64066042155298e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_east_window_0",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -2.416611995209177
+              ],
+              "width": 0.6687190826282752,
+              "height": 0.7188295165394403
+            },
+            {
+              "id": "upper_east_window_1",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -1.5918584599676375
+              ],
+              "width": 0.7515128738108235,
+              "height": 0.8078880407124682
+            }
+          ],
+          "uvError": 4.2047364923192276e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_south",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 6.019453357986038e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_west",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -1.3898795522849445
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            },
+            {
+              "id": "upper_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -3.480051270319019
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            }
+          ],
+          "uvError": 5.881855846823214e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 44,
+          "nonfiniteOpeningUVs": 0
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "mode": "reference",
+      "walls": [
+        {
+          "wallId": "ground_north",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_north_window_0",
+              "position": [
+                -2.209049841891281,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7223309742508659,
+              "height": 0.7692307692307692
+            },
+            {
+              "id": "ground_north_window_1",
+              "position": [
+                -1.3326215931335637,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7993796115042916,
+              "height": 0.8557692307692308
+            },
+            {
+              "id": "ground_north_window_2",
+              "position": [
+                -0.12392109622044778,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8282728504743263,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "ground_north_window_3",
+              "position": [
+                0.8151091703056776,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8764282487577173,
+              "height": 0.9423076923076924
+            }
+          ],
+          "uvError": 5.614845721702011e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_setback_door_0",
+              "position": [
+                1.513362445414848,
+                0,
+                -3.9345880828253685
+              ],
+              "width": 0.922039973051059,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 6.656743067878779e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_east_top_window_0",
+              "position": [
+                2.0487283313484195,
+                0,
+                -3.0972493956643783
+              ],
+              "width": 0.8788813903224382,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 3.963521644223533e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east",
+          "expectedOpenings": 7,
+          "openings": [
+            {
+              "id": "ground_east_door_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                1.6813544008271135
+              ],
+              "width": 0.8533221065163377,
+              "height": 1.9006849315068495
+            },
+            {
+              "id": "ground_east_window_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                -2.4401913736467984
+              ],
+              "width": 0.6655912430827434,
+              "height": 0.7191780821917808
+            },
+            {
+              "id": "ground_east_window_1",
+              "position": [
+                2.9303056768558955,
+                0,
+                -1.5954024881956235
+              ],
+              "width": 0.7509234537343772,
+              "height": 0.821917808219178
+            },
+            {
+              "id": "ground_east_window_2",
+              "position": [
+                2.9303056768558955,
+                0,
+                0.5891021044862024
+              ],
+              "width": 0.8874549907769913,
+              "height": 0.9589041095890409
+            },
+            {
+              "id": "ground_east_window_3",
+              "position": [
+                2.9303056768558955,
+                0,
+                2.6114754969299208
+              ],
+              "width": 0.4949268217794759,
+              "height": 0.5308219178082192
+            },
+            {
+              "id": "ground_east_window_4",
+              "position": [
+                2.9303056768558955,
+                0,
+                3.1661348661655415
+              ],
+              "width": 0.4095946111278421,
+              "height": 0.46232876712328763
+            },
+            {
+              "id": "ground_east_window_5",
+              "position": [
+                2.9303056768558955,
+                0,
+                4.0279901937470415
+              ],
+              "width": 0.8703885486466645,
+              "height": 0.9589041095890409
+            }
+          ],
+          "uvError": 4.903341888073953e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south_extension",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 3.241298707212792e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_terrace_side",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_terrace_side_door_0",
+              "position": [
+                0.6413973799126644,
+                0,
+                4.1248581348496165
+              ],
+              "width": 0.9199953410868952,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 9.478116913541612e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_diagonal",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_diagonal_window_0",
+              "position": [
+                0.43312873042698286,
+                0,
+                3.0990078730608372
+              ],
+              "width": 0.3890968498999955,
+              "height": 0.4148706896551724
+            }
+          ],
+          "uvError": 3.112919255698898e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "ground_south_door_0",
+              "position": [
+                -0.33957235356121007,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.9207348290920042,
+              "height": 1.9
+            },
+            {
+              "id": "ground_south_window_0",
+              "position": [
+                -1.7991868694473718,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.88504743261557,
+              "height": 0.95
+            }
+          ],
+          "uvError": 5.838839567395837e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_west",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.8412130661613064
+              ],
+              "width": 0.7310795113082689,
+              "height": 0.7833333333333334
+            },
+            {
+              "id": "ground_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.0353640593783284
+              ],
+              "width": 0.6480022941141474,
+              "height": 0.7166666666666666
+            },
+            {
+              "id": "ground_west_window_2",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -1.3572597958123707
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            },
+            {
+              "id": "ground_west_window_3",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -3.4674211125430556
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            }
+          ],
+          "uvError": 4.3586904086012623e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_north",
+          "expectedOpenings": 3,
+          "openings": [
+            {
+              "id": "upper_north_window_0",
+              "position": [
+                -1.9845444963107965,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.884396928173468,
+              "height": 0.9423076923076924
+            },
+            {
+              "id": "upper_north_window_1",
+              "position": [
+                -0.12923354916428131,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "upper_north_window_2",
+              "position": [
+                0.784002409275713,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            }
+          ],
+          "uvError": 4.5697467809802106e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_setback_door_0",
+              "position": [
+                1.5049781659388657,
+                2.5,
+                -3.649159676068108
+              ],
+              "width": 0.921764749988003,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 8.221692093801636e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_east_top_window_0",
+              "position": [
+                2.2351160880280165,
+                2.5,
+                -3.1139904670929504
+              ],
+              "width": 0.8795192182973748,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 6.64066042155298e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_east_window_0",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -2.416611995209177
+              ],
+              "width": 0.6687190826282752,
+              "height": 0.7188295165394403
+            },
+            {
+              "id": "upper_east_window_1",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -1.5918584599676375
+              ],
+              "width": 0.7515128738108235,
+              "height": 0.8078880407124682
+            }
+          ],
+          "uvError": 4.2047364923192276e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_south",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 6.019453357986038e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_west",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -1.3898795522849445
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            },
+            {
+              "id": "upper_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -3.480051270319019
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            }
+          ],
+          "uvError": 5.881855846823214e-8,
+          "textureSize": [
+            1024,
+            1024
+          ],
+          "pbr": true,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        }
+      ],
+      "unresolved": []
+    },
+    {
+      "mode": "guide",
+      "walls": [
+        {
+          "wallId": "ground_north",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_north_window_0",
+              "position": [
+                -2.209049841891281,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7223309742508659,
+              "height": 0.7692307692307692
+            },
+            {
+              "id": "ground_north_window_1",
+              "position": [
+                -1.3326215931335637,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.7993796115042916,
+              "height": 0.8557692307692308
+            },
+            {
+              "id": "ground_north_window_2",
+              "position": [
+                -0.12392109622044778,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8282728504743263,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "ground_north_window_3",
+              "position": [
+                0.8151091703056776,
+                0,
+                -4.821579752807235
+              ],
+              "width": 0.8764282487577173,
+              "height": 0.9423076923076924
+            }
+          ],
+          "uvError": 5.614845721702011e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_setback_door_0",
+              "position": [
+                1.513362445414848,
+                0,
+                -3.9345880828253685
+              ],
+              "width": 0.922039973051059,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 6.656743067878779e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_east_top_window_0",
+              "position": [
+                2.0487283313484195,
+                0,
+                -3.0972493956643783
+              ],
+              "width": 0.8788813903224382,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 3.963521644223533e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_east",
+          "expectedOpenings": 7,
+          "openings": [
+            {
+              "id": "ground_east_door_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                1.6813544008271135
+              ],
+              "width": 0.8533221065163377,
+              "height": 1.9006849315068495
+            },
+            {
+              "id": "ground_east_window_0",
+              "position": [
+                2.9303056768558955,
+                0,
+                -2.4401913736467984
+              ],
+              "width": 0.6655912430827434,
+              "height": 0.7191780821917808
+            },
+            {
+              "id": "ground_east_window_1",
+              "position": [
+                2.9303056768558955,
+                0,
+                -1.5954024881956235
+              ],
+              "width": 0.7509234537343772,
+              "height": 0.821917808219178
+            },
+            {
+              "id": "ground_east_window_2",
+              "position": [
+                2.9303056768558955,
+                0,
+                0.5891021044862024
+              ],
+              "width": 0.8874549907769913,
+              "height": 0.9589041095890409
+            },
+            {
+              "id": "ground_east_window_3",
+              "position": [
+                2.9303056768558955,
+                0,
+                2.6114754969299208
+              ],
+              "width": 0.4949268217794759,
+              "height": 0.5308219178082192
+            },
+            {
+              "id": "ground_east_window_4",
+              "position": [
+                2.9303056768558955,
+                0,
+                3.1661348661655415
+              ],
+              "width": 0.4095946111278421,
+              "height": 0.46232876712328763
+            },
+            {
+              "id": "ground_east_window_5",
+              "position": [
+                2.9303056768558955,
+                0,
+                4.0279901937470415
+              ],
+              "width": 0.8703885486466645,
+              "height": 0.9589041095890409
+            }
+          ],
+          "uvError": 4.903341888073953e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south_extension",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 3.241298707212792e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_terrace_side",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_terrace_side_door_0",
+              "position": [
+                0.6413973799126644,
+                0,
+                4.1248581348496165
+              ],
+              "width": 0.9199953410868952,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 9.478116913541612e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_diagonal",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "ground_diagonal_window_0",
+              "position": [
+                0.43312873042698286,
+                0,
+                3.0990078730608372
+              ],
+              "width": 0.3890968498999955,
+              "height": 0.4148706896551724
+            }
+          ],
+          "uvError": 3.112919255698898e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_south",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "ground_south_door_0",
+              "position": [
+                -0.33957235356121007,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.9207348290920042,
+              "height": 1.9
+            },
+            {
+              "id": "ground_south_window_0",
+              "position": [
+                -1.7991868694473718,
+                0,
+                2.887986002807236
+              ],
+              "width": 0.88504743261557,
+              "height": 0.95
+            }
+          ],
+          "uvError": 5.838839567395837e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "ground_west",
+          "expectedOpenings": 4,
+          "openings": [
+            {
+              "id": "ground_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.8412130661613064
+              ],
+              "width": 0.7310795113082689,
+              "height": 0.7833333333333334
+            },
+            {
+              "id": "ground_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                0,
+                1.0353640593783284
+              ],
+              "width": 0.6480022941141474,
+              "height": 0.7166666666666666
+            },
+            {
+              "id": "ground_west_window_2",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -1.3572597958123707
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            },
+            {
+              "id": "ground_west_window_3",
+              "position": [
+                -2.9554585152838424,
+                0,
+                -3.4674211125430556
+              ],
+              "width": 0.8806185022576876,
+              "height": 0.9500000000000001
+            }
+          ],
+          "uvError": 4.3586904086012623e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_north",
+          "expectedOpenings": 3,
+          "openings": [
+            {
+              "id": "upper_north_window_0",
+              "position": [
+                -1.9845444963107965,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.884396928173468,
+              "height": 0.9423076923076924
+            },
+            {
+              "id": "upper_north_window_1",
+              "position": [
+                -0.12923354916428131,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            },
+            {
+              "id": "upper_north_window_2",
+              "position": [
+                0.784002409275713,
+                2.5,
+                -4.821579752807235
+              ],
+              "width": 0.8267188676404158,
+              "height": 0.8942307692307693
+            }
+          ],
+          "uvError": 4.5697467809802106e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_setback",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_setback_door_0",
+              "position": [
+                1.5049781659388657,
+                2.5,
+                -3.649159676068108
+              ],
+              "width": 0.921764749988003,
+              "height": 1.9019396551724137
+            }
+          ],
+          "uvError": 8.221692093801636e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east_top",
+          "expectedOpenings": 1,
+          "openings": [
+            {
+              "id": "upper_east_top_window_0",
+              "position": [
+                2.2351160880280165,
+                2.5,
+                -3.1139904670929504
+              ],
+              "width": 0.8795192182973748,
+              "height": 0.9482758620689654
+            }
+          ],
+          "uvError": 6.64066042155298e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_east",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_east_window_0",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -2.416611995209177
+              ],
+              "width": 0.6687190826282752,
+              "height": 0.7188295165394403
+            },
+            {
+              "id": "upper_east_window_1",
+              "position": [
+                2.9554585152838424,
+                2.5,
+                -1.5918584599676375
+              ],
+              "width": 0.7515128738108235,
+              "height": 0.8078880407124682
+            }
+          ],
+          "uvError": 4.2047364923192276e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_south",
+          "expectedOpenings": 0,
+          "openings": [],
+          "uvError": 6.019453357986038e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        },
+        {
+          "wallId": "upper_west",
+          "expectedOpenings": 2,
+          "openings": [
+            {
+              "id": "upper_west_window_0",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -1.3898795522849445
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            },
+            {
+              "id": "upper_west_window_1",
+              "position": [
+                -2.9554585152838424,
+                2.5,
+                -3.480051270319019
+              ],
+              "width": 0.8742545166777138,
+              "height": 0.9437751004016064
+            }
+          ],
+          "uvError": 5.881855846823214e-8,
+          "textureSize": [
+            512,
+            512
+          ],
+          "pbr": false,
+          "neuralMeshes": 0,
+          "nonfiniteOpeningUVs": 0
+        }
+      ],
+      "unresolved": []
+    }
+  ]
+}

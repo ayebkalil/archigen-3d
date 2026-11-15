@@ -1,0 +1,688 @@
+{
+  "case": "One bundled house, 15 panels; no held-out facade photos or human judgements",
+  "metric_notes": [
+    "Wall-colour dispersion is a texture-space consistency proxy, not realism or material recognition.",
+    "Lower blank-wall gradient is not proof of fewer semantic false openings.",
+    "Locked/base values are constrained by construction, not evidence of learned-model improvement."
+  ],
+  "modes": {
+    "v2": {
+      "wall_mean_srgb_dispersion": 32.96404725643787,
+      "blank_wall_sobel_mean": 0.5507180094718933
+    },
+    "guided": {
+      "wall_mean_srgb_dispersion": 2.107585699931384,
+      "blank_wall_sobel_mean": 0.02606773655861616
+    },
+    "locked": {
+      "wall_mean_srgb_dispersion": 0.013317749048057348,
+      "blank_wall_sobel_mean": 0.02160256076604128
+    },
+    "base": {
+      "wall_mean_srgb_dispersion": 0.013317749048057348,
+      "blank_wall_sobel_mean": 0.02160256076604128
+    }
+  },
+  "panels": [
+    {
+      "wall_id": "ground_north",
+      "mode": "v2",
+      "openings": 4,
+      "wall_mean_srgb": [
+        94.13300575364327,
+        90.57681323757927,
+        75.26113980933182
+      ],
+      "wall_sobel_mean": 0.4135979115962982
+    },
+    {
+      "wall_id": "ground_north",
+      "mode": "guided",
+      "openings": 4,
+      "wall_mean_srgb": [
+        208.78383940195707,
+        206.4836840115913,
+        203.9140733274537
+      ],
+      "wall_sobel_mean": 0.02048429846763611
+    },
+    {
+      "wall_id": "ground_north",
+      "mode": "locked",
+      "openings": 4,
+      "wall_mean_srgb": [
+        214.813741548024,
+        210.81380454411826,
+        207.81382554281635
+      ],
+      "wall_sobel_mean": 0.013979878276586533
+    },
+    {
+      "wall_id": "ground_north",
+      "mode": "base",
+      "openings": 4,
+      "wall_mean_srgb": [
+        214.813741548024,
+        210.81380454411826,
+        207.81382554281635
+      ],
+      "wall_sobel_mean": 0.013979878276586533
+    },
+    {
+      "wall_id": "ground_setback",
+      "mode": "v2",
+      "openings": 1,
+      "wall_mean_srgb": [
+        85.78983427013726,
+        79.63298193134393,
+        83.78664994089692
+      ],
+      "wall_sobel_mean": 0.5317420959472656
+    },
+    {
+      "wall_id": "ground_setback",
+      "mode": "guided",
+      "openings": 1,
+      "wall_mean_srgb": [
+        209.37997249897475,
+        206.145369454563,
+        201.89238414590017
+      ],
+      "wall_sobel_mean": 0.026295291259884834
+    },
+    {
+      "wall_id": "ground_setback",
+      "mode": "locked",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.81506766699636,
+        210.81528478035366,
+        207.81509179070272
+      ],
+      "wall_sobel_mean": 0.02378270775079727
+    },
+    {
+      "wall_id": "ground_setback",
+      "mode": "base",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.81506766699636,
+        210.81528478035366,
+        207.81509179070272
+      ],
+      "wall_sobel_mean": 0.02378270775079727
+    },
+    {
+      "wall_id": "ground_east_top",
+      "mode": "v2",
+      "openings": 1,
+      "wall_mean_srgb": [
+        91.42098745046235,
+        86.32659758916776,
+        82.50363276089828
+      ],
+      "wall_sobel_mean": 0.35736244916915894
+    },
+    {
+      "wall_id": "ground_east_top",
+      "mode": "guided",
+      "openings": 1,
+      "wall_mean_srgb": [
+        210.37281208718628,
+        208.14562004623514,
+        205.28929986789962
+      ],
+      "wall_sobel_mean": 0.026449866592884064
+    },
+    {
+      "wall_id": "ground_east_top",
+      "mode": "locked",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.81468791281372,
+        210.81477047556143,
+        207.81477047556143
+      ],
+      "wall_sobel_mean": 0.02346443384885788
+    },
+    {
+      "wall_id": "ground_east_top",
+      "mode": "base",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.81468791281372,
+        210.81477047556143,
+        207.81477047556143
+      ],
+      "wall_sobel_mean": 0.02346443384885788
+    },
+    {
+      "wall_id": "ground_east",
+      "mode": "v2",
+      "openings": 7,
+      "wall_mean_srgb": [
+        134.59695559104347,
+        110.22853453841188,
+        73.86181237470694
+      ],
+      "wall_sobel_mean": 0.17156192660331726
+    },
+    {
+      "wall_id": "ground_east",
+      "mode": "guided",
+      "openings": 7,
+      "wall_mean_srgb": [
+        209.25384798341884,
+        205.6266861472597,
+        200.7914104175869
+      ],
+      "wall_sobel_mean": 0.022892620414495468
+    },
+    {
+      "wall_id": "ground_east",
+      "mode": "locked",
+      "openings": 7,
+      "wall_mean_srgb": [
+        214.81074377357209,
+        210.81077775135063,
+        207.81098161802183
+      ],
+      "wall_sobel_mean": 0.017215445637702942
+    },
+    {
+      "wall_id": "ground_east",
+      "mode": "base",
+      "openings": 7,
+      "wall_mean_srgb": [
+        214.81074377357209,
+        210.81077775135063,
+        207.81098161802183
+      ],
+      "wall_sobel_mean": 0.017215445637702942
+    },
+    {
+      "wall_id": "ground_south_extension",
+      "mode": "v2",
+      "openings": 0,
+      "wall_mean_srgb": [
+        104.49909665763325,
+        92.6752351347043,
+        87.04930522344439
+      ],
+      "wall_sobel_mean": 0.672922670841217
+    },
+    {
+      "wall_id": "ground_south_extension",
+      "mode": "guided",
+      "openings": 0,
+      "wall_mean_srgb": [
+        210.57832509697647,
+        207.19740687602953,
+        203.03040809819862
+      ],
+      "wall_sobel_mean": 0.029136158525943756
+    },
+    {
+      "wall_id": "ground_south_extension",
+      "mode": "locked",
+      "openings": 0,
+      "wall_mean_srgb": [
+        214.81002577182633,
+        210.80979329401137,
+        207.80985971624423
+      ],
+      "wall_sobel_mean": 0.02553384378552437
+    },
+    {
+      "wall_id": "ground_south_extension",
+      "mode": "base",
+      "openings": 0,
+      "wall_mean_srgb": [
+        214.81002577182633,
+        210.80979329401137,
+        207.80985971624423
+      ],
+      "wall_sobel_mean": 0.02553384378552437
+    },
+    {
+      "wall_id": "ground_terrace_side",
+      "mode": "v2",
+      "openings": 1,
+      "wall_mean_srgb": [
+        99.96914036657975,
+        95.41650776355216,
+        99.26901972992957
+      ],
+      "wall_sobel_mean": 0.255715012550354
+    },
+    {
+      "wall_id": "ground_terrace_side",
+      "mode": "guided",
+      "openings": 1,
+      "wall_mean_srgb": [
+        210.24057282951318,
+        205.99867688835272,
+        201.36455617387244
+      ],
+      "wall_sobel_mean": 0.026644224300980568
+    },
+    {
+      "wall_id": "ground_terrace_side",
+      "mode": "locked",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.8242985562517,
+        210.8242985562517,
+        207.8242985562517
+      ],
+      "wall_sobel_mean": 0.0224428940564394
+    },
+    {
+      "wall_id": "ground_terrace_side",
+      "mode": "base",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.8242985562517,
+        210.8242985562517,
+        207.8242985562517
+      ],
+      "wall_sobel_mean": 0.0224428940564394
+    },
+    {
+      "wall_id": "ground_diagonal",
+      "mode": "v2",
+      "openings": 1,
+      "wall_mean_srgb": [
+        139.34720142602495,
+        131.68538324420678,
+        123.18124777183601
+      ],
+      "wall_sobel_mean": 0.4542284905910492
+    },
+    {
+      "wall_id": "ground_diagonal",
+      "mode": "guided",
+      "openings": 1,
+      "wall_mean_srgb": [
+        208.74698752228164,
+        205.4886631016043,
+        201.06
+      ],
+      "wall_sobel_mean": 0.02787879668176174
+    },
+    {
+      "wall_id": "ground_diagonal",
+      "mode": "locked",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.80541889483067,
+        210.80570409982175,
+        207.8058110516934
+      ],
+      "wall_sobel_mean": 0.024452732875943184
+    },
+    {
+      "wall_id": "ground_diagonal",
+      "mode": "base",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.80541889483067,
+        210.80570409982175,
+        207.8058110516934
+      ],
+      "wall_sobel_mean": 0.024452732875943184
+    },
+    {
+      "wall_id": "ground_south",
+      "mode": "v2",
+      "openings": 2,
+      "wall_mean_srgb": [
+        117.82423833731023,
+        74.52652418992288,
+        49.06186672199744
+      ],
+      "wall_sobel_mean": 0.3956214487552643
+    },
+    {
+      "wall_id": "ground_south",
+      "mode": "guided",
+      "openings": 2,
+      "wall_mean_srgb": [
+        212.22426254452398,
+        208.24617007296746,
+        203.58740533250338
+      ],
+      "wall_sobel_mean": 0.02328329347074032
+    },
+    {
+      "wall_id": "ground_south",
+      "mode": "locked",
+      "openings": 2,
+      "wall_mean_srgb": [
+        214.81623266590586,
+        210.81628453850675,
+        207.81633641110764
+      ],
+      "wall_sobel_mean": 0.01728086732327938
+    },
+    {
+      "wall_id": "ground_south",
+      "mode": "base",
+      "openings": 2,
+      "wall_mean_srgb": [
+        214.81623266590586,
+        210.81628453850675,
+        207.81633641110764
+      ],
+      "wall_sobel_mean": 0.01728086732327938
+    },
+    {
+      "wall_id": "ground_west",
+      "mode": "v2",
+      "openings": 4,
+      "wall_mean_srgb": [
+        149.63448992412893,
+        124.78036050838448,
+        75.07159425892814
+      ],
+      "wall_sobel_mean": 0.3569861054420471
+    },
+    {
+      "wall_id": "ground_west",
+      "mode": "guided",
+      "openings": 4,
+      "wall_mean_srgb": [
+        208.3777605953704,
+        205.5977383656309,
+        201.75738172328806
+      ],
+      "wall_sobel_mean": 0.023642648011446
+    },
+    {
+      "wall_id": "ground_west",
+      "mode": "locked",
+      "openings": 4,
+      "wall_mean_srgb": [
+        214.81882762286764,
+        210.81868264630552,
+        207.81865848354516
+      ],
+      "wall_sobel_mean": 0.01785605028271675
+    },
+    {
+      "wall_id": "ground_west",
+      "mode": "base",
+      "openings": 4,
+      "wall_mean_srgb": [
+        214.81882762286764,
+        210.81868264630552,
+        207.81865848354516
+      ],
+      "wall_sobel_mean": 0.01785605028271675
+    },
+    {
+      "wall_id": "upper_north",
+      "mode": "v2",
+      "openings": 3,
+      "wall_mean_srgb": [
+        128.1622930530394,
+        109.83221825617478,
+        90.20618464242794
+      ],
+      "wall_sobel_mean": 0.3722197115421295
+    },
+    {
+      "wall_id": "upper_north",
+      "mode": "guided",
+      "openings": 3,
+      "wall_mean_srgb": [
+        209.0540079998565,
+        205.52851069935966,
+        201.82637082742912
+      ],
+      "wall_sobel_mean": 0.022567447274923325
+    },
+    {
+      "wall_id": "upper_north",
+      "mode": "locked",
+      "openings": 3,
+      "wall_mean_srgb": [
+        214.7987300676221,
+        210.79837132966225,
+        207.7984789510502
+      ],
+      "wall_sobel_mean": 0.015842553228139877
+    },
+    {
+      "wall_id": "upper_north",
+      "mode": "base",
+      "openings": 3,
+      "wall_mean_srgb": [
+        214.7987300676221,
+        210.79837132966225,
+        207.7984789510502
+      ],
+      "wall_sobel_mean": 0.015842553228139877
+    },
+    {
+      "wall_id": "upper_setback",
+      "mode": "v2",
+      "openings": 1,
+      "wall_mean_srgb": [
+        107.67649176596288,
+        102.47069890599958,
+        104.24806633684064
+      ],
+      "wall_sobel_mean": 0.3189989924430847
+    },
+    {
+      "wall_id": "upper_setback",
+      "mode": "guided",
+      "openings": 1,
+      "wall_mean_srgb": [
+        209.68064943209532,
+        206.1133022089053,
+        201.4868185724572
+      ],
+      "wall_sobel_mean": 0.029068350791931152
+    },
+    {
+      "wall_id": "upper_setback",
+      "mode": "locked",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.79223282930343,
+        210.792372192414,
+        207.79232573804381
+      ],
+      "wall_sobel_mean": 0.02478051371872425
+    },
+    {
+      "wall_id": "upper_setback",
+      "mode": "base",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.79223282930343,
+        210.792372192414,
+        207.79232573804381
+      ],
+      "wall_sobel_mean": 0.02478051371872425
+    },
+    {
+      "wall_id": "upper_east_top",
+      "mode": "v2",
+      "openings": 1,
+      "wall_mean_srgb": [
+        102.18903253693807,
+        95.31831578120088,
+        92.08281593838416
+      ],
+      "wall_sobel_mean": 0.4514700472354889
+    },
+    {
+      "wall_id": "upper_east_top",
+      "mode": "guided",
+      "openings": 1,
+      "wall_mean_srgb": [
+        210.6917832442628,
+        208.01021691292047,
+        204.60873153096512
+      ],
+      "wall_sobel_mean": 0.02700013667345047
+    },
+    {
+      "wall_id": "upper_east_top",
+      "mode": "locked",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.8111442942471,
+        210.81047626532538,
+        207.81049591323483
+      ],
+      "wall_sobel_mean": 0.02499629557132721
+    },
+    {
+      "wall_id": "upper_east_top",
+      "mode": "base",
+      "openings": 1,
+      "wall_mean_srgb": [
+        214.8111442942471,
+        210.81047626532538,
+        207.81049591323483
+      ],
+      "wall_sobel_mean": 0.02499629557132721
+    },
+    {
+      "wall_id": "upper_east",
+      "mode": "v2",
+      "openings": 2,
+      "wall_mean_srgb": [
+        86.31892845447727,
+        60.75991633832275,
+        46.11540452322351
+      ],
+      "wall_sobel_mean": 0.31937140226364136
+    },
+    {
+      "wall_id": "upper_east",
+      "mode": "guided",
+      "openings": 2,
+      "wall_mean_srgb": [
+        210.8738525568572,
+        208.7559445213221,
+        205.7272544814983
+      ],
+      "wall_sobel_mean": 0.024141669273376465
+    },
+    {
+      "wall_id": "upper_east",
+      "mode": "locked",
+      "openings": 2,
+      "wall_mean_srgb": [
+        214.80618378104302,
+        210.8058880074366,
+        207.80594082415203
+      ],
+      "wall_sobel_mean": 0.02025308459997177
+    },
+    {
+      "wall_id": "upper_east",
+      "mode": "base",
+      "openings": 2,
+      "wall_mean_srgb": [
+        214.80618378104302,
+        210.8058880074366,
+        207.80594082415203
+      ],
+      "wall_sobel_mean": 0.02025308459997177
+    },
+    {
+      "wall_id": "upper_south",
+      "mode": "v2",
+      "openings": 0,
+      "wall_mean_srgb": [
+        138.7762156448203,
+        108.27324260042283,
+        69.92123414376321
+      ],
+      "wall_sobel_mean": 0.4285133481025696
+    },
+    {
+      "wall_id": "upper_south",
+      "mode": "guided",
+      "openings": 0,
+      "wall_mean_srgb": [
+        209.37818446088795,
+        206.4525766384778,
+        201.98461945031713
+      ],
+      "wall_sobel_mean": 0.022999314591288567
+    },
+    {
+      "wall_id": "upper_south",
+      "mode": "locked",
+      "openings": 0,
+      "wall_mean_srgb": [
+        214.8084963002114,
+        210.80840380549682,
+        207.80852272727273
+      ],
+      "wall_sobel_mean": 0.01767127774655819
+    },
+    {
+      "wall_id": "upper_south",
+      "mode": "base",
+      "openings": 0,
+      "wall_mean_srgb": [
+        214.8084963002114,
+        210.80840380549682,
+        207.80852272727273
+      ],
+      "wall_sobel_mean": 0.01767127774655819
+    },
+    {
+      "wall_id": "upper_west",
+      "mode": "v2",
+      "openings": 2,
+      "wall_mean_srgb": [
+        111.00828411328185,
+        99.26092685143117,
+        73.12600333181886
+      ],
+      "wall_sobel_mean": 0.46455711126327515
+    },
+    {
+      "wall_id": "upper_west",
+      "mode": "guided",
+      "openings": 2,
+      "wall_mean_srgb": [
+        209.7332576101772,
+        206.97890352869908,
+        203.67623807360292
+      ],
+      "wall_sobel_mean": 0.02202240191400051
+    },
+    {
+      "wall_id": "upper_west",
+      "mode": "locked",
+      "openings": 2,
+      "wall_mean_srgb": [
+        214.80566409207935,
+        210.80539148871725,
+        207.80545206724216
+      ],
+      "wall_sobel_mean": 0.016276895999908447
+    },
+    {
+      "wall_id": "upper_west",
+      "mode": "base",
+      "openings": 2,
+      "wall_mean_srgb": [
+        214.80566409207935,
+        210.80539148871725,
+        207.80545206724216
+      ],
+      "wall_sobel_mean": 0.016276895999908447
+    }
+  ]
+}

@@ -3,6 +3,8 @@
 Branch: `codex/facade-v3-reference-locked`. Research only; the application default,
 production checkpoints, and production Viewer3D implementation are unchanged.
 
+Executed results and limitations: [RESULTS.md](RESULTS.md).
+
 ## What failed in V2
 
 V2 generates each panel independently as a **photograph**. Semantic ControlNet
@@ -85,6 +87,7 @@ python -m experiments.facade_semantic_v2.local_house_session --project PROJECT -
 python -m experiments.facade_reference_v3.assess --output outputs/albedo-house
 python -m experiments.facade_reference_v3.run stage --project PROJECT --output outputs/albedo-house
 node experiments/facade_reference_v3/render_checks.cjs PROJECT ABS_OUTPUT
+python -m experiments.facade_reference_v3.record --output outputs/albedo-house --tracking-uri LOCAL_MLFLOW_URI
 ```
 
 Open <http://127.0.0.1:3001/tmp/facade-reference-v3/>. Compare V2 raw,
