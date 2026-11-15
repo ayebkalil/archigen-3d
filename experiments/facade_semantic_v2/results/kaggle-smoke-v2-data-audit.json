@@ -1,0 +1,94 @@
+{
+  "counts": {
+    "CMP": {
+      "train": 400,
+      "val": 100,
+      "test": 106
+    },
+    "IRF": {
+      "train": 825,
+      "val": 110,
+      "test": 104
+    }
+  },
+  "excluded": [
+    {
+      "id": "CMP/train/236.jpg",
+      "reason": "Sparse mask: retained in locked split, excluded from optimization"
+    },
+    {
+      "id": "A_0002",
+      "reason": "Human JSON does not match the photograph"
+    },
+    {
+      "id": "A_0122",
+      "reason": "Human JSON does not match the photograph"
+    },
+    {
+      "id": "A_0297",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "A_0517",
+      "reason": "exact duplicate"
+    },
+    {
+      "id": "B_0054",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "B_0176",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "B_0192",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "C_0052",
+      "reason": "Human JSON does not match the photograph"
+    },
+    {
+      "id": "C_0080",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "C_0209",
+      "reason": "Human JSON does not match the photograph"
+    },
+    {
+      "id": "C_0298",
+      "reason": "Human JSON does not match the photograph"
+    },
+    {
+      "id": "C_0411",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "C_0413",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "C_0558",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "C_0594",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "D_0264",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "E_0035",
+      "reason": "Insufficient original image resolution"
+    },
+    {
+      "id": "E_0037",
+      "reason": "Insufficient original image resolution"
+    }
+  ],
+  "irf_building_groups": 949,
+  "native_short_axis_ge_512": 1253
+}

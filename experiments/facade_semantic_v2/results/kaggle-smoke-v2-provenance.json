@@ -1,0 +1,104 @@
+{
+  "notebook": "khalilayeb/archigen-facade-semantic7-lora-v2-smoke",
+  "version": 2,
+  "source_commit": "354d2b8c4a5573196f2de19a6ff1d4ff4b3ad57c",
+  "mlflow_run_id": "8701677bfbe548dab7ebb10e6e987c6c",
+  "architecture": "sd15_semantic7_lora_facade_v2",
+  "manifest_sha256": "d8068cb4a0547efeac30e0a84e7acfa4a685b9a421910b3363d4368825bfee13",
+  "quality_claim": false,
+  "optimizer_steps": 2,
+  "inference_steps": 2,
+  "metrics": [
+    {
+      "type": "metric",
+      "key": "train_loss",
+      "value": 0.07068623974919319,
+      "step": 1,
+      "timestamp": 1794725380214
+    },
+    {
+      "type": "metric",
+      "key": "learning_rate",
+      "value": 5e-06,
+      "step": 1,
+      "timestamp": 1794725380214
+    },
+    {
+      "type": "metric",
+      "key": "peak_allocated_mib",
+      "value": 5968.08544921875,
+      "step": 1,
+      "timestamp": 1794725380214
+    },
+    {
+      "type": "metric",
+      "key": "elapsed_seconds",
+      "value": 7.9469911109999885,
+      "step": 1,
+      "timestamp": 1794725380214
+    },
+    {
+      "type": "metric",
+      "key": "train_loss",
+      "value": 0.14168144576251507,
+      "step": 2,
+      "timestamp": 1794725382851
+    },
+    {
+      "type": "metric",
+      "key": "learning_rate",
+      "value": 0.0,
+      "step": 2,
+      "timestamp": 1794725382851
+    },
+    {
+      "type": "metric",
+      "key": "peak_allocated_mib",
+      "value": 6444.8779296875,
+      "step": 2,
+      "timestamp": 1794725382851
+    },
+    {
+      "type": "metric",
+      "key": "elapsed_seconds",
+      "value": 10.584692184000005,
+      "step": 2,
+      "timestamp": 1794725382851
+    },
+    {
+      "type": "metric",
+      "key": "val_CMP_lpips",
+      "value": 0.7259214520454407,
+      "step": 2,
+      "timestamp": 1794725386340
+    },
+    {
+      "type": "metric",
+      "key": "val_CMP_ssim",
+      "value": 0.25212577071767867,
+      "step": 2,
+      "timestamp": 1794725386340
+    },
+    {
+      "type": "metric",
+      "key": "val_CMP_psnr",
+      "value": 12.699032910232631,
+      "step": 2,
+      "timestamp": 1794725386340
+    },
+    {
+      "type": "metric",
+      "key": "val_CMP_opening_edge_mae",
+      "value": 0.25188344717025757,
+      "step": 2,
+      "timestamp": 1794725386340
+    },
+    {
+      "type": "metric",
+      "key": "val_macro_lpips",
+      "value": 0.7259214520454407,
+      "step": 2,
+      "timestamp": 1794725386340
+    }
+  ]
+}
