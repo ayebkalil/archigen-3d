@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from src.data.facade_palette import FACADE_STYLES, NEUTRAL_STYLE
+from src.models.artifacts import verify_model, ModelArtifactError
 
 
 class ExperimentalFacadeInference:
@@ -15,12 +16,20 @@ class ExperimentalFacadeInference:
 
     def __init__(self, path, device='cpu'):
         self.path, self.device = Path(path), device
-        if not self.path.is_file():
-            raise FileNotFoundError(f'Experimental facade weights missing: {self.path}')
+        try:
+            verify_model(self.path)
+        except ModelArtifactError as error:
+            if not self.path.is_file():
+                raise FileNotFoundError(str(error)) from error
+            raise
         if self.path.suffix == '.onnx':
+            sidecar = self.path.with_suffix('.json')
+            verify_model(sidecar)
+            self.metadata = json.loads(sidecar.read_text(encoding='utf-8'))
+            if self.metadata.get('architecture') != 'facade_residual_film_512_v1' or self.metadata.get('resolution') != 512:
+                raise ValueError('Experimental ONNX sidecar must describe facade_residual_film_512_v1 at 512 pixels')
             import onnxruntime as ort
             self.session = ort.InferenceSession(str(self.path), providers=['CPUExecutionProvider'])
-            self.metadata = json.loads(self.path.with_suffix('.json').read_text())
             self.generator = None
         else:
             from src.models.facade_experiment import load_generator, MemoryBudget

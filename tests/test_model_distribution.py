@@ -111,6 +111,103 @@ def test_runtime_dvc_sources_are_portable_and_match_manifest():
         assert item['url'].startswith('https://github.com/ayebkalil/archigen-3d/releases/download/model-weights-v1/')
 
 
+def test_facade512_profiles_pin_metadata_without_changing_production():
+    from src.models.artifacts import inventory, sha256
+    manifest = inventory()
+    assert len(manifest['profiles']['runtime']) == 3
+    assert not any('facade512_experiment' in path for path in manifest['profiles']['runtime'])
+    expected = {'models/saved/facade512_experiment/generator.onnx',
+                'models/saved/facade512_experiment/generator.json'}
+    assert set(manifest['profiles']['facade512']) == expected
+    entries = {entry['path']: entry for entry in manifest['artifacts']}
+    for path in expected:
+        assert entries[path]['url'].startswith('https://github.com/ayebkalil/archigen-3d/releases/download/facade512-weights-v1/')
+        assert entries[path]['stage'] == 'experimental'
+    sidecar = 'models/saved/facade512_experiment/generator.json'
+    assert sha256(Path(__file__).resolve().parents[1] / sidecar) == entries[sidecar]['sha256']
+    assert (Path(__file__).resolve().parents[1] / sidecar).stat().st_size == entries[sidecar]['size']
+
+
+def test_experimental_dvc_imports_have_public_versioned_sources():
+    import yaml
+    from src.models.artifacts import inventory
+    root = Path(__file__).resolve().parents[1]
+    manifest = inventory(root)
+    for item in manifest['artifacts']:
+        if item.get('stage') != 'experimental' or not item.get('dvc'):
+            continue
+        pointer = yaml.safe_load((root / item['dvc']).read_text())
+        assert pointer['frozen'] is True
+        assert pointer['deps'][0]['path'] == item['url']
+        assert pointer['deps'][0]['size'] == item['size']
+        assert pointer['outs'][0]['path'] == Path(item['path']).name
+
+
+def test_sidecar_repair_rejects_bad_download_without_overwriting(monkeypatch, tmp_path):
+    from scripts.models import restore_sidecar
+    target = tmp_path / 'models/generator.json'; target.parent.mkdir()
+    target.write_bytes(b'old metadata')
+    content = b'{"resolution":512}\n'
+    item = {'path': 'models/generator.json', 'url': 'https://example.invalid/generator.json',
+            'size': len(content), 'sha256': hashlib.sha256(content).hexdigest()}
+    monkeypatch.setattr('scripts.models.urlopen', lambda *a, **kw: io.BytesIO(b'X' * len(content)))
+    with pytest.raises(ModelArtifactError, match='Sidecar checksum'):
+        restore_sidecar(item, tmp_path)
+    assert target.read_bytes() == b'old metadata'
+    monkeypatch.setattr('scripts.models.urlopen', lambda *a, **kw: io.BytesIO(content))
+    restore_sidecar(item, tmp_path)
+    assert target.read_bytes() == content
+
+
+def test_missing_experimental_model_reports_its_optional_profile(tmp_path):
+    model = tmp_path / 'models/generator.onnx'; model.parent.mkdir()
+    (tmp_path / 'models/artifacts.json').write_text(json.dumps({'schema_version': 1,
+        'profiles': {'runtime': [], 'facade512': ['models/generator.onnx']},
+        'artifacts': [{'path': 'models/generator.onnx', 'size': 3, 'sha256': 'test'}]}))
+    with pytest.raises(ModelArtifactError, match='pull --profile facade512'):
+        verify_model(model, root=tmp_path)
+
+
+def test_experimental_onnx_rejects_mismatched_sidecar_before_loading(tmp_path, monkeypatch):
+    from src.bridge.facade_experimental import ExperimentalFacadeInference
+    model = tmp_path / 'generator.onnx'; model.write_bytes(b'fixture')
+    model.with_suffix('.json').write_text(json.dumps({'architecture': 'wrong', 'resolution': 512}))
+    monkeypatch.setitem(__import__('sys').modules, 'onnxruntime', SimpleNamespace(
+        InferenceSession=lambda *a, **kw: pytest.fail('Should reject metadata before loading weights')))
+    with pytest.raises(ValueError, match='sidecar must describe'):
+        ExperimentalFacadeInference(model)
+
+
+def test_experimental_loader_rejects_tampered_style_metadata(tmp_path, monkeypatch):
+    import src.bridge.facade_experimental as adapter
+    model = tmp_path / 'models/generator.onnx'; model.parent.mkdir()
+    model.write_bytes(b'fixture graph')
+    sidecar = model.with_suffix('.json')
+    original = json.dumps({'architecture': 'facade_residual_film_512_v1', 'resolution': 512,
+                           'supported_style_ids': []}).encode()
+    sidecar.write_bytes(original)
+    entries = [{'path': path.relative_to(tmp_path).as_posix(), 'size': path.stat().st_size,
+                'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for path in (model, sidecar)]
+    (tmp_path / 'models/artifacts.json').write_text(json.dumps({'schema_version': 1,
+        'profiles': {'runtime': [], 'facade512': [e['path'] for e in entries]}, 'artifacts': entries}))
+    sidecar.write_bytes(original.replace(b'[]', b'[0]'))
+    monkeypatch.setattr(adapter, 'verify_model', lambda path: verify_model(path, root=tmp_path))
+    with pytest.raises(ModelArtifactError, match='generator.json.*pull --profile facade512'):
+        adapter.ExperimentalFacadeInference(model)
+
+
+def test_optional_missing_weights_do_not_block_production(tmp_path):
+    root = tmp_path / 'models'; root.mkdir()
+    model = root / 'runtime.onnx'; model.write_bytes(b'production')
+    manifest = {'schema_version': 1, 'profiles': {'runtime': ['models/runtime.onnx'],
+        'facade512': ['models/optional.onnx']}, 'artifacts': [
+            {'path': 'models/runtime.onnx', 'size': 10, 'sha256': hashlib.sha256(b'production').hexdigest()},
+            {'path': 'models/optional.onnx', 'size': 9, 'sha256': 'missing'}]}
+    (root / 'artifacts.json').write_text(json.dumps(manifest))
+    assert require_artifacts('runtime', tmp_path)[0]['status'] == 'ok'
+    assert inspect_artifacts('facade512', tmp_path)[0]['status'] == 'missing'
+
+
 def test_onnx_eight_fold_inverts_all_views_before_averaging():
     import numpy as np
     from backend.app.floorplan_engine import FloorplanPipeline

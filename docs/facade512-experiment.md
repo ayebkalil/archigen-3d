@@ -182,11 +182,20 @@ comparison isolates network predictions on the same input. No image was retouche
 Full configurations, checkpoint hashes, per-image metrics, and validation records
 are in `models/saved/facade512_experiment/experiment_results.json` and
 `test_metrics.json`. The selected PyTorch/ONNX weights and original/prepared data
-are DVC-tracked and pushed to the existing `onedrive_backup` remote. No heavy
-weights or raw images were added to Git. Retrieve weights with:
+are DVC-tracked. The original `onedrive_backup` location was machine-local;
+teammates should use the versioned optional weight release instead. No heavy
+weights or raw images were added to Git. Retrieve the ONNX + required JSON with:
 
 ```powershell
-python -m dvc pull models/saved/facade512_experiment/generator.pth.dvc models/saved/facade512_experiment/generator.onnx.dvc
+python scripts/models.py pull --profile facade512
+python scripts/models.py check --profile facade512 --json
+# Optional native checkpoint, with its metadata:
+python scripts/models.py pull --profile facade512-torch
 ```
 
 `python scripts/report_facade512.py` regenerates the unretouched comparison and curves.
+
+The [facade512-weights-v1 release](https://github.com/ayebkalil/archigen-3d/releases/tag/facade512-weights-v1)
+contains the exact weights, canonical JSON and SHA-256 checksums. See
+[teammate setup](model-setup.md#optional-pix2pix-512-experiment). Production defaults
+are unchanged; this experiment must be selected explicitly.

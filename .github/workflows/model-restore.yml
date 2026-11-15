@@ -1,12 +1,15 @@
 name: Clean teammate model installation
 on:
   push:
-    branches: [codex/fix-model-distribution]
+    branches: [codex/fix-model-distribution, codex/fix-facade512-distribution]
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   clean-restore:
+    strategy:
+      matrix:
+        profile: [runtime, facade512]
     runs-on: ubuntu-latest
     env:
       OMP_NUM_THREADS: '2'
@@ -18,4 +21,4 @@ jobs:
           python-version: '3.11'
       - run: pip install -r backend/requirements.txt dvc
       - name: Restore in a second fresh clone and execute actual models
-        run: python scripts/verify_team_install.py --ref "$GITHUB_REF_NAME"
+        run: python scripts/verify_team_install.py --ref "$GITHUB_REF_NAME" --profile "${{ matrix.profile }}"
