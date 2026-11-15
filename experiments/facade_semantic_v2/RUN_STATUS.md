@@ -37,6 +37,9 @@ limitations are described in the README. No four-style labels were invented.
 
 - [Kaggle training notebook](https://www.kaggle.com/code/khalilayeb/archigen-facade-semantic7-lora-v2-train), saved version 1.
 - Pinned source: `5d9d1e8a988e49e4fbb11e03518603efa303e415`.
+- Full-run data audit reproduced the smoke counts. Optimizer steps 1–14 were
+  observed with finite losses and no runtime failure; peak allocated VRAM was
+  6451.05 MiB. This is an early execution check, not a quality evaluation.
 - Config: 2000 optimizer steps; physical batch 1, accumulation 4; semantic7
   ControlNet + rank8 UNet LoRA; fixed base and parent weight hashes.
 - Best model selected every 500 steps using source-macro LPIPS on fixed 12 CMP
