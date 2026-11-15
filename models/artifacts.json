@@ -6,6 +6,14 @@
       "models/saved/floorplan_unetpp/floorplan_multitask.onnx",
       "models/saved/floorplan_unetpp/floorplan_fallback.onnx",
       "models/saved/generator_perceptual_ema.onnx"
+    ],
+    "facade512": [
+      "models/saved/facade512_experiment/generator.onnx",
+      "models/saved/facade512_experiment/generator.json"
+    ],
+    "facade512-torch": [
+      "models/saved/facade512_experiment/generator.pth",
+      "models/saved/facade512_experiment/generator.json"
     ]
   },
   "artifacts": [
@@ -14,14 +22,20 @@
       "dvc": "models/saved/facade512_experiment/generator.onnx.dvc",
       "size": 171571099,
       "md5": "9b067930324826f39ee1f422309335ab",
-      "sha256": "7ef57b3f42e81cb16544e1b7592f246d9cb59535ea7d48dcf5786ffd51b0ea83"
+      "sha256": "7ef57b3f42e81cb16544e1b7592f246d9cb59535ea7d48dcf5786ffd51b0ea83",
+      "url": "https://github.com/ayebkalil/archigen-3d/releases/download/facade512-weights-v1/generator.onnx",
+      "stage": "experimental",
+      "architecture": "facade_residual_film_512_v1"
     },
     {
       "path": "models/saved/facade512_experiment/generator.pth",
       "dvc": "models/saved/facade512_experiment/generator.pth.dvc",
       "size": 171472130,
       "md5": "78691c443433935d9b0c26f9ab1ae481",
-      "sha256": "0d1aa7d883a464a076877e207ba6e87a1c5e33b0e642fb96d250d3a599f718dc"
+      "sha256": "0d1aa7d883a464a076877e207ba6e87a1c5e33b0e642fb96d250d3a599f718dc",
+      "url": "https://github.com/ayebkalil/archigen-3d/releases/download/facade512-weights-v1/generator.pth",
+      "stage": "experimental",
+      "architecture": "facade_residual_film_512_v1"
     },
     {
       "path": "models/saved/floorplan_baseline/best.safetensors",
@@ -116,6 +130,17 @@
       "size": 156600817,
       "md5": "e827802338e7a41d43f5b7778f16c347",
       "sha256": "4d4ec134344564cd7af6c79864f204ff72129dff036c4788b740cf80a7a662bc"
+    },
+    {
+      "path": "models/saved/facade512_experiment/generator.json",
+      "size": 834,
+      "sha256": "c765f9b584c21f8d288db117ab1e0b06f993afae9e90866b1412264add7c95af",
+      "url": "https://github.com/ayebkalil/archigen-3d/releases/download/facade512-weights-v1/generator.json",
+      "stage": "experimental",
+      "architecture": "facade_residual_film_512_v1"
     }
-  ]
+  ],
+  "experimental_releases": {
+    "facade512": "https://github.com/ayebkalil/archigen-3d/releases/tag/facade512-weights-v1"
+  }
 }
