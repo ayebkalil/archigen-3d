@@ -13,6 +13,8 @@ def main():
     parser.add_argument('--project', type=Path, required=True)
     parser.add_argument('--model', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--module', choices=['experiments.facade_semantic_v2.house_multiface',
+                        'experiments.facade_reference_v3.run'], default='experiments.facade_semantic_v2.house_multiface')
     args = parser.parse_args()
     project, output = args.project.resolve(), args.output.resolve()
     logs = output / 'services'; logs.mkdir(parents=True, exist_ok=True)
@@ -35,7 +37,7 @@ def main():
         env = {**os.environ, 'PYTHONIOENCODING': 'utf-8', 'USE_TF': '0', 'USE_FLAX': '0',
                'HF_HUB_OFFLINE': '1', 'TRANSFORMERS_OFFLINE': '1', 'OMP_NUM_THREADS': '2', 'MKL_NUM_THREADS': '2'}
         subprocess.run([str(project / '.venv-facade-diffusion/Scripts/python.exe'), '-m',
-            'experiments.facade_semantic_v2.house_multiface', 'generate', '--model', str(args.model.resolve()),
+            args.module, 'generate', '--model', str(args.model.resolve()),
             '--output', str(output)], cwd=Path(__file__).resolve().parents[2], env=env, check=True)
     finally:
         for service in stopped:
