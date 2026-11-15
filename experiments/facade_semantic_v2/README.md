@@ -43,6 +43,10 @@ deterministic 80/10/10 building split. This reduces leakage; it cannot prove the
 absence of every unrecognized cross-source view. Exclusions and actual counts
 are recorded in `audit.json`; corrupt or unknown-palette inputs are not silently
 used. No test image participates in optimization or checkpoint selection.
+The sparse original CMP `train/236.jpg` mask has only 2.55% annotated foreground:
+its locked membership is retained, but it is excluded from optimization. Effective
+CMP training count is therefore 399 rather than silently inventing missing wall
+labels. Effective counts are tracked separately from original split sizes.
 
 IRFs numeric order is background/plant/wall/window/door/fence; its exact palette
 is mapped to the common six classes. CMP maps shutter/shop to window, balcony

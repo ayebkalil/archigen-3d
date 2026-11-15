@@ -57,8 +57,11 @@ def build_dataset(cmp_root, irf_root, output, phash_threshold=5):
     source_roots = {'CMP': str(cmp_root), 'IRF': str(irf_root)}
 
     def add(source, sample_id, split, group, photo, canonical, annotation):
-        if (canonical > 0).sum() < canonical.size * .03:
+        sparse = (canonical > 0).sum() < canonical.size * .03
+        if sparse and source != 'CMP':
             raise ValueError('Annotation has too little facade foreground')
+        if sparse:
+            excluded.append({'id': 'CMP/' + sample_id, 'reason': 'Sparse mask: retained in locked split, excluded from optimization'})
         mask = output / 'labels' / source / (sample_id.replace('/', '__') + '.png')
         mask.parent.mkdir(parents=True, exist_ok=True)
         Image.fromarray(canonical).save(mask, compress_level=3)
@@ -70,7 +73,8 @@ def build_dataset(cmp_root, irf_root, output, phash_threshold=5):
             'photo': photo.relative_to(Path(source_roots[source])).as_posix(),
             'labels': mask.relative_to(output).as_posix(), 'photo_sha256': digest(photo),
             'labels_sha256': digest(mask), 'annotation_sha256': digest(annotation),
-            'native_size': size, 'has_door': bool((canonical == 3).any()), 'window_count': int(windows)})
+            'native_size': size, 'has_door': bool((canonical == 3).any()), 'window_count': int(windows),
+            'training_eligible': not sparse})
 
     for row in cmp_manifest['samples']:
         photo, annotation = cmp_root / row['photo'], cmp_root / row['labels']
@@ -201,7 +205,9 @@ class FacadeDataset:
         self.root = Path(root)
         self.manifest = json.loads((self.root / 'manifest.json').read_text())
         self.sources = {key: Path(value) for key, value in json.loads((self.root / 'sources.json').read_text()).items()}
-        self.rows = sorted((row for row in self.manifest['samples'] if row['split'] == split and (not source or row['source'] == source)), key=lambda row: row['id'])
+        self.rows = sorted((row for row in self.manifest['samples'] if row['split'] == split
+            and (split != 'train' or row.get('training_eligible', True))
+            and (not source or row['source'] == source)), key=lambda row: row['id'])
         if not self.rows:
             raise ValueError('Empty dataset split')
         self.augment, self.crop_probability, self.epoch = augment and split == 'train', crop_probability, 0

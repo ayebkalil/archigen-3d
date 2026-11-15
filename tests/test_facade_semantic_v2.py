@@ -168,3 +168,24 @@ def test_metrics_do_not_reward_or_penalize_letterbox_padding():
     generated = np.asarray(photo).copy(); generated[:16] = 255; generated[48:] = 0
     scores = pair_metrics(Image.fromarray(generated), photo, labels, valid, perceptual=False)
     assert scores['ssim'] == 1 and scores['psnr'] >= 99
+
+
+def test_actual_pipeline_accepts_semantic_tensor_and_reloads_lora(tmp_path):
+    pytest.importorskip('peft')
+    import torch
+    from diffusers import StableDiffusionControlNetPipeline, AutoencoderKL, DDIMScheduler
+    from experiments.facade_semantic_v2.architecture import upgrade_conditioning, add_facade_lora, save_lora
+    unet, control = tiny_models()
+    add_facade_lora(unet, 2); save_lora(unet, tmp_path)
+    unet.delete_adapters('default')
+    vae = AutoencoderKL(block_out_channels=(16, 32, 32, 32), norm_num_groups=8,
+        down_block_types=('DownEncoderBlock2D',) * 4, up_block_types=('UpDecoderBlock2D',) * 4, latent_channels=4)
+    pipeline = StableDiffusionControlNetPipeline(vae=vae, unet=unet, controlnet=upgrade_conditioning(control),
+        text_encoder=None, tokenizer=None, scheduler=DDIMScheduler(), safety_checker=None,
+        feature_extractor=None, requires_safety_checker=False)
+    pipeline.load_lora_weights(str(tmp_path), weight_name='facade_lora.safetensors')
+    pipeline.set_progress_bar_config(disable=True)
+    with torch.no_grad():
+        result = pipeline(prompt_embeds=torch.randn(1, 8, 16), negative_prompt_embeds=torch.zeros(1, 8, 16),
+            image=torch.rand(1, 7, 64, 64), height=64, width=64, num_inference_steps=2, output_type='latent').images
+    assert result.shape == (1, 4, 8, 8) and torch.isfinite(result).all()

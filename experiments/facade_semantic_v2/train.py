@@ -119,7 +119,8 @@ def train(args):
         embeddings = encoder(ids)[0]
     del encoder; torch.cuda.empty_cache()
     tracker = RunTracker(output, config['experiment_name'], {**config, 'manifest_sha256': contract['manifest_sha256'],
-        'dataset_counts': manifest['splits'], 'lora_parameters': sum(p.numel() for p in lora_parameters)},
+        'dataset_counts': manifest['counts'], 'effective_training_samples': len(train_data),
+        'lora_parameters': sum(p.numel() for p in lora_parameters)},
         {'git_commit': git_revision(), 'git_branch': 'codex/facade-semantic-controlnet-v2',
          'mode': 'smoke' if args.smoke else 'train', 'gpu': torch.cuda.get_device_name(0)},
         tracking_uri=os.getenv('MLFLOW_TRACKING_URI'))
