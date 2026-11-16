@@ -10,6 +10,7 @@ import zipfile
 from experiments.facade_sd15_controlnet.data import locate_kaggle_dataset,digest,write_json
 from experiments.facade_semantic_v2.data import build_dataset,validate_dataset
 from .runtime import validate_export
+from .data import audit_material_samples
 
 
 def run_staged(work):
@@ -43,6 +44,9 @@ def main():
     cmp=locate_kaggle_dataset(input_root=cmp_mounts[0])
     if not (root/'manifest.json').is_file():build_dataset(cmp,irf_lists[0].parent,root)
     validate_dataset(root)
+    material_audit=root/'material-reference-audit.json'
+    audit_material_samples(root,material_audit,config['strip_crop_probability'],config['blank_crop_probability'])
+    shutil.copyfile(material_audit,output/'material-reference-audit.json')
     for name in ('manifest.json','audit.json','ATTRIBUTION.md','irf-credits.json'):shutil.copyfile(root/name,output/name)
     (output/'requirements-freeze.txt').write_text(subprocess.check_output([sys.executable,'-m','pip','freeze'],text=True))
     for module,extra in [('teacher',[]),('train',['--parent',str(parents[0]),'--teacher',str(output/'teacher')])]:
@@ -68,7 +72,7 @@ print('EXPORT RELOAD PASSED: material10 + existing LoRA, no teacher needed at in
     archive=work/('archigen-facade-material-v3-smoke-model-and-mlflow.zip' if args.mode=='smoke' else 'archigen-facade-material-v3-model-and-mlflow.zip')
     paths=['export','teacher','validation','portable-artifacts','tracking-events.jsonl','tracking-run.json',
         'requirements-freeze.txt','config.json','contract.json','teacher.json','reload-check.json','export-reloaded.png',
-        'manifest.json','audit.json','ATTRIBUTION.md','irf-credits.json']
+        'manifest.json','audit.json','material-reference-audit.json','ATTRIBUTION.md','irf-credits.json']
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=3) as zipped:
         for name in paths:
             path=output/name

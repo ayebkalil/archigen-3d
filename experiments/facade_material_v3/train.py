@@ -88,6 +88,8 @@ def train(args):
     for name,value in [('config.json',config),('contract.json',contract),('teacher.json',teacher_meta)]:
         write_json(output/name,value);tracker.artifact(output/name)
     for name in ('manifest.json','audit.json','ATTRIBUTION.md','irf-credits.json'):tracker.artifact(Path(args.data)/name)
+    material_audit=Path(args.data)/'material-reference-audit.json'
+    if material_audit.is_file():tracker.artifact(material_audit)
     def validate(step):
         encoder=CLIPTextModel.from_pretrained(config['base_model'],subfolder='text_encoder',**common).to(device)
         try:return validation(accelerator.unwrap_model(control),unet,vae,encoder,tokenizer,scheduler_noise,val_data,ref_data,teacher,config,output,step,tracker,device,indices)
@@ -98,7 +100,8 @@ def train(args):
             accelerator.unwrap_model(control).save_pretrained(output/'best-controlnet',safe_serialization=True)
             save_lora(unet,output/'best-lora')
     step,epoch,skip=state['step'],state['epoch'],state['next_batch'];started=time.perf_counter();torch.cuda.reset_peak_memory_stats()
-    counts={'microbatches':0,'feedback_microbatches':0,'blank_crops':0,'reference_fallbacks':0}
+    counts={'microbatches':0,'feedback_microbatches':0,'blank_crops':0,'reference_fallbacks':0,
+        'reference_unavailable':0,'reference_full_photo':0}
     try:
         if not args.resume:
             scores=validate(0);state['initial_score']=scores['val_selection_score'];select(scores,0)
@@ -128,11 +131,14 @@ def train(args):
                             small=F.interpolate(decoded,(256,256),mode='bilinear',align_corners=False)
                             logits=teacher(small)
                             semantic,false_opening=semantic_feedback(logits,labels,valid)
-                            material=material_statistics(decoded,batch['reference'].to(device),labels,valid)
+                            material_valid=valid*batch['reference_available'].to(device)[:,None,None]
+                            material=material_statistics(decoded,batch['reference'].to(device),labels,material_valid)
                             loss=loss+config['semantic_loss_weight']*semantic+config['false_opening_loss_weight']*false_opening+config['material_loss_weight']*material
                             counts['feedback_microbatches']+=1
                             parts.update(semantic_loss=float(semantic.detach()),false_opening_loss=float(false_opening.detach()),material_loss=float(material.detach()))
                     accelerator.backward(loss);counts['microbatches']+=1;counts['blank_crops']+=int(batch['blank_crop'].sum());counts['reference_fallbacks']+=int(batch['reference_median_fallback'].sum())
+                    counts['reference_unavailable']+=int((~batch['reference_available']).sum())
+                    counts['reference_full_photo']+=int(batch['reference_from_full_photo'].sum())
                     parts['train_loss']=float(loss.detach())
                     for k,v in parts.items():sums[k]=sums.get(k,0.)+v
                     n+=1

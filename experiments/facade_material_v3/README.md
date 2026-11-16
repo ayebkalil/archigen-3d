@@ -40,7 +40,21 @@ needed. Attach the original Kaggle datasets and completed V2 notebook outputs.
 
 Material references are tiled **wall-only patches** extracted with human masks;
 they contain no annotated window or door. If a suitable patch does not fit,
-use an explicitly counted median-wall-colour fallback. On 20% of training
+use an explicitly counted median-wall-colour fallback. A crop containing no
+wall pixels first falls back to annotated wall pixels in the **same full source
+photo**. If that photo also has no labelled wall, preserve its photo/semantics,
+mark the reference unavailable and zero the three reference-conditioning
+channels. Do not fabricate a material from glass or rewrite the annotations.
+Such samples contribute no material-matching loss. An invalid independent
+reference never falls back to the validation target's material.
+
+Before GPU optimization, audit every training and validation sample at epoch
+zero. Save fallback counts and sample IDs in `material-reference-audit.json`,
+track the report in MLflow and include it in the bundle. Cache the audit only
+when the validated dataset manifest, loader code and crop settings match.
+The test split is never read by this audit.
+
+On 20% of training
 attempts, extract a genuine annotated opening-free square of at least 64 native
 pixels, when one exists. Never remove an opening from a label and leave its
 photograph behind. Wall-only crops can be upsampled; they teach absence of

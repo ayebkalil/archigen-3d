@@ -60,6 +60,8 @@ def train(args):
          'manifest_sha256':digest(Path(args.data)/'manifest.json'), 'training_samples':len(data)},
         {'git_commit':git_revision(), 'mode':'smoke' if args.smoke else 'train', 'test_used':False},
         tracking_uri=os.getenv('MLFLOW_TRACKING_URI'))
+    material_audit=Path(args.data)/'material-reference-audit.json'
+    if material_audit.is_file():tracker.artifact(material_audit)
     best = -1.; step = 0
     try:
         for epoch in range(epochs):

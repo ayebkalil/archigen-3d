@@ -52,6 +52,64 @@ def test_material_dataset_respects_splits_and_aligns_ten_channels(tmp_path):
     assert (val[0]['labels']==2).any() and not val[0]['blank_crop']
 
 
+def test_opening_only_crop_uses_original_building_wall_without_changing_labels(tmp_path,monkeypatch):
+    from experiments.facade_semantic_v2.conditioning import control_channels
+    from experiments.facade_semantic_v2.data import FacadeDataset
+    dataset_fixture(tmp_path)
+    labels=np.full((512,512),2,np.uint8)
+    photo=Image.new('RGB',(512,512),(20,60,130));valid=np.ones((512,512),np.float32)
+    monkeypatch.setattr(FacadeDataset,'images',lambda self,index:(photo,labels.copy(),valid,control_channels(labels)))
+    data=MaterialDataset(tmp_path,'train',augment=True,blank_probability=0)
+    sample=data[0]
+    assert sample['reference_available'] and sample['reference_from_full_photo']
+    assert (sample['labels']==2).all() and not (sample['labels']==1).any()
+    assert np.all(np.asarray(data.sample(0)[4])==[190,130,80])
+    # The semantic input and RGB target retain the window-only crop.
+    assert (sample['condition'][3]==1).all()
+    assert np.allclose(sample['photo'][:,0,0].numpy(),np.array([20,60,130])/127.5-1)
+
+
+def test_genuinely_wall_free_source_is_explicit_dropout_without_material_loss(tmp_path):
+    import torch
+    dataset_fixture(tmp_path)
+    Image.new('L',(256,256),2).save(tmp_path/'labels/0.png')
+    Image.new('RGB',(256,256),(20,60,130)).save(tmp_path/'photos/0.png')
+    data=MaterialDataset(tmp_path,'train',augment=False)
+    sample=data[0]
+    assert not sample['reference_available'] and not sample['reference_from_full_photo']
+    assert not sample['reference_median_fallback'] and (sample['labels']==2).all()
+    assert (sample['condition'][7:]==0).all()
+    image=torch.randn(1,3,32,32,requires_grad=True)
+    unavailable=torch.zeros(1,512,512)
+    loss=material_statistics(image,sample['reference'][None],sample['labels'][None],unavailable)
+    loss.backward()
+    assert loss.item()==0 and image.grad.abs().sum()==0
+
+
+def test_invalid_external_reference_never_falls_back_to_validation_target(tmp_path):
+    from experiments.facade_material_v3.validation import reference_colour_error
+    dataset_fixture(tmp_path)
+    data=MaterialDataset(tmp_path,'val')
+    glass=Image.new('RGB',(512,512),'blue');labels=np.full((512,512),2,np.uint8)
+    sample=data.sample(0,reference_photo=glass,reference_labels=labels,include_reference_info=True)
+    assert sample[7]=={'available':False,'from_full_photo':False,'external':True}
+    assert not np.asarray(sample[4]).any()
+    assert reference_colour_error(sample[0],sample[4],sample[1],sample[2],available=False) is None
+
+
+def test_complete_material_audit_preserves_samples_and_never_reads_test_split(tmp_path):
+    from experiments.facade_material_v3.data import audit_material_samples
+    dataset_fixture(tmp_path)
+    manifest=json.loads((tmp_path/'manifest.json').read_text())
+    manifest['samples'][-1]['photo']='missing-test-photo.png'
+    manifest['samples'][-1]['labels']='missing-test-label.png'
+    (tmp_path/'manifest.json').write_text(json.dumps(manifest))
+    report=audit_material_samples(tmp_path,tmp_path/'material-audit.json')
+    assert report['splits']['train']['samples']==2 and report['splits']['val']['samples']==1
+    assert not report['test_split_accessed']
+    assert report==audit_material_samples(tmp_path,tmp_path/'material-audit.json')
+
+
 def test_blank_perfect_prediction_and_false_opening_diagnostics():
     correct=np.zeros((6,6),int);correct[1,1]=100
     assert segmentation_scores(correct)['opening_iou']==1
