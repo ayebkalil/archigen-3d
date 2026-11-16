@@ -1,0 +1,23 @@
+{
+  "dataset": "Original CMP, fixed stratified validation pilot",
+  "n": 16,
+  "selection": "Seed 42 SHA ordering, round-robin door-presence/window-count strata; selected before outputs",
+  "test_used": false,
+  "score_resolutions": [
+    256,
+    512
+  ],
+  "primary_score_resolution": 256,
+  "preprocessing": "Shared facade bbox, neutral GT background, aspect-preserving 512 letterbox; valid rectangle scored",
+  "production_condition": "Original CMP 12-class training LUT at native 256; native production sharpening on; styles off",
+  "v3_condition": "Same annotation collapsed to semantic7 + explicit independent PBR material reference at 512",
+  "reference_is_target_derived": false,
+  "v3_reference_kernels_zero": true,
+  "v3_status": "SMOKE export selected step 0; V2 parent initialization, not quality-trained V3",
+  "v3_variants": {
+    "v3_default": 2,
+    "v3_25steps": 25
+  },
+  "metrics_note": "Validation previously used for model selection, not an independent test. Single fixed SD seed per image. No FID on this small pilot; no generator IoU using the rejected teacher.",
+  "attribution": "CMP Facade Database, Tylecek and Sara (2013), https://cmp.felk.cvut.cz/~tylecr1/facade/, CC BY-SA. Ground-truth comparison images retain this attribution."
+}
