@@ -1,0 +1,293 @@
+{
+  "date_reviewed": "2026-11-16",
+  "notebook_version": 2,
+  "notebook": "khalilayeb/archigen-facade-material10-feedback-v3-train",
+  "source_commit": "e02099d6815424959beae6a195eb8e4522cb0e56",
+  "status": "ERROR; teacher quality gate rejected feedback model",
+  "data_audit_passed": true,
+  "training_samples": 1224,
+  "validation_samples": 210,
+  "test_used": false,
+  "full_teacher_epochs": 25,
+  "full_teacher_optimizer_steps": 3825,
+  "selected_epoch": 21,
+  "teacher_source_run_id": "749064adeff54f3b92f09e148c635e8e",
+  "teacher_weights_sha256": "989e72db00d170c71be4d2658bf011349d22e6820b8d8620564c635b2bc2d7bf",
+  "weights_downloaded_and_verified": true,
+  "gates": {
+    "miou": {
+      "value": 0.4358677537199258,
+      "minimum": 0.3
+    },
+    "opening_iou": {
+      "value": 0.6132667516537407,
+      "minimum": 0.35
+    },
+    "door_iou": {
+      "value": 0.3070772147039063,
+      "minimum": 0.1
+    },
+    "wall_false_opening_rate": {
+      "value": 0.0757436406725601,
+      "maximum": 0.05
+    }
+  },
+  "lowest_wall_false_opening_rate": 0.06653441021667572,
+  "any_epoch_passed_all_gates": false,
+  "full_facade_finetuning_started": false,
+  "quality_trained_facade_export_available": false,
+  "smoke_export_only": true,
+  "production_changed": false,
+  "epochs": [
+    {
+      "teacher_epoch": 1,
+      "optimizer_steps": 153,
+      "miou": 0.18220137997882846,
+      "wall_iou": 0.6975749183724692,
+      "window_iou": 0.38883239224854155,
+      "door_iou": 8.165657167285495e-05,
+      "opening_iou": 0.386260062892854,
+      "wall_false_opening_rate": 0.0945758067926773
+    },
+    {
+      "teacher_epoch": 2,
+      "optimizer_steps": 306,
+      "miou": 0.21909868525741083,
+      "wall_iou": 0.720973964382272,
+      "window_iou": 0.45400669135655225,
+      "door_iou": 0.13961145580564072,
+      "opening_iou": 0.47623178557038304,
+      "wall_false_opening_rate": 0.07992279409253111
+    },
+    {
+      "teacher_epoch": 3,
+      "optimizer_steps": 459,
+      "miou": 0.22651242390307902,
+      "wall_iou": 0.7242914347910069,
+      "window_iou": 0.478268066319433,
+      "door_iou": 0.1565150423080341,
+      "opening_iou": 0.4973646923396994,
+      "wall_false_opening_rate": 0.08793841194076517
+    },
+    {
+      "teacher_epoch": 4,
+      "optimizer_steps": 612,
+      "miou": 0.2333819058356447,
+      "wall_iou": 0.7141693577801683,
+      "window_iou": 0.4810324369496363,
+      "door_iou": 0.2019549586112366,
+      "opening_iou": 0.5210489147022502,
+      "wall_false_opening_rate": 0.14049644942747744
+    },
+    {
+      "teacher_epoch": 5,
+      "optimizer_steps": 765,
+      "miou": 0.23451783037314286,
+      "wall_iou": 0.712638640609955,
+      "window_iou": 0.48394332544699475,
+      "door_iou": 0.210500098203586,
+      "opening_iou": 0.5133443695616836,
+      "wall_false_opening_rate": 0.1477578972972054
+    },
+    {
+      "teacher_epoch": 6,
+      "optimizer_steps": 918,
+      "miou": 0.24703376214101994,
+      "wall_iou": 0.7333557055751372,
+      "window_iou": 0.5099764825216353,
+      "door_iou": 0.20849270280219884,
+      "opening_iou": 0.5442041429338687,
+      "wall_false_opening_rate": 0.11744763586697057
+    },
+    {
+      "teacher_epoch": 7,
+      "optimizer_steps": 1071,
+      "miou": 0.2493947609546832,
+      "wall_iou": 0.7398680350106979,
+      "window_iou": 0.5177637550751073,
+      "door_iou": 0.21195703860565676,
+      "opening_iou": 0.5510918920491638,
+      "wall_false_opening_rate": 0.08994068795490295
+    },
+    {
+      "teacher_epoch": 8,
+      "optimizer_steps": 1224,
+      "miou": 0.2781474588230939,
+      "wall_iou": 0.746001675005047,
+      "window_iou": 0.5098479357018598,
+      "door_iou": 0.21430945952623753,
+      "opening_iou": 0.5569559628633635,
+      "wall_false_opening_rate": 0.10926917322666391
+    },
+    {
+      "teacher_epoch": 9,
+      "optimizer_steps": 1377,
+      "miou": 0.299548716850638,
+      "wall_iou": 0.7604119578972007,
+      "window_iou": 0.5491274121295997,
+      "door_iou": 0.22851680388676293,
+      "opening_iou": 0.5861421129322856,
+      "wall_false_opening_rate": 0.08991066096397445
+    },
+    {
+      "teacher_epoch": 10,
+      "optimizer_steps": 1530,
+      "miou": 0.31746646212227303,
+      "wall_iou": 0.7604614687614024,
+      "window_iou": 0.5409664146875481,
+      "door_iou": 0.1980013075558046,
+      "opening_iou": 0.5640359779206632,
+      "wall_false_opening_rate": 0.06653441021667572
+    },
+    {
+      "teacher_epoch": 11,
+      "optimizer_steps": 1683,
+      "miou": 0.29022743349916685,
+      "wall_iou": 0.7240579946993329,
+      "window_iou": 0.5111015285521725,
+      "door_iou": 0.2571990200124526,
+      "opening_iou": 0.5521321004663156,
+      "wall_false_opening_rate": 0.15749109080114396
+    },
+    {
+      "teacher_epoch": 12,
+      "optimizer_steps": 1836,
+      "miou": 0.3780383159790748,
+      "wall_iou": 0.7742460922384294,
+      "window_iou": 0.5328333375340304,
+      "door_iou": 0.25645444370962,
+      "opening_iou": 0.576078248850526,
+      "wall_false_opening_rate": 0.0974445759736093
+    },
+    {
+      "teacher_epoch": 13,
+      "optimizer_steps": 1989,
+      "miou": 0.3339664524077855,
+      "wall_iou": 0.7529203807116079,
+      "window_iou": 0.5337861595254247,
+      "door_iou": 0.26105896706894754,
+      "opening_iou": 0.5741138816819391,
+      "wall_false_opening_rate": 0.10748804838380913
+    },
+    {
+      "teacher_epoch": 14,
+      "optimizer_steps": 2142,
+      "miou": 0.3839690568112469,
+      "wall_iou": 0.7654794580588754,
+      "window_iou": 0.5338881800058892,
+      "door_iou": 0.25007438626951983,
+      "opening_iou": 0.5726887947744846,
+      "wall_false_opening_rate": 0.13642564737159768
+    },
+    {
+      "teacher_epoch": 15,
+      "optimizer_steps": 2295,
+      "miou": 0.4007064213182346,
+      "wall_iou": 0.754822870218033,
+      "window_iou": 0.5238452647882246,
+      "door_iou": 0.26861135030959116,
+      "opening_iou": 0.5679727082496459,
+      "wall_false_opening_rate": 0.1503870860425808
+    },
+    {
+      "teacher_epoch": 16,
+      "optimizer_steps": 2448,
+      "miou": 0.41821954926425015,
+      "wall_iou": 0.7753918472590363,
+      "window_iou": 0.5490062366506124,
+      "door_iou": 0.2415407196702794,
+      "opening_iou": 0.5956983621293731,
+      "wall_false_opening_rate": 0.11668456900226347
+    },
+    {
+      "teacher_epoch": 17,
+      "optimizer_steps": 2601,
+      "miou": 0.40659657775924,
+      "wall_iou": 0.7752316577300973,
+      "window_iou": 0.5343378577252277,
+      "door_iou": 0.25911366494858074,
+      "opening_iou": 0.5832756155850024,
+      "wall_false_opening_rate": 0.1213988065780399
+    },
+    {
+      "teacher_epoch": 18,
+      "optimizer_steps": 2754,
+      "miou": 0.4346870757071135,
+      "wall_iou": 0.7783126413121526,
+      "window_iou": 0.541349815341439,
+      "door_iou": 0.2328846839221277,
+      "opening_iou": 0.5879096415794265,
+      "wall_false_opening_rate": 0.12341077384321812
+    },
+    {
+      "teacher_epoch": 19,
+      "optimizer_steps": 2907,
+      "miou": 0.4331441365207726,
+      "wall_iou": 0.7882422788511403,
+      "window_iou": 0.5378206471775993,
+      "door_iou": 0.23193339396258544,
+      "opening_iou": 0.5974286784293295,
+      "wall_false_opening_rate": 0.09662622131608142
+    },
+    {
+      "teacher_epoch": 20,
+      "optimizer_steps": 3060,
+      "miou": 0.40559086166961716,
+      "wall_iou": 0.7891793484605899,
+      "window_iou": 0.580860642873293,
+      "door_iou": 0.2867635884706955,
+      "opening_iou": 0.6130481951675769,
+      "wall_false_opening_rate": 0.07909284170834831
+    },
+    {
+      "teacher_epoch": 21,
+      "optimizer_steps": 3213,
+      "miou": 0.4358677537199258,
+      "wall_iou": 0.791742022983362,
+      "window_iou": 0.5801312710262168,
+      "door_iou": 0.3070772147039063,
+      "opening_iou": 0.6132667516537407,
+      "wall_false_opening_rate": 0.0757436406725601
+    },
+    {
+      "teacher_epoch": 22,
+      "optimizer_steps": 3366,
+      "miou": 0.4384547733813453,
+      "wall_iou": 0.7978407154167416,
+      "window_iou": 0.57597784816344,
+      "door_iou": 0.26816779765576804,
+      "opening_iou": 0.613851278167072,
+      "wall_false_opening_rate": 0.07505730945133697
+    },
+    {
+      "teacher_epoch": 23,
+      "optimizer_steps": 3519,
+      "miou": 0.4685015902474581,
+      "wall_iou": 0.7940266477942373,
+      "window_iou": 0.5844517013324545,
+      "door_iou": 0.2602849696577701,
+      "opening_iou": 0.6226406303128944,
+      "wall_false_opening_rate": 0.10511512173561727
+    },
+    {
+      "teacher_epoch": 24,
+      "optimizer_steps": 3672,
+      "miou": 0.43282819032750214,
+      "wall_iou": 0.7766826430250326,
+      "window_iou": 0.5463815898383974,
+      "door_iou": 0.2855230583966881,
+      "opening_iou": 0.5936530227361534,
+      "wall_false_opening_rate": 0.13029966460327752
+    },
+    {
+      "teacher_epoch": 25,
+      "optimizer_steps": 3825,
+      "miou": 0.44935915005569754,
+      "wall_iou": 0.7912973206243235,
+      "window_iou": 0.5617172763090341,
+      "door_iou": 0.2556800907411305,
+      "opening_iou": 0.6067091731020249,
+      "wall_false_opening_rate": 0.12010256203314186
+    }
+  ]
+}

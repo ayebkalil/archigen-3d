@@ -1,6 +1,54 @@
 # Submission status — 16 November 2026
 
-**Version 2 submitted with a data-loader fix; currently awaiting GPU allocation.**
+**Version 2 executed; the trained teacher failed its declared precision gate.
+Full facade fine-tuning did not start. No quality-trained V3 facade export exists.**
+
+## Version 2 outcome
+
+- Complete data audit passed: **1224 training / 210 validation** examples,
+  239 genuine blank training crops at audit epoch zero, one unavailable material
+  reference explicitly preserved. No test images accessed.
+- GPU smoke passed again: two optimizer steps, 16 low-noise feedback
+  microbatches, export and fresh-process offloaded inference. Its weights are
+  smoke-only and are not an improved facade generator.
+- Full teacher completed **25 epochs / 3825 optimizer steps**. Total notebook
+  execution was about **70.5 minutes** including audit and smoke.
+- Selected teacher checkpoint: **epoch 21**. Scores on 100 CMP + 110 IRF
+  validation photos, used for checkpoint selection:
+
+| Gate | Selected score | Requirement | Result |
+|---|---:|---:|---|
+| Six-class mean IoU | 43.59% | >=30% | Pass |
+| Window/door union IoU | 61.33% | >=35% | Pass |
+| Door IoU | 30.71% | >=10% | Pass |
+| Real wall pixels classified as openings | 7.57% | <=5% | **Fail** |
+
+These are **auxiliary segmentation scores on real photographs**, not generated
+facade accuracy or photorealism. None of the 25 epochs met all gates; the
+lowest false-opening rate was **6.65%** at epoch 10. The run stopped with
+`Teacher failed the predeclared validation gate; diffusion training is blocked`.
+The 5% limit was not relaxed and no replacement training was automatically
+launched in response to the results question.
+
+Teacher weights were downloaded and SHA-256 verified in the ignored local
+`outputs/kaggle-v3-version2/facade-material-v3/teacher` directory. Their metadata,
+all 25 epoch metrics, and acceptance checks are preserved in
+[the result record](results/kaggle-version2-teacher-results.json).
+
+![Teacher learning curves and failed precision gate](results/teacher-training-curves.png)
+
+Portable histories were imported into the existing local facade MLflow DB:
+
+- Full teacher (failed acceptance): `2035db4a7e624e88806e1d5509e9e0e4`
+  (Kaggle source `749064adeff54f3b92f09e148c635e8e`).
+- Smoke teacher: `a3af1a6632c246ea9c3ee9cf5759770d`.
+- Smoke diffusion: `80d75cc860ba4d6b801cd0fb4bbc3b34`.
+
+Production and existing facade checkpoints remain unchanged. The next learned
+experiment must improve teacher wall/opening precision before using that
+teacher as diffusion feedback; a better overlap score alone is insufficient.
+
+## Earlier version 1 failure
 
 Version 1 did execute. Its GPU smoke passed two optimizer steps, 16 decoded
 feedback microbatches, export/checksum validation and fresh-process offloaded
@@ -21,7 +69,7 @@ No test image was opened. The full CMP+IRFs audit will run on Kaggle.
 Evidence: [local audit](results/local-cmp-reference-audit.json) and
 [version-1 failure record](results/kaggle-version1-failure.json).
 
-## Current submission
+## Submission provenance
 
 - Notebook: <https://www.kaggle.com/code/khalilayeb/archigen-facade-material10-feedback-v3-train>
 - Private version 2, source pinned to
@@ -49,16 +97,8 @@ Evidence: [local audit](results/local-cmp-reference-audit.json) and
 - Source compiles; no whitespace errors. Both production backends remain
   healthy. No production frontend, API default or existing model weights changed.
 
-## Pending evidence
+## Remaining evidence before promotion
 
-Version 2 has not yet produced execution logs or new training/quality results.
-Version 1's smoke results establish execution only, not improved facade quality.
-MLflow teacher/training run IDs will
-be created when execution starts; portable logs are included in the output
-bundles for later local import. A queued submission is not a successful GPU
-smoke test and does not establish improved results.
-
-After completion, inspect teacher gates, compare selection against step 0,
-review held-out buildings and blank-wall cases, then profile the export on the
-RTX3050 and test multiple house elevations. Only those checks can justify any
-production promotion.
+An accepted teacher, actual full facade fine-tuning, held-out building/blank-wall
+evaluation, and local RTX3050/multi-house tests are still required. The only
+diffusion weights produced so far are from the deliberately short smoke test.
