@@ -1,0 +1,35 @@
+{
+  "contract": {
+    "manifest_sha256": "615f4b08e53ab077cbaf534e9528c21533463389fd1731e76bc21d28fe7195e4",
+    "loader_sha256": "f9ec489d137902535a0ec622a897d216f8f04f675fded2857be96701397b5d26",
+    "crop_probability": 0.5,
+    "blank_probability": 0.2,
+    "epoch": 0
+  },
+  "splits": {
+    "train": {
+      "samples": 399,
+      "full_photo_references": 0,
+      "unavailable_references": 1,
+      "median_references": 46,
+      "blank_crops": 77
+    },
+    "val": {
+      "samples": 100,
+      "full_photo_references": 0,
+      "unavailable_references": 0,
+      "median_references": 3,
+      "blank_crops": 0
+    }
+  },
+  "test_split_accessed": false,
+  "reference_fallback_samples": [
+    {
+      "id": "CMP/train/242.jpg",
+      "split": "train",
+      "available": false,
+      "from_full_photo": false,
+      "external": false
+    }
+  ]
+}

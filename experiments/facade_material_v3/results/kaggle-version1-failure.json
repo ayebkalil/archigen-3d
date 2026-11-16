@@ -1,0 +1,20 @@
+{
+  "date_reviewed": "2026-11-16",
+  "notebook": "khalilayeb/archigen-facade-material10-feedback-v3-train",
+  "version": 1,
+  "source_commit": "47da048a98612267994b94d37d5f3c42fa4ae3bb",
+  "status": "ERROR",
+  "elapsed_seconds_approximately": 674,
+  "gpu_smoke_passed": true,
+  "smoke_optimizer_steps": 2,
+  "smoke_feedback_microbatches": 16,
+  "smoke_peak_allocated_mib": 11034.88818359375,
+  "smoke_export_reload_passed": true,
+  "smoke_bundle_sha256": "9285b0b98c0c8931cdda7ee14c092c006db82dd938c871b5499aac296dc8a4ab",
+  "failure_component": "full semantic teacher data loading",
+  "exception": "ValueError: No annotated wall pixels for material reference",
+  "full_teacher_completed_epochs": 0,
+  "full_facade_finetuning_started": false,
+  "quality_claim": false,
+  "diagnosis": "MaterialDataset required wall pixels in every selected crop. The local CMP audit found CMP/train/242.jpg has no wall reference in its full annotation, requiring explicit reference dropout rather than invented labels."
+}

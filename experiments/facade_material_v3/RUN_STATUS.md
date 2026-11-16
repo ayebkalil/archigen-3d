@@ -1,10 +1,31 @@
-# Submission status — 15 November 2026
+# Submission status — 16 November 2026
 
-**Submitted; awaiting Kaggle GPU allocation. Training has not started.**
+**Version 2 submitted with a data-loader fix; currently awaiting GPU allocation.**
+
+Version 1 did execute. Its GPU smoke passed two optimizer steps, 16 decoded
+feedback microbatches, export/checksum validation and fresh-process offloaded
+reload. The full teacher then failed before completing its first epoch with
+`ValueError: No annotated wall pixels for material reference`. Full facade
+fine-tuning therefore never started. This was a loader failure, not a failed
+teacher quality gate or a CUDA out-of-memory error.
+
+The loader now uses a wall reference from the same original photo when a crop
+has none. If the original annotation also contains no wall, it keeps the
+sample, marks the reference unavailable, zeros reference channels and excludes
+material loss. Independent references never borrow the target's material.
+A complete train/validation sample audit now runs before optimization.
+
+The real local CMP audit passed **399 eligible training + 100 validation
+images**, including `CMP/train/242.jpg`, whose reference is unavailable.
+No test image was opened. The full CMP+IRFs audit will run on Kaggle.
+Evidence: [local audit](results/local-cmp-reference-audit.json) and
+[version-1 failure record](results/kaggle-version1-failure.json).
+
+## Current submission
 
 - Notebook: <https://www.kaggle.com/code/khalilayeb/archigen-facade-material10-feedback-v3-train>
-- Private version 1, source pinned to
-  `47da048a98612267994b94d37d5f3c42fa4ae3bb` on
+- Private version 2, source pinned to
+  `e02099d6815424959beae6a195eb8e4522cb0e56` on
   `codex/facade-material-controlnet-v3`.
 - Requested GPU T4 x2; code uses one GPU. Runtime limit: six hours after
   allocation. Free quota was checked and pay-to-scale is disabled.
@@ -19,9 +40,9 @@
 
 ## Verified locally
 
-- **126 passed, 19 skipped** in the experiment worktree's complete Python suite.
+- **130 passed, 19 skipped** in the experiment worktree's complete Python suite.
   Skips are optional dependency/model/data checks unavailable in this checkout.
-- **10 passed** in the diffusion environment's V3-specific suite, including
+- **14 passed** in the diffusion environment's V3-specific suite, including
   actual material10 inference/export/reload, initial-response preservation,
   nonzero gradients through a real frozen VAE decoder, protected training
   splits, genuine wall-only crops, and failed-preflight execution gating.
@@ -30,8 +51,9 @@
 
 ## Pending evidence
 
-Kaggle has produced no execution logs, teacher scores, training losses, new
-quality metrics or trained V3 weights yet. MLflow teacher/training run IDs will
+Version 2 has not yet produced execution logs or new training/quality results.
+Version 1's smoke results establish execution only, not improved facade quality.
+MLflow teacher/training run IDs will
 be created when execution starts; portable logs are included in the output
 bundles for later local import. A queued submission is not a successful GPU
 smoke test and does not establish improved results.
