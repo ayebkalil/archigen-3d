@@ -1,7 +1,31 @@
 # Submission status — 16 November 2026
 
-**Version 2 executed; the trained teacher failed its declared precision gate.
-Full facade fine-tuning did not start. No quality-trained V3 facade export exists.**
+**Recovery submitted as Kaggle version 3 from commit `cd58f59`.
+The historical version-2 failure is preserved below.**
+
+## Version 3 recovery
+
+- Fixed inverse CE-class-cost correction on the exact epoch-21 teacher;
+  checksum-locked private recovery dataset attached. No gate was relaxed.
+- Local diagnostic on all 100 CMP validation photos: wall false-opening
+  rate **6.19% -> 3.19%**, opening union IoU **67.66% -> 66.95%**,
+  six-class mIoU **40.22% -> 44.82%**. These are detector selection metrics,
+  not generated-facade accuracy, and not an independent test.
+- Full combined CMP+IRF acceptance is checked on Kaggle before diffusion.
+  If correction fails, precision-focused warm-start fine-tuning is available;
+  failing teachers still block full diffusion training.
+- Private notebook version 3 submitted on 16 November:
+  [training run](https://www.kaggle.com/code/khalilayeb/archigen-facade-material10-feedback-v3-train).
+  Its staged path checks smoke, the original teacher gate, then up to
+  1500 real diffusion optimizer steps. Submission alone is not training completion.
+- Local suite: **143 passed, 11 skipped**. Production unchanged.
+- Step-zero exports cannot be installed as a new V3 model. Actual optimizer
+  progress and reference-kernel learning are logged; non-improving trained
+  candidates are retained with an explicit label.
+
+At submission, no claim is made that a quality-trained V3 export exists or that
+facade quality improved. Verify the run logs, trained selected step and validation
+images before making either claim.
 
 ## Version 2 outcome
 
