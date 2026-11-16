@@ -62,3 +62,14 @@ def test_recovery_dataset_is_attached_and_notebook_pins_immutable_source(tmp_pat
     notebook=json.loads((tmp_path/'train_facade_material.ipynb').read_text())
     code=''.join(''.join(c['source']) for c in notebook['cells'] if c['cell_type']=='code')
     assert 'a'*40 in code and 'MODE = "staged"' in code
+
+
+def test_installer_cannot_label_a_retained_initialization_as_new_training(tmp_path,monkeypatch):
+    import zipfile
+    from experiments.facade_material_v3 import manage
+    archive=tmp_path/'parent-only.zip'
+    with zipfile.ZipFile(archive,'w') as zipped:zipped.writestr('export/model.json','{}')
+    monkeypatch.setattr(manage,'validate_export',lambda root:{'selected_step':0})
+    with pytest.raises(ValueError,match='step-zero initialization'):
+        manage.install(archive,tmp_path/'installed')
+    assert not (tmp_path/'installed').exists()
