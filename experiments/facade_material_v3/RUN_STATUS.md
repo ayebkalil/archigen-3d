@@ -1,7 +1,8 @@
 # Submission status — 16 November 2026
 
-**Kaggle version 3 passed smoke and the unchanged teacher gate; full diffusion
-training has started from commit `cd58f59`. The previous failure is preserved below.**
+**Kaggle version 3 completed all 1500 updates; selected step 1000 and portable
+reload passed. See [completed results and actual images](COMPLETED_RESULTS.md).
+The recovery and earlier failures below are historical records.**
 
 ## Version 3 recovery
 

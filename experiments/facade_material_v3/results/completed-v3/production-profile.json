@@ -1,0 +1,29 @@
+{
+  "checkpoint": "generator_perceptual_ema_best.pth",
+  "sha256": "4d4ec134344564cd7af6c79864f204ff72129dff036c4788b740cf80a7a662bc",
+  "device": "NVIDIA GeForce RTX 3050 Laptop GPU",
+  "mode": "Native FP32 PyTorch CUDA, production PNG wrapper and default sharpening, no style finish",
+  "generator_parameters": 39147907,
+  "native_resolution": 256,
+  "architecture_sha256": "72bbb6a04fb7866cccfccb0099d57c43425d8876123b026197401fd034bef55a",
+  "bridge_sha256": "7c51162e66d58cd85f90566149da8921a7bce2e97a5c89f77f244daf19cf052a",
+  "checkpoint_bytes": 156600817,
+  "peak_torch_allocated_mib": 211.39599609375,
+  "cases": [
+    {
+      "id": "CMP/val/39.jpg",
+      "seconds": 0.021055600023828447,
+      "repeats": 3
+    },
+    {
+      "id": "CMP/val/19.jpg",
+      "seconds": 0.02125380001962185,
+      "repeats": 3
+    },
+    {
+      "id": "CMP/val/1.jpg",
+      "seconds": 0.021534100058488548,
+      "repeats": 3
+    }
+  ]
+}

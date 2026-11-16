@@ -1,9 +1,9 @@
 # Current local facade model versus the available Kaggle V3 export
 
 **Historical comparison, before the precision recovery.** Kaggle version 3 has
-since passed the teacher gate and begun actual full diffusion optimization;
-see [current run status](RUN_STATUS.md). The images and metrics below remain
-the original initialization comparison, not the result of that ongoing run.
+since completed actual full diffusion optimization and selected step 1000;
+see [completed results](COMPLETED_RESULTS.md). The images and metrics below remain
+the original initialization comparison, not the result of the completed run.
 
 16 November 2026 (before recovery). **No fully fine-tuned V3 facade generator was available.** The
 Kaggle smoke export selected **step 0**, retaining the trained V2 parent and

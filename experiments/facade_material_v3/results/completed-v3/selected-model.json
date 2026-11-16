@@ -1,0 +1,283 @@
+{
+  "schema_version": 3,
+  "architecture": "sd15_semantic10_material_lora_v3",
+  "config": {
+    "schema_version": 3,
+    "architecture": "sd15_semantic10_material_lora_v3",
+    "conditioning": "facade_semantic7_material_rgb_v3",
+    "base_model": "stable-diffusion-v1-5/stable-diffusion-v1-5",
+    "base_revision": "451f4fe16113bff5a5d2269ed5ad43b0592e9a14",
+    "parent_weights_sha256": "07c7eab625e775b88ca4f9a099f661b7e1dfe9decfbff5bbf648a218e0466d1f",
+    "parent_lora_sha256": "7fa979232a4a6e15037e006e3c7705865c76ad8755848409463532749e910830",
+    "resolution": 512,
+    "seed": 42,
+    "batch_size": 1,
+    "gradient_accumulation_steps": 8,
+    "max_train_steps": 1500,
+    "learning_rate": 5e-06,
+    "lora_learning_rate": 3e-06,
+    "unet_lora_rank": 8,
+    "warmup_steps": 75,
+    "max_grad_norm": 1.0,
+    "min_snr_gamma": 5.0,
+    "opening_loss_weight": 2.0,
+    "background_loss_weight": 0.15,
+    "blank_crop_probability": 0.2,
+    "strip_crop_probability": 0.5,
+    "feedback_max_timestep": 250,
+    "semantic_loss_weight": 0.1,
+    "false_opening_loss_weight": 0.2,
+    "material_loss_weight": 0.05,
+    "teacher_width": 24,
+    "teacher_epochs": 12,
+    "teacher_recovery_sha256": "989e72db00d170c71be4d2658bf011349d22e6820b8d8620564c635b2bc2d7bf",
+    "teacher_legacy_class_weights": [
+      0.2,
+      1,
+      3,
+      4,
+      1,
+      1
+    ],
+    "teacher_dice_weight": 0.25,
+    "teacher_hard_negative_weight": 0.5,
+    "teacher_batch_size": 8,
+    "teacher_lr": 0.0003,
+    "teacher_min_miou": 0.3,
+    "teacher_min_opening_iou": 0.35,
+    "teacher_min_door_iou": 0.1,
+    "teacher_max_wall_fp": 0.05,
+    "checkpoint_steps": 500,
+    "validation_steps": 500,
+    "keep_checkpoints": 1,
+    "inference_steps": 25,
+    "guidance_scale": 5.0,
+    "controlnet_conditioning_scale": 1.3,
+    "local_vram_budget_mib": 3500,
+    "experiment_name": "ArchiGen-Facade-Material10-Semantic-Feedback-V3",
+    "prompt": "Architectural facade surface, front elevation, wall finish matching the supplied material reference, clear glass within the marked windows, doors within marked door regions, realistic material texture, neutral diffuse light.",
+    "negative_prompt": "extra windows, extra doors, painted openings on a blank wall, plants added, trees, roof, street, people, cars, text, watermark, perspective, warped windows, blurry, drawing, cartoon",
+    "style_supervision": "No supervised four-style labels. Conditioning is an explicit material reference, not a learned four-class style switch."
+  },
+  "git_commit": "cd58f59ccd903611f33d7e72b8550d8985be418f",
+  "run_id": "8cd8f53cba554535961fde9a48188971",
+  "manifest_sha256": "d8068cb4a0547efeac30e0a84e7acfa4a685b9a421910b3363d4368825bfee13",
+  "teacher_sha256": "477e42d1bbad0bcb14d2943a23b945a1f7f45dffb8362e9f5e2ded7d2c099845",
+  "teacher_validation": {
+    "miou": 0.470530095578283,
+    "wall_iou": 0.8044204071996731,
+    "window_iou": 0.5605912925122684,
+    "door_iou": 0.2976713087406967,
+    "opening_iou": 0.5852581511552334,
+    "wall_false_opening_rate": 0.03934806795378131,
+    "class_iou": [
+      0.6548762866863851,
+      0.8044204071996731,
+      0.5605912925122684,
+      0.2976713087406967,
+      0.1851568493080629,
+      0.3204644290226122
+    ],
+    "confusion": [
+      [
+        424221,
+        172804,
+        3870,
+        362,
+        404,
+        314
+      ],
+      [
+        41983,
+        5959551,
+        216597,
+        31073,
+        39963,
+        5170
+      ],
+      [
+        1364,
+        521257,
+        1191127,
+        52039,
+        27106,
+        1933
+      ],
+      [
+        159,
+        84744,
+        34745,
+        88150,
+        251,
+        113
+      ],
+      [
+        1989,
+        260582,
+        63721,
+        2706,
+        90513,
+        303
+      ],
+      [
+        318,
+        74779,
+        11010,
+        1790,
+        1307,
+        45762
+      ]
+    ],
+    "by_source": {
+      "CMP": {
+        "miou": 0.44825166244909104,
+        "wall_iou": 0.8363438130990325,
+        "window_iou": 0.6471525442268604,
+        "door_iou": 0.3881476973402687,
+        "opening_iou": 0.6695031974110904,
+        "wall_false_opening_rate": 0.03190081741608404,
+        "class_iou": [
+          0.6136871226639385,
+          0.8363438130990325,
+          0.6471525442268604,
+          0.3881476973402687,
+          0.2041787973644463,
+          0.0
+        ],
+        "confusion": [
+          [
+            170362,
+            78150,
+            2917,
+            33,
+            259,
+            7
+          ],
+          [
+            24651,
+            3264740,
+            96197,
+            12995,
+            22436,
+            1840
+          ],
+          [
+            956,
+            225567,
+            721788,
+            22415,
+            9007,
+            455
+          ],
+          [
+            23,
+            17637,
+            10239,
+            40818,
+            40,
+            0
+          ],
+          [
+            246,
+            159373,
+            25788,
+            961,
+            55965,
+            23
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      "IRF": {
+        "miou": 0.4423459010997792,
+        "wall_iou": 0.7688658533140728,
+        "window_iou": 0.46494987319702014,
+        "door_iou": 0.2478491498709228,
+        "opening_iou": 0.49795905192531326,
+        "wall_false_opening_rate": 0.048225339006602176,
+        "class_iou": [
+          0.6857643766343224,
+          0.7688658533140728,
+          0.46494987319702014,
+          0.2478491498709228,
+          0.1608776839723023,
+          0.3257684696100346
+        ],
+        "confusion": [
+          [
+            253859,
+            94654,
+            953,
+            329,
+            145,
+            307
+          ],
+          [
+            17332,
+            2694811,
+            120400,
+            18078,
+            17527,
+            3330
+          ],
+          [
+            408,
+            295690,
+            469339,
+            29624,
+            18099,
+            1478
+          ],
+          [
+            136,
+            67107,
+            24506,
+            47332,
+            211,
+            113
+          ],
+          [
+            1743,
+            101209,
+            37933,
+            1745,
+            34548,
+            280
+          ],
+          [
+            318,
+            74779,
+            11010,
+            1790,
+            1307,
+            45762
+          ]
+        ]
+      }
+    }
+  },
+  "selected_step": 1000,
+  "initial_score": 0.5562944287937304,
+  "selected_score": 0.44678943535966636,
+  "improved_selection_score": true,
+  "selection": "Source-macro teacher opening consistency plus 0.25 target-reference-assisted LPIPS; teacher is not independent. Test untouched.",
+  "quality_status": "experimental trained V3; held-out and local house evaluation required",
+  "completed_optimizer_steps": 1500,
+  "weights_sha256": "d8365c3c045ee3f4028907bdcbe8a9f9e05aa430f770a94c131595555f4b48ed",
+  "lora_sha256": "88375e863323db4c27fa62c3a54f9ee37a8746fb0f86dbe83ccfaa73662ef17e",
+  "training_counts": {
+    "microbatches": 12008,
+    "feedback_microbatches": 3022,
+    "blank_crops": 2311,
+    "reference_fallbacks": 1615,
+    "reference_unavailable": 26,
+    "reference_full_photo": 0
+  }
+}

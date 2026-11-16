@@ -1,0 +1,12 @@
+{
+  "ten_channel_inference": true,
+  "teacher_required_for_inference": false,
+  "profile": {
+    "seconds": 30.626203104000524,
+    "peak_torch_allocated_mib": 913.9033203125,
+    "peak_torch_reserved_mib": 996.0,
+    "teacher_required_for_inference": false
+  },
+  "smoke_only": false,
+  "quality_claim": false
+}
