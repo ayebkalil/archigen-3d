@@ -81,10 +81,36 @@ must follow training before any production promotion.
 
 ## Training and tracking
 
+### Precision recovery (16 November)
+
+The previous full teacher failed the unchanged 5% wall false-opening gate.
+Its CE weights `[.2, 1, 3, 4, 1, 1]` inflate opening logits. Recovery attaches
+the exact epoch-21 checkpoint in the private `archigen-v3-teacher-recovery`
+dataset, checks both SHA-256 and the original manifest digest, and subtracts
+`log(class_weight)` from its output bias. This is a **fixed inverse training-cost
+correction**, not a threshold fitted to validation labels. Because the old
+objective also contained Dice, the correction is approximate: all 210 CMP/IRF
+validation photographs must still pass the original gate. Scores are model
+selection diagnostics, not independent test accuracy. Per-source scores are
+also retained. No threshold is loosened and test images remain unopened.
+
+If correction passes, reuse the corrected frozen teacher immediately. If it
+fails, fine-tune for up to 12 additional epochs using unweighted CE + .25 Dice
++ .5 explicit wall false-opening negative log likelihood. A passing checkpoint
+always takes precedence over one with higher recall but failing precision.
+Smoke still trains a fresh tiny teacher for two steps; it never tests quality.
+
+Diffusion logs actual optimizer progress and the new RGB-reference kernel norm.
+The bundle records both completed optimizer steps and selected step. If no
+trained checkpoint beats step 0, retain an explicitly **nonselected trained
+candidate** for research, label the default export `NO IMPROVEMENT`, and reject
+step-0 installation as a new V3 model. Full training cannot silently masquerade
+as a new model when only the V2 initialization was selected.
+
 First run smoke: two teacher optimizer steps and two diffusion optimizer steps,
 full low-noise feedback gradient path, validation, checkpoint, export, checksum
 validation, and offloaded inference in a fresh process. This tests execution,
-not quality. Full mode: at most 25 teacher epochs and 1500 diffusion optimizer
+not quality. Full mode: recovered teacher (or up to 12 further epochs) and 1500 diffusion optimizer
 steps, physical batch 1 / effective batch 8, FP16, gradient checkpointing and
 8-bit Adam. One Kaggle GPU is used; two T4 memories are not pooled. The laptop's
 3500 MiB budget applies to **offloaded inference**, not Kaggle training.
@@ -107,14 +133,14 @@ kaggle kernels push --path . --accelerator NvidiaTeslaT4
 
 Staging `--mode train` creates one **staged** notebook: smoke runs first in
 `facade-material-v3-smoke`, and full training starts only after successful smoke
-execution, checksum validation and offloaded reload. It then trains a fresh
-teacher and applies the declared quality gate. Smoke and full outputs and ZIPs
+execution, checksum validation and offloaded reload. It then recovers the
+checksummed teacher and applies the declared quality gate. Smoke and full outputs and ZIPs
 have distinct names; neither overwrites the other. This allows one queued GPU
 allocation to complete the workflow without another manual start.
 
 Notebooks are private,
-pin a full commit, and attach the existing private CMP dataset, original IRFs
-and completed V2 output. No credentials belong in the notebook or Git.
+pin a full commit, and attach the existing private CMP dataset, original IRFs,
+private teacher-recovery dataset and completed V2 output. No credentials belong in the notebook or Git.
 
 ## Laptop integration after evaluation
 

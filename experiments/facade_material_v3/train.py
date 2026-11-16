@@ -18,6 +18,7 @@ from .architecture import upgrade_material_conditioning,make_teacher
 from .data import MaterialDataset
 from .losses import predicted_clean,semantic_feedback,material_statistics
 from .validation import validation
+from .teacher import teacher_accepted
 
 
 def train(args):
@@ -42,7 +43,8 @@ def train(args):
     teacher_root=Path(args.teacher);teacher_meta=json.loads((teacher_root/'teacher.json').read_text())
     if teacher_meta['weights_sha256']!=digest(teacher_root/'teacher.safetensors') or teacher_meta['manifest_sha256']!=digest(Path(args.data)/'manifest.json'):
         raise ValueError('Teacher checksum or training/validation split mismatch')
-    if not args.smoke and (not teacher_meta.get('feedback_accepted') or teacher_meta['smoke_only']):
+    if not args.smoke and (not teacher_meta.get('feedback_accepted') or teacher_meta['smoke_only']
+            or not teacher_accepted(teacher_meta['validation'],config)):
         raise ValueError('A validated, quality-gated teacher is required')
     accelerator=Accelerator(gradient_accumulation_steps=config['gradient_accumulation_steps'],mixed_precision='fp16')
     if accelerator.num_processes!=1:raise ValueError('Single GPU process required')
@@ -104,6 +106,7 @@ def train(args):
         'reference_unavailable':0,'reference_full_photo':0}
     try:
         if not args.resume:
+            print('FULL DIFFUSION TRAINING STARTED' if not args.smoke else 'SMOKE DIFFUSION STARTED',flush=True)
             scores=validate(0);state['initial_score']=scores['val_selection_score'];select(scores,0)
         sums={};n=0
         while step<config['max_train_steps']:
@@ -150,6 +153,7 @@ def train(args):
                 metrics={k:v/n for k,v in sums.items()};sums={};n=0
                 metrics.update(learning_rate=lr_scheduler.get_last_lr()[0],peak_allocated_mib=torch.cuda.max_memory_allocated()/1024**2,
                     elapsed_seconds=time.perf_counter()-started,**counts)
+                metrics['reference_kernel_l2']=float(accelerator.unwrap_model(control).controlnet_cond_embedding.conv_in.weight[:,7:].detach().float().norm())
                 tracker.metrics(metrics,step);print(json.dumps({'step':step,**metrics}),flush=True)
                 if step%config['validation_steps']==0 or step==config['max_train_steps']:select(validate(step),step)
                 if step%config['checkpoint_steps']==0 or step==config['max_train_steps']:
@@ -169,10 +173,28 @@ def train(args):
             'run_id':tracker.run_id,'manifest_sha256':contract['manifest_sha256'],'teacher_sha256':contract['teacher_sha256'],
             'teacher_validation':teacher_meta['validation'],'selected_step':state['best_step'],'initial_score':state['initial_score'],'selected_score':state['best_score'],
             'improved_selection_score':state['best_step']!=0,'selection':'Source-macro teacher opening consistency plus 0.25 target-reference-assisted LPIPS; teacher is not independent. Test untouched.',
-            'quality_status':'SMOKE ONLY; not quality trained' if args.smoke else 'experimental; held-out and local house evaluation required',
+            'quality_status':('SMOKE ONLY; not quality trained' if args.smoke else
+                'NO IMPROVEMENT; retained V2 initialization, not a trained V3 upgrade' if state['best_step']==0 else
+                'experimental trained V3; held-out and local house evaluation required'),
+            'completed_optimizer_steps':step,
             'weights_sha256':digest(output/'export/controlnet/diffusion_pytorch_model.safetensors'),
             'lora_sha256':digest(output/'export/lora/facade_lora.safetensors'),'training_counts':counts}
-        write_json(output/'export/model.json',metadata);tracker.artifact(output/'export/model.json','model');tracker.finish()
+        write_json(output/'export/model.json',metadata);tracker.artifact(output/'export/model.json','model')
+        if not args.smoke and state['best_step']==0:
+            # Keep a genuine trained candidate for diagnosis instead of silently
+            # distributing the untouched parent as the outcome of full training.
+            latest=output/'trained-candidate'
+            accelerator.unwrap_model(control).to(dtype=torch.float16).save_pretrained(latest/'controlnet',safe_serialization=True)
+            save_lora(unet,latest/'lora')
+            candidate={**metadata,'selected_step':step,'improved_selection_score':False,
+                'quality_status':'EXPERIMENTAL NONSELECTED trained candidate; failed to improve validation selection',
+                'weights_sha256':digest(latest/'controlnet/diffusion_pytorch_model.safetensors'),
+                'lora_sha256':digest(latest/'lora/facade_lora.safetensors')}
+            write_json(latest/'model.json',candidate)
+            tracker.artifact(latest/'model.json','nonselected-candidate')
+        print('DIFFUSION TRAINING FINISHED: '+json.dumps({'completed_optimizer_steps':step,
+            'selected_step':state['best_step'],'improved_selection_score':state['best_step']!=0}),flush=True)
+        tracker.finish()
     except BaseException:
         tracker.finish('FAILED');raise
     finally:accelerator.end_training()

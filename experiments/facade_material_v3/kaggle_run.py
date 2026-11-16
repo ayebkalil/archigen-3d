@@ -22,7 +22,7 @@ def run_staged(work):
         raise RuntimeError('Smoke completion contract failed; full training was not started')
     write_json(work/'v3-preflight-passed.json',{'smoke_passed':True,'weights_sha256':metadata['weights_sha256'],
         'training_run_id':metadata['run_id'],'reload_check':check})
-    print('PREFLIGHT PASSED; starting quality-gated full teacher and diffusion training',flush=True)
+    print('PREFLIGHT PASSED; starting quality-gated teacher recovery and full diffusion training',flush=True)
     subprocess.run([sys.executable,'-m','experiments.facade_material_v3.kaggle_run','--mode','train'],check=True)
 
 
@@ -49,9 +49,14 @@ def main():
     shutil.copyfile(material_audit,output/'material-reference-audit.json')
     for name in ('manifest.json','audit.json','ATTRIBUTION.md','irf-credits.json'):shutil.copyfile(root/name,output/name)
     (output/'requirements-freeze.txt').write_text(subprocess.check_output([sys.executable,'-m','pip','freeze'],text=True))
+    recovery = [p.parent for p in inputs.rglob('teacher.safetensors')
+        if digest(p)==config['teacher_recovery_sha256']]
+    if args.mode=='train' and len(recovery)!=1:
+        raise ValueError('Attach exactly one checksummed V3 teacher recovery dataset')
     for module,extra in [('teacher',[]),('train',['--parent',str(parents[0]),'--teacher',str(output/'teacher')])]:
         command=[sys.executable,'-m','experiments.facade_material_v3.'+module,'--data',str(root),'--output',str(output/'teacher' if module=='teacher' else output),*extra]
         if args.mode=='smoke':command.append('--smoke')
+        elif module=='teacher':command.extend(['--initialize-from',str(recovery[0])])
         subprocess.run(command,check=True)
     validate_export(output/'export',allow_smoke=args.mode=='smoke')
     # Separate process releases optimizer/base residency before portable offloaded inference.
@@ -70,7 +75,7 @@ print('EXPORT RELOAD PASSED: material10 + existing LoRA, no teacher needed at in
 '''.replace('/kaggle/working/facade-material-v3',str(output)).replace('SMOKE',str(args.mode=='smoke'))
     subprocess.run([sys.executable,'-c',reload_code],check=True)
     archive=work/('archigen-facade-material-v3-smoke-model-and-mlflow.zip' if args.mode=='smoke' else 'archigen-facade-material-v3-model-and-mlflow.zip')
-    paths=['export','teacher','validation','portable-artifacts','tracking-events.jsonl','tracking-run.json',
+    paths=['export','trained-candidate','teacher','validation','portable-artifacts','tracking-events.jsonl','tracking-run.json',
         'requirements-freeze.txt','config.json','contract.json','teacher.json','reload-check.json','export-reloaded.png',
         'manifest.json','audit.json','material-reference-audit.json','ATTRIBUTION.md','irf-credits.json']
     with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=3) as zipped:

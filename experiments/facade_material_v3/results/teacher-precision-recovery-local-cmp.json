@@ -1,0 +1,137 @@
+{
+  "protocol": "Fixed inverse original CE weights [0.2,1,3,4,1,1]; not fitted on validation labels. Evaluate all 100 CMP validation photographs at teacher resolution 256. Original teacher trained/selected on CMP+IRF; these are model-selection diagnostics, not independent test accuracy. No IRF photos in this local diagnostic. No test photos read.",
+  "source_teacher_sha256": "989e72db00d170c71be4d2658bf011349d22e6820b8d8620564c635b2bc2d7bf",
+  "full_combined_acceptance_verified": false,
+  "raw": {
+    "miou": 0.4021746507021015,
+    "wall_iou": 0.8205204347792435,
+    "window_iou": 0.6500420796935885,
+    "door_iou": 0.3838961740333823,
+    "opening_iou": 0.6765679712795585,
+    "wall_false_opening_rate": 0.06190030030451152,
+    "class_iou": [
+      0.38103651805972893,
+      0.8205204347792435,
+      0.6500420796935885,
+      0.3838961740333823,
+      0.1775526976466659,
+      0.0
+    ],
+    "confusion": [
+      [
+        99417,
+        144130,
+        7726,
+        167,
+        281,
+        7
+      ],
+      [
+        8947,
+        3180329,
+        191014,
+        20862,
+        19873,
+        1834
+      ],
+      [
+        232,
+        146368,
+        801745,
+        27520,
+        3961,
+        362
+      ],
+      [
+        0,
+        10580,
+        12681,
+        45494,
+        2,
+        0
+      ],
+      [
+        5,
+        152053,
+        41765,
+        1200,
+        47313,
+        20
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "inverse_training_weights": {
+    "miou": 0.44823430275324977,
+    "wall_iou": 0.8363365659680088,
+    "window_iou": 0.6471468482814025,
+    "door_iou": 0.38817734926928527,
+    "opening_iou": 0.6695037467135753,
+    "wall_false_opening_rate": 0.031903154643530454,
+    "class_iou": [
+      0.6135487589610576,
+      0.8363365659680088,
+      0.6471468482814025,
+      0.38817734926928527,
+      0.20419629403974476,
+      0.0
+    ],
+    "confusion": [
+      [
+        170315,
+        78196,
+        2917,
+        33,
+        260,
+        7
+      ],
+      [
+        24638,
+        3264746,
+        96200,
+        13000,
+        22436,
+        1839
+      ],
+      [
+        955,
+        225570,
+        721781,
+        22420,
+        9007,
+        455
+      ],
+      [
+        23,
+        17631,
+        10238,
+        40825,
+        40,
+        0
+      ],
+      [
+        246,
+        159371,
+        25785,
+        961,
+        55970,
+        23
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  }
+}

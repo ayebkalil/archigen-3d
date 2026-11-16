@@ -28,7 +28,8 @@ def stage_kernel(output,commit=None,mode='smoke'):
         'title':'ArchiGen Facade Material10 Feedback V3 '+mode.title(),
         'code_file':'train_facade_material.ipynb','language':'python','kernel_type':'notebook',
         'is_private':True,'enable_gpu':True,'enable_internet':True,
-        'dataset_sources':['khalilayeb/archigen-cmp-facades-original-locked-splits','liushuyuu/irregular-facades-irfs'],
+        'dataset_sources':['khalilayeb/archigen-cmp-facades-original-locked-splits','liushuyuu/irregular-facades-irfs',
+            'khalilayeb/archigen-v3-teacher-recovery'],
         'kernel_sources':['khalilayeb/archigen-facade-semantic7-lora-v2-train'],'competition_sources':[],'model_sources':[]}
     write_json(output/'kernel-metadata.json',metadata)
     write_json(output/'source-pin.json',{'commit':commit,'branch':'codex/facade-material-controlnet-v3','mode':mode,'execution_mode':execution_mode})
@@ -46,6 +47,8 @@ def install(archive,destination,tracking_uri=None):
                     raise ValueError('Unsafe archive path or link')
             zipped.extractall(root)
         metadata=validate_export(root/'export')
+        if metadata.get('selected_step',0)==0:
+            raise ValueError('No improved trained checkpoint was selected; step-zero initialization is not a new V3 model')
         destination.parent.mkdir(parents=True,exist_ok=True);shutil.copytree(root,destination)
     ids=[]
     if tracking_uri:
