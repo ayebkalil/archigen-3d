@@ -1,7 +1,7 @@
 # Submission status — 16 November 2026
 
-**Recovery submitted as Kaggle version 3 from commit `cd58f59`.
-The historical version-2 failure is preserved below.**
+**Kaggle version 3 passed smoke and the unchanged teacher gate; full diffusion
+training has started from commit `cd58f59`. The previous failure is preserved below.**
 
 ## Version 3 recovery
 
@@ -11,21 +11,40 @@ The historical version-2 failure is preserved below.**
   rate **6.19% -> 3.19%**, opening union IoU **67.66% -> 66.95%**,
   six-class mIoU **40.22% -> 44.82%**. These are detector selection metrics,
   not generated-facade accuracy, and not an independent test.
-- Full combined CMP+IRF acceptance is checked on Kaggle before diffusion.
-  If correction fails, precision-focused warm-start fine-tuning is available;
-  failing teachers still block full diffusion training.
+- Combined CMP+IRF acceptance **passed** on Kaggle. No further teacher fitting
+  was needed; the corrected teacher is frozen for diffusion feedback.
 - Private notebook version 3 submitted on 16 November:
   [training run](https://www.kaggle.com/code/khalilayeb/archigen-facade-material10-feedback-v3-train).
   Its staged path checks smoke, the original teacher gate, then up to
   1500 real diffusion optimizer steps. Submission alone is not training completion.
-- Local suite: **143 passed, 11 skipped**. Production unchanged.
+- Local suite: **144 passed, 11 skipped**. Production unchanged.
 - Step-zero exports cannot be installed as a new V3 model. Actual optimizer
   progress and reference-kernel learning are logged; non-improving trained
   candidates are retained with an explicit label.
 
-At submission, no claim is made that a quality-trained V3 export exists or that
-facade quality improved. Verify the run logs, trained selected step and validation
-images before making either claim.
+| Teacher diagnostic (210 validation photos) | Old | Corrected | Gate |
+|---|---:|---:|---:|
+| Six-class mean IoU | 43.59% | 47.05% | >=30% |
+| Window/door union IoU | 61.33% | 58.53% | >=35% |
+| Door IoU | 30.71% | 29.77% | >=10% |
+| Wall false-opening rate | 7.57% | 3.93% | <=5% |
+
+Per-source false-opening rates: **CMP 3.19%, IRF 4.82%**. Both sources also
+exceed the other overlap thresholds. Precision improved with a small opening
+overlap tradeoff; no claim of uniformly better segmentation is made. These
+selection scores evaluate real photographs, **not generated facade quality**.
+
+Smoke completed two real updates, selected step 2 and passed portable export
+plus fresh-process offloaded reload. The full run then passed the teacher gate
+and completed **at least 8 real diffusion optimizer updates / 64 microbatches**.
+The new reference kernel L2 norm grew from zero to **1.919e-5**. Kaggle peak
+Torch allocation was **11035.7 MiB** on its 16 GB T4 (the laptop limit concerns
+offloaded inference, not this training allocation). This confirms actual
+optimization beyond smoke; it does not establish improved generated images.
+The full run continues toward 1500 updates with MLflow histories and checkpoints.
+Its trained selected step and final images are still pending. There is no
+completed quality-trained V3 export at this point.
+Evidence: [version-3 record](results/kaggle-version3-recovery.json).
 
 ## Version 2 outcome
 
